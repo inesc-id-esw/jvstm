@@ -1,3 +1,6 @@
+
+import jvstm.*;
+
 public class CFOCounter implements Counter {
     private VBox<Long> count = new VBox<Long>(0L);
 
@@ -7,7 +10,7 @@ public class CFOCounter implements Counter {
         }
     };
 
-    public @Atomic void inc() {
+    public void inc() {
         toAdd.put(toAdd.get() + 1);
     }
 
