@@ -102,7 +102,6 @@ abstract class ReadWriteTransaction extends Transaction {
         T value = getPerTxValue(box);
         if (value == null) {
             value = initial;
-            perTxValues.put(box, value);
         }
 
         return value;
