@@ -1,13 +1,14 @@
 package jvstm;
 
-class NestedTransaction extends Transaction {
+class NestedTransaction extends ReadWriteTransaction {
 
-    NestedTransaction(Transaction parent) {
+    NestedTransaction(ReadWriteTransaction parent) {
         super(parent);
     }
 
     protected void tryCommit() {
-        getParent().bodiesRead.putAll(bodiesRead);
-        getParent().bodiesWritten.putAll(bodiesWritten);
+        getRWParent().bodiesRead.putAll(bodiesRead);
+        getRWParent().bodiesWritten.putAll(bodiesWritten);
+        getRWParent().perTxValues.putAll(perTxValues);
     }
 }

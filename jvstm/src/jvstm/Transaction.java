@@ -1,12 +1,22 @@
 package jvstm;
 
-import java.util.Map;
-import java.util.IdentityHashMap;
+public abstract class Transaction implements Comparable<Transaction> {
 
-public abstract class Transaction {
     private static int commited = 0;
 
+    protected static final ActiveTransactionQueue ACTIVE_TXS = new ActiveTransactionQueue();
+
     protected static final ThreadLocal<Transaction> current = new ThreadLocal<Transaction>();
+
+    private static TransactionFactory TRANSACTION_FACTORY = new TransactionFactory() {
+	    public Transaction makeTopLevelTransaction(int txNumber) {
+		return new TopLevelTransaction(txNumber);
+	    }
+	};
+
+    public static void setTransactionFactory(TransactionFactory factory) {
+	TRANSACTION_FACTORY = factory;
+    }
 
     public static Transaction current() {
         return current.get();
@@ -20,56 +30,49 @@ public abstract class Transaction {
         commited = Math.max(number, commited);
     }
 
-    public static Transaction beginReadOnly() {
-        Transaction currentTx = current.get();
-        if (currentTx != null) {
-            throw new Error("Can't have non top-level read-only txs");
-        }
-        Transaction tx = new ReadTransaction(getCommitted());
-        current.set(tx);
-        return tx;
+    public static void addTxQueueListener(TxQueueListener listener) {
+	ACTIVE_TXS.addListener(listener);
     }
 
     public static Transaction begin() {
-        return begin(-1);
-    }
-
-    protected static Transaction begin(int txNumber) {
         Transaction parent = current.get();
         Transaction tx = null;
-        if (parent == null) {
-            int num = ((txNumber == -1) ? getCommitted() : txNumber);
-            tx = new TopLevelTransaction(num);
-        } else {
-            tx = new NestedTransaction(parent);
-        }        
-        current.set(tx);
+
+	// we need to synchronize on the queue to inhibit the queue clean-up because we 
+	// don't want that a transaction that commits between we get the last committed number 
+	// and we add the new transaction cleans up the version number that we got before 
+	// the new transaction is added to the queue
+	synchronized (ACTIVE_TXS) {
+	    if (parent == null) {
+		tx = TRANSACTION_FACTORY.makeTopLevelTransaction(getCommitted());
+	    } else {
+		tx = parent.makeNestedTransaction();
+	    }
+	    current.set(tx);
+	    ACTIVE_TXS.add(tx);
+	}
         return tx;
     }
 
+
     public static void abort() {
-        current.set(current.get().getParent());
+	current.get().finish();
     }
 
-    public static int commit() {
+    public static void commit() {
         Transaction tx = current.get();
-        tx.tryCommit();
-        current.set(tx.getParent());
-        return tx.getNumber();
+        tx.doCommit();
+	tx.finish();
     }
 
-    public static Transaction checkpoint() {
-        int txNumber = commit();
-        return begin(txNumber);
+    public static void checkpoint() {
+        Transaction tx = current.get();
+        tx.doCommit();
     }
 
     protected int number;
     protected Transaction parent;
-
-    protected Map<VBox,VBoxBody> bodiesRead = new IdentityHashMap<VBox,VBoxBody>();
-    protected Map<VBox,VBoxBody> bodiesWritten = new IdentityHashMap<VBox,VBoxBody>();
-
-    protected Map<PerTxBox,PerTxBoxBody> perTxBodies = new IdentityHashMap<PerTxBox,PerTxBoxBody>();
+    protected boolean finished = false;
 
     
     public Transaction(int number) {
@@ -93,66 +96,44 @@ public abstract class Transaction {
         this.number = number;
     }
 
-    protected void renumber(int number) {
-	setNumber(number);
+    public int compareTo(Transaction o) {
+	return (this.getNumber() - o.getNumber());
     }
 
-    <T> PerTxBoxBody<T> getPerTxBody(PerTxBox<T> box, T initial) {
-        PerTxBoxBody<T> body = (PerTxBoxBody<T>)perTxBodies.get(box);
-        if (body == null) {
-            body = new PerTxBoxBody<T>(initial);
-            perTxBodies.put(box, body);
-        }
-
-        return body;
+    protected void renumber(int txNumber) {
+	// To keep the queue ordered, we have to remove and reinsert the TX when it is renumbered
+	ACTIVE_TXS.renumberTransaction(this, txNumber);
     }
 
-
-    <T> void register(VBox<T> vbox, VBoxBody<T> body) {
-        bodiesWritten.put(vbox, body);
+    public boolean isFinished() {
+	return finished;
     }
 
-    protected <T> VBoxBody<T> getBodyWritten(VBox<T> vbox) {
-        VBoxBody<T> body = bodiesWritten.get(vbox);
-        if ((body == null) && (parent != null)) {
-            body = parent.getBodyWritten(vbox);
-        }
-        
-        return body;
+    protected void finish() {
+	this.finished = true;
+        current.set(this.getParent());
+	// the eventual setCommitted was already done, then we may clean-up
+	ACTIVE_TXS.noteTxFinished(this);
     }
 
-    protected <T> VBoxBody<T> getBodyRead(VBox<T> vbox) {
-        VBoxBody<T> body = bodiesRead.get(vbox);
-        if ((body == null) && (parent != null)) {
-            body = parent.getBodyRead(vbox);
-        }
-        
-        return body;
+    protected void gcTransaction() {
+	// by default, do nothing
     }
 
-    <T> VBoxBody<T> getBodyForRead(VBox<T> vbox) {
-        VBoxBody<T> body = getBodyWritten(vbox);
-        if (body == null) {
-            body = getBodyRead(vbox);
-        }
-        if (body == null) {
-            body = vbox.body.getBody(number);
-            bodiesRead.put(vbox, body);
-        }
-        return body;
-    }
+    abstract Transaction makeNestedTransaction();
 
-    <T> VBoxBody<T> getBodyForWrite(VBox<T> vbox) {
-        VBoxBody<T> body = (VBoxBody<T>)bodiesWritten.get(vbox);
-        if (body == null) {
-            body = vbox.makeNewBody();
-            register(vbox, body);
-        }
+    abstract <T> void register(VBox<T> vbox, VBoxBody<T> body);
 
-        return body;
-    }
+    abstract <T> VBoxBody<T> getBodyForRead(VBox<T> vbox);
+
+    abstract <T> VBoxBody<T> getBodyForWrite(VBox<T> vbox);
     
-    protected abstract void tryCommit();
+    abstract <T> T getPerTxValue(PerTxBox<T> box, T initial);
+
+    abstract <T> void setPerTxValue(PerTxBox<T> box, T value);
+
+    protected abstract void doCommit();
+
 
     public static void transactionallyDo(TransactionalCommand command) {
         while (true) {

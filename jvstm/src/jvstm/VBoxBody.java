@@ -6,5 +6,7 @@ public abstract class VBoxBody<E> {
     
     public abstract VBoxBody<E> getBody(int maxVersion);
 
-    public abstract void commit(VBoxBody<E> previous);
+    public abstract void setPrevious(VBoxBody<E> previous);
+
+    public abstract void clearPrevious();
 }

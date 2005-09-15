@@ -52,4 +52,9 @@ public class VBox<E> {
     public VBoxBody<E> makeNewBody() {
 	return new MultiVersionBoxBody<E>();
     }
+
+    public void commit(VBoxBody<E> newBody) {
+	newBody.setPrevious(this.body);
+	this.body = newBody;
+    }
 }

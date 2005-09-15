@@ -1,9 +1,13 @@
 package jvstm;
 
+import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 
-public class TopLevelTransaction extends Transaction {
+public class TopLevelTransaction extends ReadWriteTransaction {
     private static final Object COMMIT_LOCK = new Object();
+
+    protected List<VBoxBody> bodiesCommitted = null;
 
     public TopLevelTransaction(int number) {
         super(number);
@@ -17,7 +21,7 @@ public class TopLevelTransaction extends Transaction {
         if (isWriteTransaction()) {
             synchronized (COMMIT_LOCK) {
 		if (validateCommit()) {
-		    performValidCommit();
+		    setCommitted(performValidCommit());
 		} else {
 		    throw new CommitException();
 		}
@@ -25,17 +29,17 @@ public class TopLevelTransaction extends Transaction {
         }
     }
 
-    protected void performValidCommit() {
+    protected int performValidCommit() {
 	int newTxNumber = getCommitted() + 1;
         
 	// renumber the TX to the new number
 	renumber(newTxNumber);
-	for (Map.Entry<PerTxBox,PerTxBoxBody> entry : perTxBodies.entrySet()) {
-	    entry.getKey().commit(entry.getValue().value);
+	for (Map.Entry<PerTxBox,Object> entry : perTxValues.entrySet()) {
+	    entry.getKey().commit(entry.getValue());
 	}
 	
 	doCommit(newTxNumber);
-	setCommitted(newTxNumber);
+	return newTxNumber;
     }
 
     protected boolean validateCommit() {
@@ -53,8 +57,25 @@ public class TopLevelTransaction extends Transaction {
             VBoxBody body = entry.getValue();
 
             body.version = newTxNumber;
-	    body.commit(vbox.body);
-	    vbox.body = body;
+	    vbox.commit(body);
         }
+
+	// save them for future GC
+	if (bodiesCommitted == null) {
+	    bodiesCommitted = new ArrayList<VBoxBody>(bodiesWritten.values());
+	} else {
+	    bodiesCommitted.addAll(bodiesWritten.values());
+	}
+    }
+
+    protected void gcTransaction() {
+	if (bodiesCommitted != null) {
+	    // clean old versions of committed bodies
+	    for (VBoxBody body : bodiesCommitted) {
+		body.clearPrevious();
+	    }
+	    
+	    bodiesCommitted = null;
+	}
     }
 }

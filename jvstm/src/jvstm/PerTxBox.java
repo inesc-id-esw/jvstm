@@ -7,24 +7,27 @@ public class PerTxBox<E> {
         this.initial = initial;
     }
 
-    private PerTxBoxBody<E> getBody() {
+    public E get() {
         Transaction tx = Transaction.current();
         if (tx == null) {
             tx = Transaction.begin();
-            PerTxBoxBody<E> result = tx.getPerTxBody(this, initial);
+            E result = tx.getPerTxValue(this, initial);
             tx.commit();
             return result;
         } else {
-            return tx.getPerTxBody(this, initial);
+            return tx.getPerTxValue(this, initial);
         }
     }
 
-    public E get() {
-        return getBody().value;
-    }
-
     public void put(E newE) {
-        getBody().value = newE;
+        Transaction tx = Transaction.current();
+        if (tx == null) {
+            tx = Transaction.begin();
+            tx.setPerTxValue(this, newE);
+            tx.commit();
+        } else {
+            tx.setPerTxValue(this, newE);
+        }
     }
 
     public void commit(E value) {

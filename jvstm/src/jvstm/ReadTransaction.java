@@ -6,6 +6,14 @@ class ReadTransaction extends Transaction {
         super(number);
     }
 
+    ReadTransaction(Transaction parent) {
+	super(parent);
+    }
+
+    Transaction makeNestedTransaction() {
+	return new ReadTransaction(this);
+    }
+
     <T> void register(VBox<T> vbox, VBoxBody<T> body) {
         throw new WriteOnReadException();
     }
@@ -18,7 +26,15 @@ class ReadTransaction extends Transaction {
         throw new WriteOnReadException();
     }
 
-    protected void tryCommit() {
+    <T> T getPerTxValue(PerTxBox<T> box, T initial) {
+	return initial;
+    }
+    
+    <T> void setPerTxValue(PerTxBox<T> box, T value) {
+        throw new WriteOnReadException();
+    }
+
+    protected void doCommit() {
         // do nothing
     }
 }
