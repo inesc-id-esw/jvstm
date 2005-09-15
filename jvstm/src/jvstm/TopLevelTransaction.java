@@ -14,7 +14,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
     }
 
     protected boolean isWriteTransaction() {
-	return (! bodiesWritten.isEmpty());
+	return (! bodiesWritten.isEmpty()) || (! perTxValues.isEmpty());
     }
 
     protected void tryCommit() {
