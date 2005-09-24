@@ -19,7 +19,7 @@ abstract class ReadWriteTransaction extends Transaction {
         super(parent);
     }
 
-    Transaction makeNestedTransaction() {
+    protected Transaction makeNestedTransaction() {
 	return new NestedTransaction(this);
     }
 
@@ -46,7 +46,7 @@ abstract class ReadWriteTransaction extends Transaction {
     protected abstract void tryCommit();
 
 
-    <T> void register(VBox<T> vbox, VBoxBody<T> body) {
+    protected <T> void register(VBox<T> vbox, VBoxBody<T> body) {
         bodiesWritten.put(vbox, body);
     }
 
@@ -68,7 +68,7 @@ abstract class ReadWriteTransaction extends Transaction {
         return body;
     }
 
-    <T> VBoxBody<T> getBodyForRead(VBox<T> vbox) {
+    protected <T> VBoxBody<T> getBodyForRead(VBox<T> vbox) {
         VBoxBody<T> body = getBodyWritten(vbox);
         if (body == null) {
             body = getBodyRead(vbox);
@@ -80,7 +80,7 @@ abstract class ReadWriteTransaction extends Transaction {
         return body;
     }
 
-    <T> VBoxBody<T> getBodyForWrite(VBox<T> vbox) {
+    protected <T> VBoxBody<T> getBodyForWrite(VBox<T> vbox) {
         VBoxBody<T> body = (VBoxBody<T>)bodiesWritten.get(vbox);
         if (body == null) {
             body = vbox.makeNewBody();
@@ -98,7 +98,7 @@ abstract class ReadWriteTransaction extends Transaction {
 	return value;
     }
 
-    <T> T getPerTxValue(PerTxBox<T> box, T initial) {
+    protected <T> T getPerTxValue(PerTxBox<T> box, T initial) {
         T value = getPerTxValue(box);
         if (value == null) {
             value = initial;
@@ -107,7 +107,7 @@ abstract class ReadWriteTransaction extends Transaction {
         return value;
     }
 
-    <T> void setPerTxValue(PerTxBox<T> box, T value) {
+    protected <T> void setPerTxValue(PerTxBox<T> box, T value) {
 	perTxValues.put(box, value);
     }
 }

@@ -120,17 +120,17 @@ public abstract class Transaction implements Comparable<Transaction> {
 	// by default, do nothing
     }
 
-    abstract Transaction makeNestedTransaction();
+    protected abstract Transaction makeNestedTransaction();
 
-    abstract <T> void register(VBox<T> vbox, VBoxBody<T> body);
+    protected abstract <T> void register(VBox<T> vbox, VBoxBody<T> body);
 
-    abstract <T> VBoxBody<T> getBodyForRead(VBox<T> vbox);
+    protected abstract <T> VBoxBody<T> getBodyForRead(VBox<T> vbox);
 
-    abstract <T> VBoxBody<T> getBodyForWrite(VBox<T> vbox);
+    protected abstract <T> VBoxBody<T> getBodyForWrite(VBox<T> vbox);
     
-    abstract <T> T getPerTxValue(PerTxBox<T> box, T initial);
+    protected abstract <T> T getPerTxValue(PerTxBox<T> box, T initial);
 
-    abstract <T> void setPerTxValue(PerTxBox<T> box, T value);
+    protected abstract <T> void setPerTxValue(PerTxBox<T> box, T value);
 
     protected abstract void doCommit();
 
