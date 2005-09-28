@@ -4,6 +4,7 @@
   <property name="src.dir" location="src"/>
   <property name="build.dir" location="classes"/>
   <property name="dist.dir" location="dist"/>
+  <property name="lib.dir" location="lib"/>
   <property name="jar.file" value="${dist.dir}/jvstm.jar"/>
 
 
@@ -14,7 +15,7 @@
 
   <target name="compile" description="Compiles the jvstm source">
     <mkdir dir="${build.dir}"/>
-    <javac srcdir="${src.dir}" destdir="${build.dir}" debug="on"/>
+    <javac srcdir="${src.dir}" destdir="${build.dir}" extdirs="${lib.dir}" debug="on"/>
   </target>
 
   <target name="jar" depends="compile" description="Generates the jar with the jvstm">
