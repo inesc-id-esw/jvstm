@@ -1,3 +1,5 @@
+import jvstm.*;
+
 class VAccount implements Account {
     private VBox<Long> balance = new VBox<Long>();
 
@@ -6,11 +8,11 @@ class VAccount implements Account {
     }
 
     public long getBalance() {
-        return balance.getValue();
+        return balance.get();
     }
 
     void setBalance(long newBalance) {
-        this.balance.setValue(newBalance);
+        this.balance.put(newBalance);
     }
 
     public @Atomic void withdraw(long amount) {
