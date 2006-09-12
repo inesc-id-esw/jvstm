@@ -1,9 +1,9 @@
-
+import jvstm.*;
 
 public class TestNested {
 
     static void showBox(VBox box) {
-        System.out.println("Value for box " + box + " -> " + box.getValue());
+        System.out.println("Value for box " + box + " -> " + box.get());
     }
 
 
@@ -12,8 +12,8 @@ public class TestNested {
                 public void doIt() {
                     final VBox<Long> b1 = new VBox<Long>();
                     final VBox<Long> b2 = new VBox<Long>();
-                    b1.setValue(1L);
-                    b2.setValue(2L);
+                    b1.put(1L);
+                    b2.put(2L);
                     
                     showBox(b1);
                     showBox(b2);
@@ -24,8 +24,8 @@ public class TestNested {
                                     try {
                                         Transaction.transactionallyDo(new TransactionalCommand() {
                                                 public void doIt() {
-                                                    b1.setValue(b1.getValue() + 3);
-                                                    b2.setValue(b2.getValue() + 6);
+                                                    b1.put(b1.get() + 3);
+                                                    b2.put(b2.get() + 6);
                                                     throw new Error("Some");
                                                 }
                                             });
@@ -36,8 +36,8 @@ public class TestNested {
                                     
                                     Transaction.transactionallyDo(new TransactionalCommand() {
                                             public void doIt() {
-                                                b1.setValue(b1.getValue() + 3);
-                                                b2.setValue(b2.getValue() + 6);
+                                                b1.put(b1.get() + 3);
+                                                b2.put(b2.get() + 6);
                                             }
                                         });
                                     
