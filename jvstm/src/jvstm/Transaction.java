@@ -27,6 +27,8 @@ package jvstm;
 
 public abstract class Transaction implements Comparable<Transaction> {
 
+    private enum TxState { RUNNING, COMMITING, FINISHED }
+
     private static int commited = 0;
 
     protected static final ActiveTransactionQueue ACTIVE_TXS = new ActiveTransactionQueue();
@@ -81,13 +83,15 @@ public abstract class Transaction implements Comparable<Transaction> {
 
 
     public static void abort() {
-	current.get().finish();
+	Transaction tx = current.get();
+        tx.abortTx();
+        current.set(tx.getParent());
     }
 
     public static void commit() {
-        Transaction tx = current.get();
-        tx.doCommit();
-	tx.finish();
+	Transaction tx = current.get();
+        tx.commitTx();
+        current.set(tx.getParent());
     }
 
     public static void checkpoint() {
@@ -95,10 +99,16 @@ public abstract class Transaction implements Comparable<Transaction> {
         tx.doCommit();
     }
 
+    public static void setTimeout(long millis) {
+        Transaction tx = current.get();
+        tx.setTimeoutMillis(millis);        
+    }
+
     protected int number;
     protected Transaction parent;
-    protected boolean finished = false;
-
+    protected TxState state = TxState.RUNNING;
+    protected Thread thread = Thread.currentThread();
+    protected long timeoutAfterMillis = -1;
     
     public Transaction(int number) {
         this.number = number;
@@ -107,6 +117,14 @@ public abstract class Transaction implements Comparable<Transaction> {
     public Transaction(Transaction parent) {
         this(parent.getNumber());
         this.parent = parent;
+    }
+
+    public void setTimeoutMillis(long millis) {
+        timeoutAfterMillis = (millis == -1) ? -1 : System.currentTimeMillis() + millis;
+    }
+
+    public Thread getThread() {
+        return thread;
     }
 
     protected Transaction getParent() {
@@ -130,13 +148,57 @@ public abstract class Transaction implements Comparable<Transaction> {
 	ACTIVE_TXS.renumberTransaction(this, txNumber);
     }
 
-    public boolean isFinished() {
-	return finished;
+    protected void abortTx() {
+        boolean callFinish = false;
+        synchronized (this) {
+            if (state == TxState.RUNNING) {
+                state = TxState.FINISHED;
+                callFinish = true;
+            }
+        }
+        if (callFinish) {
+            finish();
+        }
+    }
+
+    protected void commitTx() {
+        synchronized (this) {
+            if (state == TxState.RUNNING) {
+                state = TxState.COMMITING;
+            } else {
+                throw new Error("Cannot commit a transaction that is not running anymore");
+            }
+        }
+
+        try {
+            doCommit();
+
+            synchronized (this) {
+                state = TxState.FINISHED;
+            }
+        } finally {
+            synchronized (this) {
+                // If an exception ocurred during the commit revert
+                // the state back to RUNNING so that a posterior abort
+                // properly finishes the transaction
+                if (state == TxState.COMMITING) {
+                    state = TxState.RUNNING;
+                }
+            }
+        }
+
+        finish();
+    }
+
+    synchronized boolean isFinished() {
+        return state == TxState.FINISHED;
+    }
+
+    boolean hasPassedTimeout() {
+        return (timeoutAfterMillis > 0) && (System.currentTimeMillis() > timeoutAfterMillis);
     }
 
     protected void finish() {
-	this.finished = true;
-        current.set(this.getParent());
 	// the eventual setCommitted was already done, then we may clean-up
 	ACTIVE_TXS.noteTxFinished(this);
     }

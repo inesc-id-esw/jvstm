@@ -120,11 +120,35 @@ public class ActiveTransactionQueue {
 
 
     protected synchronized void cleanOldTransactions() throws InterruptedException {
-	while (txs.isEmpty() || (! txs.peek().isFinished())) {
+	while (txs.isEmpty()) {
 	    wait();
 	}
 
+        // is not empty now...
 	Transaction oldestTx = txs.peek();
+
+	while (! oldestTx.isFinished()) {
+            Thread txThread = oldestTx.getThread();
+
+            if (! txThread.isAlive()) {
+                System.out.println("Aborting a transaction with a dead thread.");
+                oldestTx.abortTx();
+            } else if (oldestTx.hasPassedTimeout()) {
+                System.out.println("Dumping stack for thread with a timedout transaction and aborting that transaction...");
+                Throwable t = new Throwable();
+                t.setStackTrace(txThread.getStackTrace());
+                t.printStackTrace();
+                oldestTx.abortTx();
+            } else {
+                wait();
+                // after the wait, the peek may return a different
+                // value because of renumbering of transactions.  So,
+                // update the value of the variable oldestTx
+                oldestTx = txs.peek();
+            }
+            //debug("cleanOldTransactions alive");
+	}
+
 	int newOldest = oldestTx.getNumber();
 	while ((oldestTx != null) && oldestTx.isFinished()) {
 	    txs.poll();

@@ -29,8 +29,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
 
+import java.util.concurrent.locks.ReentrantLock;
+
+
 public class TopLevelTransaction extends ReadWriteTransaction {
-    private static final Object COMMIT_LOCK = new Object();
+    private static final ReentrantLock COMMIT_LOCK = new ReentrantLock(true);
 
     protected List<VBoxBody> bodiesCommitted = null;
 
@@ -44,12 +47,15 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 
     protected void tryCommit() {
         if (isWriteTransaction()) {
-            synchronized (COMMIT_LOCK) {
+            COMMIT_LOCK.lock();
+            try {
 		if (validateCommit()) {
 		    setCommitted(performValidCommit());
 		} else {
 		    throw new CommitException();
 		}
+            } finally {
+                COMMIT_LOCK.unlock();
             }
         }
     }
