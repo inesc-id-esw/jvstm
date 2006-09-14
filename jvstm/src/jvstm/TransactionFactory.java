@@ -27,4 +27,5 @@ package jvstm;
 
 public interface TransactionFactory {
     Transaction makeTopLevelTransaction(int txNumber);
+    Transaction makeReadOnlyTopLevelTransaction(int txNumber);
 }

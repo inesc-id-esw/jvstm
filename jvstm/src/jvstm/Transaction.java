@@ -39,6 +39,9 @@ public abstract class Transaction implements Comparable<Transaction> {
 	    public Transaction makeTopLevelTransaction(int txNumber) {
 		return new TopLevelTransaction(txNumber);
 	    }
+            public Transaction makeReadOnlyTopLevelTransaction(int txNumber) {
+                return new ReadTransaction(txNumber);
+            }
 	};
 
     public static void setTransactionFactory(TransactionFactory factory) {
@@ -62,6 +65,10 @@ public abstract class Transaction implements Comparable<Transaction> {
     }
 
     public static Transaction begin() {
+        return begin(false);
+    }
+
+    public static Transaction begin(boolean readOnly) {
         Transaction parent = current.get();
         Transaction tx = null;
 
@@ -71,7 +78,11 @@ public abstract class Transaction implements Comparable<Transaction> {
 	// the new transaction is added to the queue
 	synchronized (ACTIVE_TXS) {
 	    if (parent == null) {
-		tx = TRANSACTION_FACTORY.makeTopLevelTransaction(getCommitted());
+                if (readOnly) {
+                    tx = TRANSACTION_FACTORY.makeReadOnlyTopLevelTransaction(getCommitted());
+                } else {
+                    tx = TRANSACTION_FACTORY.makeTopLevelTransaction(getCommitted());
+                }
 	    } else {
 		tx = parent.makeNestedTransaction();
 	    }
