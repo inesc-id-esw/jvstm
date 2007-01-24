@@ -33,7 +33,7 @@ public class VBox<E> {
     }
     
     public VBox(E initial) {
-        VBoxBody<E> body = makeNewBody();
+        VBoxBody<E> body = VBoxBody.makeNewBody();
         body.value = initial;
 
         Transaction tx = Transaction.current();
@@ -72,10 +72,6 @@ public class VBox<E> {
         } else {
             tx.getBodyForWrite(this).value = newE;            
         }
-    }
-
-    public VBoxBody<E> makeNewBody() {
-	return new MultiVersionBoxBody<E>();
     }
 
     public void commit(VBoxBody<E> newBody) {

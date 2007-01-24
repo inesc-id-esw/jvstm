@@ -108,7 +108,7 @@ abstract class ReadWriteTransaction extends Transaction {
     protected <T> VBoxBody<T> getBodyForWrite(VBox<T> vbox) {
         VBoxBody<T> body = (VBoxBody<T>)bodiesWritten.get(vbox);
         if (body == null) {
-            body = vbox.makeNewBody();
+            body = VBoxBody.makeNewBody();
             register(vbox, body);
         }
 
