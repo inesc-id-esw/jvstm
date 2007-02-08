@@ -31,27 +31,39 @@ import java.util.List;
 import java.util.Queue;
 import java.util.PriorityQueue;
 
+import java.util.concurrent.locks.ReentrantLock;
+
 public class ActiveTransactionQueue {
+    private static final long MONITORING_SLEEP_INTERVAL = 10 * 1000;
+    private static final long REPORT_LONG_TRANSACTION_THRESHOLD = 120 * 1000;
+
+    public final ReentrantLock LOCK = new ReentrantLock(true);
+
     protected Queue<Transaction> txs = new PriorityQueue<Transaction>();
+
+    // used for reporting long-running transactions
+    protected Transaction previousTransaction = null;
+    protected long firstNoticedTime = 0;
 
     protected int previousOldestTxNumber = 0;
     protected List<TxQueueListener> listeners = new ArrayList<TxQueueListener>();
 
     ActiveTransactionQueue() {
-	Thread gcThread = new Thread() {
-		public void run() {
-		    try {
-			while (true) {
-			    cleanOldTransactions();
-			}
-		    } catch (InterruptedException ie) {
-			// die silently...
-		    }
-		}
-	    };
+ 	Thread monitorThread = new Thread() {
+ 		public void run() {
+                    while (true) {
+                        try {
+                            monitorQueue();
+                            sleep(MONITORING_SLEEP_INTERVAL);
+                        } catch (Throwable t) {
+                            // ignore all errors, so that the thread never dies
+                        }
+                    }
+ 		}
+ 	    };
 
-	gcThread.setDaemon(true);
-	gcThread.start();
+ 	monitorThread.setDaemon(true);
+ 	monitorThread.start();
     }
 
     public void addListener(TxQueueListener listener) {
@@ -79,90 +91,143 @@ public class ActiveTransactionQueue {
 	}
     }
 
-    public synchronized void add(Transaction tx) {
-	txs.offer(tx);
+    public void add(Transaction tx) {
+        LOCK.lock();
+        try {
+            txs.offer(tx);
+        } finally {
+            LOCK.unlock();
+        }
     }
 
-    public synchronized int getQueueSize() {
-	return txs.size();
+    public int getQueueSize() {
+        LOCK.lock();
+        try {
+            return txs.size();
+        } finally {
+            LOCK.unlock();
+        }
     }
 
-    public synchronized int getOldestTxNumber() {
-	return (txs.isEmpty() ? Transaction.getCommitted() : txs.peek().getNumber());
+    public int getOldestTxNumber() {
+        LOCK.lock();
+        try {
+            return (txs.isEmpty() ? Transaction.getCommitted() : txs.peek().getNumber());
+        } finally {
+            LOCK.unlock();
+        }
     }
 
-    public synchronized Transaction getOldestTx() {
-	return txs.peek();
+    public Transaction getOldestTx() {
+        LOCK.lock();
+        try {
+            return txs.peek();
+        } finally {
+            LOCK.unlock();
+        }
     }
 
-    public synchronized void renumberTransaction(Transaction tx, int txNumber) {
-	// First remove
-	// The following does not work because the remove(Object) removes the first element 
-	// that comparesTo == 0 to the argument, rather than the element == to the argument
-	//txs.remove(tx);
-	for (Iterator iter = txs.iterator(); iter.hasNext(); ) {
-	    if (iter.next() == tx) {
-		iter.remove();
-		break;
-	    }
-	}
-
-	// renumber
-	tx.setNumber(txNumber);
-
-	// add again
-	txs.offer(tx);
-    }
-
-    public synchronized void noteTxFinished(Transaction tx) {
-	notifyAll();
-    }
-
-
-    protected synchronized void cleanOldTransactions() throws InterruptedException {
-	while (txs.isEmpty()) {
-	    wait();
-	}
-
-        // is not empty now...
-	Transaction oldestTx = txs.peek();
-
-	while (! oldestTx.isFinished()) {
-            Thread txThread = oldestTx.getThread();
-
-            if (! txThread.isAlive()) {
-                System.out.println("Aborting a transaction with a dead thread.");
-                oldestTx.abortTx();
-            } else if (oldestTx.hasPassedTimeout()) {
-                System.out.println("Dumping stack for thread with a timedout transaction and aborting that transaction...");
-                Throwable t = new Throwable();
-                t.setStackTrace(txThread.getStackTrace());
-                t.printStackTrace();
-                oldestTx.abortTx();
-            } else {
-                wait();
-                // after the wait, the peek may return a different
-                // value because of renumbering of transactions.  So,
-                // update the value of the variable oldestTx
-                oldestTx = txs.peek();
+    public void renumberTransaction(Transaction tx, int txNumber) {
+        LOCK.lock();
+        try {
+            // First remove
+            // The following does not work because the remove(Object) removes the first element 
+            // that comparesTo == 0 to the argument, rather than the element == to the argument
+            //txs.remove(tx);
+            for (Iterator iter = txs.iterator(); iter.hasNext(); ) {
+                if (iter.next() == tx) {
+                    iter.remove();
+                    break;
+                }
             }
-            //debug("cleanOldTransactions alive");
-	}
 
-	int newOldest = oldestTx.getNumber();
-	while ((oldestTx != null) && oldestTx.isFinished()) {
-	    txs.poll();
-	    oldestTx.gcTransaction();
-	    oldestTx = txs.peek();
-	    if (oldestTx != null) {
-		newOldest = oldestTx.getNumber();
-	    }
-	}
+            // renumber
+            tx.setNumber(txNumber);
 
-	if (previousOldestTxNumber != newOldest) {
-	    notifyListeners(previousOldestTxNumber, newOldest);
-	}
+            // add again
+            txs.offer(tx);
+        } finally {
+            LOCK.unlock();
+        }
+    }
 
-	previousOldestTxNumber = newOldest;
+    public void noteTxFinished(Transaction tx) {
+        cleanOldTransactions();
+    }
+
+
+    protected void cleanOldTransactions() {
+        LOCK.lock();
+        try {
+            Transaction oldestTx = txs.peek();
+
+            int newOldest = previousOldestTxNumber;
+
+            while (oldestTx != null) {
+                newOldest = oldestTx.getNumber();
+                if (mayRemoveTransaction(oldestTx)) {
+                    oldestTx.gcTransaction();
+                    txs.poll();
+                    oldestTx = txs.peek();
+                } else {
+                    oldestTx = null;
+                }
+            }
+
+            if (previousOldestTxNumber != newOldest) {
+                notifyListeners(previousOldestTxNumber, newOldest);
+                previousOldestTxNumber = newOldest;
+            }
+        } finally {
+            LOCK.unlock();
+        }
+    }
+
+    private static boolean mayRemoveTransaction(Transaction tx) {
+        if (tx.isFinished()) {
+            return true;
+        }
+
+        if (! tx.getThread().isAlive()) {
+            // if the tx's thread is no longer alive, then the tx will never finish
+            System.out.println("JVSTM: Discarding a transaction with a dead thread.");
+            return true;
+        }
+
+        return false;
+    }
+
+    
+    protected void monitorQueue() {
+        LOCK.lock();
+        try {
+            Transaction oldestTx = txs.peek();
+
+            if (oldestTx != null) {
+                long currentTime = System.currentTimeMillis();
+
+                if (previousTransaction == oldestTx) {
+                    long txTime = currentTime - firstNoticedTime;
+                    if (txTime > REPORT_LONG_TRANSACTION_THRESHOLD) {
+                        Thread txThread = oldestTx.getThread();
+                        // the tx may have finished meanwhile...
+                        if (txThread != null) {
+                            Throwable t = new Throwable("JVSTM: Found a long-running transaction (" + txTime + "ms)");
+                            t.setStackTrace(txThread.getStackTrace());
+                            // and, even if it did not finished above, it may have now...
+                            // in that case, don't print the stack trace
+                            if (oldestTx.getThread() == txThread) {
+                                t.printStackTrace();
+                            }
+                        }
+                    }
+                } else {
+                    previousTransaction = oldestTx;
+                    firstNoticedTime = currentTime;
+                }
+            }
+        } finally {
+            LOCK.unlock();
+        }
     }
 }

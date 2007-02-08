@@ -25,9 +25,11 @@
  */
 package jvstm;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 public abstract class Transaction implements Comparable<Transaction> {
 
-    private enum TxState { RUNNING, COMMITING, FINISHED }
+    // static part starts here
 
     private static int commited = 0;
 
@@ -68,15 +70,24 @@ public abstract class Transaction implements Comparable<Transaction> {
         return begin(false);
     }
 
+    static int maxQSize = 0;
+
     public static Transaction begin(boolean readOnly) {
         Transaction parent = current.get();
         Transaction tx = null;
 
-	// we need to synchronize on the queue to inhibit the queue clean-up because we 
+	// we need to synchronize on the queue LOCK to inhibit the queue clean-up because we 
 	// don't want that a transaction that commits between we get the last committed number 
 	// and we add the new transaction cleans up the version number that we got before 
 	// the new transaction is added to the queue
-	synchronized (ACTIVE_TXS) {
+        ACTIVE_TXS.LOCK.lock();
+        try {
+            int qSize = ACTIVE_TXS.getQueueSize() % 10;
+            if (qSize > maxQSize) {
+                maxQSize = qSize;
+                System.out.printf("# active transactions max is %d\n", maxQSize * 10);
+            }
+
 	    if (parent == null) {
                 if (readOnly) {
                     tx = TRANSACTION_FACTORY.makeReadOnlyTopLevelTransaction(getCommitted());
@@ -88,7 +99,10 @@ public abstract class Transaction implements Comparable<Transaction> {
 	    }
 	    current.set(tx);
 	    ACTIVE_TXS.add(tx);
-	}
+	} finally {
+            ACTIVE_TXS.LOCK.unlock();
+        }
+
         return tx;
     }
 
@@ -96,30 +110,22 @@ public abstract class Transaction implements Comparable<Transaction> {
     public static void abort() {
 	Transaction tx = current.get();
         tx.abortTx();
-        current.set(tx.getParent());
     }
 
     public static void commit() {
 	Transaction tx = current.get();
-        tx.commitTx();
-        current.set(tx.getParent());
+        tx.commitTx(true);
     }
 
     public static void checkpoint() {
         Transaction tx = current.get();
-        tx.doCommit();
-    }
-
-    public static void setTimeout(long millis) {
-        Transaction tx = current.get();
-        tx.setTimeoutMillis(millis);        
+        tx.commitTx(false);
     }
 
     protected int number;
     protected Transaction parent;
-    protected TxState state = TxState.RUNNING;
-    protected Thread thread = Thread.currentThread();
-    protected long timeoutAfterMillis = -1;
+    protected boolean finished = false;
+    protected volatile Thread thread = Thread.currentThread();
     
     public Transaction(int number) {
         this.number = number;
@@ -128,10 +134,6 @@ public abstract class Transaction implements Comparable<Transaction> {
     public Transaction(Transaction parent) {
         this(parent.getNumber());
         this.parent = parent;
-    }
-
-    public void setTimeoutMillis(long millis) {
-        timeoutAfterMillis = (millis == -1) ? -1 : System.currentTimeMillis() + millis;
     }
 
     public Thread getThread() {
@@ -160,58 +162,43 @@ public abstract class Transaction implements Comparable<Transaction> {
     }
 
     protected void abortTx() {
-        boolean callFinish = false;
-        synchronized (this) {
-            if (state == TxState.RUNNING) {
-                state = TxState.FINISHED;
-                callFinish = true;
-            }
-        }
-        if (callFinish) {
-            finish();
+        finishTx();
+    }
+
+    protected void commitTx(boolean finishAlso) {
+        doCommit();
+
+        if (finishAlso) {
+            finishTx();
         }
     }
 
-    protected void commitTx() {
-        synchronized (this) {
-            if (state == TxState.RUNNING) {
-                state = TxState.COMMITING;
-            } else {
-                throw new Error("Cannot commit a transaction that is not running anymore");
-            }
-        }
-
-        try {
-            doCommit();
-
-            synchronized (this) {
-                state = TxState.FINISHED;
-            }
-        } finally {
-            synchronized (this) {
-                // If an exception ocurred during the commit revert
-                // the state back to RUNNING so that a posterior abort
-                // properly finishes the transaction
-                if (state == TxState.COMMITING) {
-                    state = TxState.RUNNING;
-                }
-            }
+    private void finishTx() {
+        // ensure that this method is called only by the thread "owning" the transaction, 
+        // because, otherwise, we may not set the current ThreadLocal variable of the correct thread
+        if (Thread.currentThread() != this.thread) {
+            throw new Error("ERROR: Cannot finish a transaction from another thread than the one running it");
         }
 
         finish();
+
+        current.set(this.getParent());
+
+        // clean up the reference to the thread
+        this.thread = null;
+
+        this.finished = true;
+
+	// notify the active transaction's queue so that it may clean up
+	ACTIVE_TXS.noteTxFinished(this);
     }
 
-    synchronized boolean isFinished() {
-        return state == TxState.FINISHED;
-    }
-
-    boolean hasPassedTimeout() {
-        return (timeoutAfterMillis > 0) && (System.currentTimeMillis() > timeoutAfterMillis);
+    public boolean isFinished() {
+        return finished;
     }
 
     protected void finish() {
-	// the eventual setCommitted was already done, then we may clean-up
-	ACTIVE_TXS.noteTxFinished(this);
+        // intentionally empty
     }
 
     protected void gcTransaction() {
