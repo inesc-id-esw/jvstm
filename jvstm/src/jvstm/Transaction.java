@@ -82,7 +82,7 @@ public abstract class Transaction implements Comparable<Transaction> {
 	// the new transaction is added to the queue
         ACTIVE_TXS.LOCK.lock();
         try {
-            int qSize = ACTIVE_TXS.getQueueSize() % 10;
+            int qSize = ACTIVE_TXS.getQueueSize() / 10;
             if (qSize > maxQSize) {
                 maxQSize = qSize;
                 System.out.printf("# active transactions max is %d\n", maxQSize * 10);
