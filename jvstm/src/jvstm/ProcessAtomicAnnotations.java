@@ -291,7 +291,7 @@ public class ProcessAtomicAnnotations {
 		mv.visitTryCatchBlock(l1, l2, l7, null);
 		mv.visitTryCatchBlock(l4, l5, l7, null);
 		mv.visitTryCatchBlock(l7, l8, l7, null);
-		mv.visitMaxs(boolVarPos, boolVarPos + 2 + (2 * retSize));
+		mv.visitMaxs(Math.max(boolVarPos, retSize), boolVarPos + 2 + (2 * retSize));
 		mv.visitEnd();
 	    }
         }
