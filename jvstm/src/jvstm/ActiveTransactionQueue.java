@@ -34,36 +34,19 @@ import java.util.PriorityQueue;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class ActiveTransactionQueue {
-    private static final long MONITORING_SLEEP_INTERVAL = 10 * 1000;
-    private static final long REPORT_LONG_TRANSACTION_THRESHOLD = 120 * 1000;
-
     public final ReentrantLock LOCK = new ReentrantLock(true);
 
     protected Queue<Transaction> txs = new PriorityQueue<Transaction>();
-
-    // used for reporting long-running transactions
-    protected Transaction previousTransaction = null;
-    protected long firstNoticedTime = 0;
 
     protected int previousOldestTxNumber = 0;
     protected List<TxQueueListener> listeners = new ArrayList<TxQueueListener>();
 
     ActiveTransactionQueue() {
- 	Thread monitorThread = new Thread() {
- 		public void run() {
-                    while (true) {
-                        try {
-                            monitorQueue();
-                            sleep(MONITORING_SLEEP_INTERVAL);
-                        } catch (Throwable t) {
-                            // ignore all errors, so that the thread never dies
-                        }
-                    }
- 		}
- 	    };
+    }
 
- 	monitorThread.setDaemon(true);
- 	monitorThread.start();
+    public void startMonitoringQueue(long monitoringSleepInterval, long longTransactionThreshold) {
+        Thread monitorThread = new MonitorQueueThread(monitoringSleepInterval, longTransactionThreshold);
+        monitorThread.start();
     }
 
     public void addListener(TxQueueListener listener) {
@@ -196,39 +179,75 @@ public class ActiveTransactionQueue {
         }
 
         return false;
-    }
+    }    
 
-    
-    protected void monitorQueue() {
-        LOCK.lock();
-        try {
-            Transaction oldestTx = txs.peek();
+    public class MonitorQueueThread extends Thread {
+        private long monitoringSleepInterval;
+        private long longTransactionThreshold;
 
-            if (oldestTx != null) {
-                long currentTime = System.currentTimeMillis();
+        private Transaction previousTransaction = null;
+        private long firstNoticedTime = 0;
 
-                if (previousTransaction == oldestTx) {
-                    long txTime = currentTime - firstNoticedTime;
-                    if (txTime > REPORT_LONG_TRANSACTION_THRESHOLD) {
-                        Thread txThread = oldestTx.getThread();
-                        // the tx may have finished meanwhile...
-                        if (txThread != null) {
-                            Throwable t = new Throwable("JVSTM: Found a long-running transaction (" + txTime + "ms)");
-                            t.setStackTrace(txThread.getStackTrace());
-                            // and, even if it did not finished above, it may have now...
-                            // in that case, don't print the stack trace
-                            if (oldestTx.getThread() == txThread) {
-                                t.printStackTrace();
-                            }
-                        }
-                    }
-                } else {
-                    previousTransaction = oldestTx;
-                    firstNoticedTime = currentTime;
+        private volatile Thread monitor = this;
+
+
+        MonitorQueueThread(long monitoringSleepInterval, long longTransactionThreshold) {
+            this.monitoringSleepInterval = monitoringSleepInterval;
+            this.longTransactionThreshold = longTransactionThreshold;
+            setDaemon(true);
+        }
+
+        public void stopMonitoring() {
+            Thread monitorThread = monitor;
+            monitor = null;
+            if (monitorThread != null) {
+                monitorThread.interrupt();
+            }
+        }
+
+        public void run() {
+            while (monitor != null) {
+                try {
+                    monitorQueue();
+                    sleep(monitoringSleepInterval);
+                } catch (Throwable t) {
+                    // ignore all errors, so that the thread never dies
+                    // unless, it was explicitly stopped by the stopMonitoring
                 }
             }
-        } finally {
-            LOCK.unlock();
+        }
+
+        protected void monitorQueue() {
+            LOCK.lock();
+            try {
+                Transaction oldestTx = txs.peek();
+
+                if (oldestTx != null) {
+                    long currentTime = System.currentTimeMillis();
+
+                    if (previousTransaction == oldestTx) {
+                        long txTime = currentTime - firstNoticedTime;
+                        if (txTime > longTransactionThreshold) {
+                            Thread txThread = oldestTx.getThread();
+                            // the tx may have finished meanwhile...
+                            if (txThread != null) {
+                                Throwable t = new Throwable("JVSTM: Found a long-running transaction (" + txTime + "ms)");
+                                t.setStackTrace(txThread.getStackTrace());
+                                // and, even if it did not finished above, it may have now...
+                                // in that case, don't print the stack trace
+                                if (oldestTx.getThread() == txThread) {
+                                    t.printStackTrace();
+                                }
+                            }
+                        }
+                    } else {
+                        previousTransaction = oldestTx;
+                        firstNoticedTime = currentTime;
+                    }
+                }
+            } finally {
+                LOCK.unlock();
+            }
         }
     }
 }
