@@ -124,7 +124,7 @@ public abstract class Transaction implements Comparable<Transaction> {
 
     protected int number;
     protected Transaction parent;
-    protected boolean finished = false;
+    protected volatile boolean finished = false;
     protected volatile Thread thread = Thread.currentThread();
     
     public Transaction(int number) {
@@ -184,10 +184,10 @@ public abstract class Transaction implements Comparable<Transaction> {
 
         current.set(this.getParent());
 
+        this.finished = true;
+
         // clean up the reference to the thread
         this.thread = null;
-
-        this.finished = true;
 
 	// notify the active transaction's queue so that it may clean up
 	ACTIVE_TXS.noteTxFinished(this);

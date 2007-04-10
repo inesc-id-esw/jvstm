@@ -188,7 +188,8 @@ public class ActiveTransactionQueue {
             return true;
         }
 
-        if (! tx.getThread().isAlive()) {
+        Thread txThread = tx.getThread();
+        if ((txThread != null) && (! txThread.isAlive())) {
             // if the tx's thread is no longer alive, then the tx will never finish
             System.out.println("JVSTM: Discarding a transaction with a dead thread.");
             return true;
