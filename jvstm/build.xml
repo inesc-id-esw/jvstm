@@ -18,6 +18,14 @@
   <target name="compile" description="Compiles the jvstm source">
     <mkdir dir="${build.dir}"/>
     <javac srcdir="${src.dir}" destdir="${build.dir}" extdirs="${lib.dir}" debug="on"/>
+    <java classname="jvstm.ProcessAtomicAnnotations" fork="true">
+      <arg value="${build.dir}"/>
+      <classpath>
+        <pathelement location="${build.dir}"/>
+        <pathelement location="${lib.dir}/asm-commons-3.0.jar"/>
+        <pathelement location="${lib.dir}/asm-3.0.jar"/>
+      </classpath>
+    </java>
   </target>
 
   <target name="src-dist" description="Builds a source distribution">
