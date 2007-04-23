@@ -83,7 +83,7 @@ public class ProcessAtomicAnnotations {
             is = new FileInputStream(classFile);
             ClassReader cr = new ClassReader(is);
             AtomicMethodCollector cv = new AtomicMethodCollector();
-            cr.accept(cv, false);
+            cr.accept(cv, 0);
 	    return cv.getAtomicMethods();
         } catch (Exception e) {
             e.printStackTrace();
@@ -107,9 +107,9 @@ public class ProcessAtomicAnnotations {
             // get an input stream to read the bytecode of the class
             is = new FileInputStream(classFile);
             ClassReader cr = new ClassReader(is);
-            ClassWriter cw = new ClassWriter(false);
+            ClassWriter cw = new ClassWriter(0);
             AtomicMethodTransformer cv = new AtomicMethodTransformer(cw, atomicMethods);
-            cr.accept(cv, false);
+            cr.accept(cv, 0);
 	    writeNewClassFile(classFile, cw.toByteArray());
         } catch (Exception e) {
             e.printStackTrace();
@@ -304,11 +304,24 @@ public class ProcessAtomicAnnotations {
         public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
 	    if (renameMethods && atomicMethods.isAtomicMethod(name, desc)) {
 		methods.add(new MethodWrapper(access, name, desc, signature, exceptions));
-		return super.visitMethod(ACC_PRIVATE, getInternalMethodName(name), desc, signature, exceptions);
+		return new RemoveAtomicAnnotation(super.visitMethod(ACC_PRIVATE, getInternalMethodName(name), desc, signature, exceptions));
 	    } else {
 		return super.visitMethod(access, name, desc, signature, exceptions);
 	    }
         }
+
+	static class RemoveAtomicAnnotation extends MethodAdapter {
+	    RemoveAtomicAnnotation(MethodVisitor mv) {
+		super(mv);
+	    }
+
+            public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+ 		if (ATOMIC_DESC.equals(desc)) {
+ 		    return null;
+ 		}
+ 		return super.visitAnnotation(desc, visible);
+            }
+	}
 
 	static class MethodWrapper {
 	    final int access;
