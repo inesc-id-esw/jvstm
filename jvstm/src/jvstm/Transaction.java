@@ -70,8 +70,6 @@ public abstract class Transaction implements Comparable<Transaction> {
         return begin(false);
     }
 
-    static int maxQSize = 0;
-
     public static Transaction begin(boolean readOnly) {
         Transaction parent = current.get();
         Transaction tx = null;
@@ -82,12 +80,6 @@ public abstract class Transaction implements Comparable<Transaction> {
 	// the new transaction is added to the queue
         ACTIVE_TXS.LOCK.lock();
         try {
-            int qSize = ACTIVE_TXS.getQueueSize() / 10;
-            if (qSize > maxQSize) {
-                maxQSize = qSize;
-                System.out.printf("# active transactions max is %d\n", maxQSize * 10);
-            }
-
 	    if (parent == null) {
                 if (readOnly) {
                     tx = TRANSACTION_FACTORY.makeReadOnlyTopLevelTransaction(getCommitted());
