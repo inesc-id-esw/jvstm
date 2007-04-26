@@ -37,7 +37,7 @@ public class ActiveTransactionQueue {
     private final static int ACTIVE_THRESHOLD_TO_NOTIFY = 1000;
     private final static int WAIT_TIME_BETWEEN_CLEANUPS = 1000;
 
-    public final ReentrantLock LOCK = new ReentrantLock(true);
+    public final ReentrantLock LOCK = new ReentrantLock(false);
 
     protected Queue<Transaction> txs = new PriorityQueue<Transaction>();
 
