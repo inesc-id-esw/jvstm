@@ -180,9 +180,6 @@ public abstract class Transaction implements Comparable<Transaction> {
 
         // clean up the reference to the thread
         this.thread = null;
-
-	// notify the active transaction's queue so that it may clean up
-	ACTIVE_TXS.noteTxFinished(this);
     }
 
     public boolean isFinished() {

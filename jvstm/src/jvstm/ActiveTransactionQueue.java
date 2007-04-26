@@ -34,12 +34,17 @@ import java.util.PriorityQueue;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class ActiveTransactionQueue {
+    private final static int ACTIVE_THRESHOLD_TO_NOTIFY = 1000;
+    private final static int WAIT_TIME_BETWEEN_CLEANUPS = 1000;
+
     public final ReentrantLock LOCK = new ReentrantLock(true);
 
     protected Queue<Transaction> txs = new PriorityQueue<Transaction>();
 
     protected int previousOldestTxNumber = 0;
     protected List<TxQueueListener> listeners = new ArrayList<TxQueueListener>();
+
+    protected Thread cleanUpThread = new CleanUpThread(WAIT_TIME_BETWEEN_CLEANUPS);
 
     ActiveTransactionQueue() {
     }
@@ -78,6 +83,11 @@ public class ActiveTransactionQueue {
         LOCK.lock();
         try {
             txs.offer(tx);
+            if (txs.size() > ACTIVE_THRESHOLD_TO_NOTIFY) {
+                synchronized (cleanUpThread) {
+                    cleanUpThread.notify();
+                }
+            }
         } finally {
             LOCK.unlock();
         }
@@ -134,11 +144,6 @@ public class ActiveTransactionQueue {
         }
     }
 
-    public void noteTxFinished(Transaction tx) {
-        cleanOldTransactions();
-    }
-
-
     protected void cleanOldTransactions() {
         LOCK.lock();
         try {
@@ -163,6 +168,28 @@ public class ActiveTransactionQueue {
             }
         } finally {
             LOCK.unlock();
+        }
+    }
+
+    private class CleanUpThread extends Thread {
+        private int waitTime;
+
+        CleanUpThread(int waitTime) {
+            this.waitTime = waitTime;
+            setDaemon(true);
+        }
+
+        public void run() {
+            while (true) {
+                try {
+                    synchronized (this) {
+                        cleanOldTransactions();
+                        wait(waitTime);
+                    }
+                } catch (Throwable t) {
+                    // ignore all signals and keep running
+                }
+            }
         }
     }
 
