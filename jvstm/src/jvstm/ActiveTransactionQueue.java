@@ -148,7 +148,7 @@ public class ActiveTransactionQueue {
 
             while (oldestTx != null) {
                 newOldest = oldestTx.getNumber();
-                if (mayRemoveTransaction(oldestTx)) {
+                if (oldestTx.isFinished()) {
                     oldestTx.gcTransaction();
                     txs.poll();
                     oldestTx = txs.peek();
@@ -165,21 +165,6 @@ public class ActiveTransactionQueue {
             LOCK.unlock();
         }
     }
-
-    private static boolean mayRemoveTransaction(Transaction tx) {
-        if (tx.isFinished()) {
-            return true;
-        }
-
-        Thread txThread = tx.getThread();
-        if ((txThread != null) && (! txThread.isAlive())) {
-            // if the tx's thread is no longer alive, then the tx will never finish
-            System.out.println("JVSTM: Discarding a transaction with a dead thread.");
-            return true;
-        }
-
-        return false;
-    }    
 
     public class MonitorQueueThread extends Thread {
         private long monitoringSleepInterval;
