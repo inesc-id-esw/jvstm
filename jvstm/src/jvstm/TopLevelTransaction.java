@@ -47,9 +47,9 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 
     protected void tryCommit() {
         if (isWriteTransaction()) {
-            Thread currentThread = Thread.currentThread();
-            int origPriority = currentThread.getPriority();
-            currentThread.setPriority(Thread.MAX_PRIORITY);
+            //Thread currentThread = Thread.currentThread();
+            //int origPriority = currentThread.getPriority();
+            //currentThread.setPriority(Thread.MAX_PRIORITY);
             COMMIT_LOCK.lock();
             try {
 		if (validateCommit()) {
@@ -59,7 +59,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 		}
             } finally {
                 COMMIT_LOCK.unlock();
-                currentThread.setPriority(origPriority);
+                //currentThread.setPriority(origPriority);
             }
         }
     }
