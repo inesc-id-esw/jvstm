@@ -262,16 +262,16 @@ public class VLinkedSet<E> implements Set<E> {
         }
         
         public boolean hasNext() { 
-            return (! current.isEmpty());
+            return (current != Cons.EMPTY);
         }
         
         public T next() { 
-            if (current.isEmpty()) {
+            if (current == Cons.EMPTY) {
                 throw new NoSuchElementException();
             } else {
-                T result = current.first();
+                T result = current.first;
                 previous = current;
-                current = current.rest();
+                current = current.rest;
                 return result;
             }
         }
