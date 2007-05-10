@@ -29,14 +29,14 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 public class Cons<E> implements Iterable<E> { 
-    private static final Cons EMPTY = new Cons(null, null);
+    protected static final Cons EMPTY = new Cons(null, null);
 
     public static <T> Cons<T> empty() {
         return (Cons<T>)EMPTY;
     }
 
-    private E first;
-    private Cons<E> rest;
+    protected E first;
+    protected Cons<E> rest;
 
     private Cons(E first) {
         this.first = first;
@@ -85,9 +85,16 @@ public class Cons<E> implements Iterable<E> {
         } else {
             // skip over conses containing the elem
             Cons<E> next = this;
-            while ((next != lastFound) && sameElem(next.first, elem)) {
-                next = next.rest;
+            if (elem == null) {
+                while ((next != lastFound) && (next.first == null)) {
+                    next = next.rest;
+                }
+            } else {
+                while ((next != lastFound) && (elem.equals(next.first))) {
+                    next = next.rest;
+                }
             }
+
 
             if (next == lastFound) {
                 return next.rest;
@@ -98,12 +105,22 @@ public class Cons<E> implements Iterable<E> {
             next = next.rest;
 
             Cons<E> newCons = result;
-            while (next != lastFound) {
-                if (! sameElem(next.first, elem)) {
-                    newCons.rest = new Cons<E>(next.first);
-                    newCons = newCons.rest;
+            if (elem == null) {
+                while (next != lastFound) {
+                    if (next.first != null) {
+                        newCons.rest = new Cons<E>(next.first);
+                        newCons = newCons.rest;
+                    }
+                    next = next.rest;
                 }
-                next = next.rest;
+            } else {
+                while (next != lastFound) {
+                    if (! elem.equals(next.first)) {
+                        newCons.rest = new Cons<E>(next.first);
+                        newCons = newCons.rest;
+                    }
+                    next = next.rest;
+                }
             }
             
             // share the rest
@@ -166,11 +183,20 @@ public class Cons<E> implements Iterable<E> {
 
     public Cons<E> member(Object elem) {
         Cons<E> iter = this;
-        while (iter != EMPTY) {
-            if (sameElem(iter.first, elem)) {
-                return iter;
+        if (elem == null) {
+            while (iter != EMPTY) {
+                if (iter.first == null) {
+                    return iter;
+                }
+                iter = iter.rest;
             }
-            iter = iter.rest;
+        } else {
+            while (iter != EMPTY) {
+                if (elem.equals(iter.first)) {
+                    return iter;
+                }
+                iter = iter.rest;
+            }
         }
         return null;
     }
@@ -178,12 +204,22 @@ public class Cons<E> implements Iterable<E> {
     public Cons<E> lastMember(Object elem) {
         Cons<E> found = null;
         Cons<E> iter = this;
-        while (iter != EMPTY) {
-            if (sameElem(iter.first, elem)) {
-                found = iter;
+        if (elem == null) {
+            while (iter != EMPTY) {
+                if (iter.first == null) {
+                    found = iter;
+                }
+                iter = iter.rest;
             }
-            iter = iter.rest;
+        } else {
+            while (iter != EMPTY) {
+                if (elem.equals(iter.first)) {
+                    found = iter;
+                }
+                iter = iter.rest;
+            }
         }
+
         return found;
     }
 
@@ -201,10 +237,6 @@ public class Cons<E> implements Iterable<E> {
         return new ConsIterator<E>(this);
     }
 
-    private static boolean sameElem(Object elem1, Object elem2) {
-        return (elem1 == null) ? (elem1 == elem2) : elem1.equals(elem2);
-    }
-
     static class ConsIterator<T> implements Iterator<T> {
         private Cons<T> current;
         
@@ -213,15 +245,15 @@ public class Cons<E> implements Iterable<E> {
         }
         
         public boolean hasNext() { 
-            return (! current.isEmpty());
+            return (current != EMPTY);
         }
         
         public T next() { 
-            if (current.isEmpty()) {
+            if (current == EMPTY) {
                 throw new NoSuchElementException();
             } else {
-                T result = current.first();
-                current = current.rest();
+                T result = current.first;
+                current = current.rest;
                 return result;
             }
         }
