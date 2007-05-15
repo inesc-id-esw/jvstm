@@ -26,24 +26,14 @@
 package jvstm;
 
 public class VBox<E> {
-    public volatile VBoxBody<E> body;
+    public VBoxBody<E> body;
 
     public VBox() {
         this((E)null);
     }
     
     public VBox(E initial) {
-        VBoxBody<E> body = VBoxBody.makeNewBody();
-        body.value = initial;
-
-        Transaction tx = Transaction.current();
-        if (tx == null) {
-            tx = Transaction.begin();
-            tx.register(this, body);
-            tx.commit();
-        } else {
-            tx.register(this, body);
-        }
+        put(initial);
     }
 
     // used for persistence support
@@ -55,11 +45,11 @@ public class VBox<E> {
         Transaction tx = Transaction.current();
         if (tx == null) {
             tx = Transaction.begin();
-            E result = tx.getBodyForRead(this).value;
+            E result = tx.getBoxValue(this);
             tx.commit();
             return result;
         } else {
-            return tx.getBodyForRead(this).value;
+            return tx.getBoxValue(this);
         }
     }
 
@@ -67,15 +57,23 @@ public class VBox<E> {
         Transaction tx = Transaction.current();
         if (tx == null) {
             tx = Transaction.begin();
-            tx.getBodyForWrite(this).value = newE;
+            tx.setBoxValue(this, newE);
             tx.commit();
         } else {
-            tx.getBodyForWrite(this).value = newE;            
+            tx.setBoxValue(this, newE);
         }
     }
 
-    public void commit(VBoxBody<E> newBody) {
-	newBody.setPrevious(this.body);
+    public VBoxBody commit(E newValue, int txNumber) {
+        VBoxBody<E> newBody = makeNewBody(newValue, txNumber, this.body);
 	this.body = newBody;
+        return newBody;
+    }
+
+    // in the future, if more than one subclass of body exists, we may
+    // need a factory here but, for now, it's simpler to have it like
+    // this
+    public static <T> VBoxBody<T> makeNewBody(T value, int version, VBoxBody<T> next) {
+	return new MultiVersionBoxBody<T>(value, version, (MultiVersionBoxBody<T>)next);
     }
 }

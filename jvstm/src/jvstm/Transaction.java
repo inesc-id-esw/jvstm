@@ -31,9 +31,37 @@ public abstract class Transaction implements Comparable<Transaction> {
 
     // static part starts here
 
-    private static int commited = 0;
 
-    protected static final ActiveTransactionQueue ACTIVE_TXS = new ActiveTransactionQueue();
+    /*
+     * The committed static field is volatile to ensure correct
+     * synchronization among different threads:
+     *
+     * - A newly created transaction reads the value of this field at
+     *   the very beginning of its existence, before trying to
+     *   access any box.
+     *
+     * - A write transaction writes to this field at the very end,
+     *   after commiting all the boxes to their new values.
+     *
+     * This way, because of the new semantics of the Java Memory
+     * Model, as specified by JSR133 (which is incorporated in the
+     * newest Java Language Specification), we know that all the
+     * values written previously in the commit of write transaction
+     * will be visible to any other transaction that is created with
+     * the new value of the committed field.
+     *
+     * This change is sufficient to ensure the correct synchronization
+     * guarantees, even if we remove all the remaining volatile
+     * declarations from the VBox and VBoxBody classes.
+     */
+    private static volatile int committed = 0;
+
+    protected static final ActiveTransactionQueue ACTIVE_TXS;
+
+    static {
+        ACTIVE_TXS = new ActiveTransactionQueue();
+        ACTIVE_TXS.enable();
+    }
 
     protected static final ThreadLocal<Transaction> current = new ThreadLocal<Transaction>();
 
@@ -54,12 +82,12 @@ public abstract class Transaction implements Comparable<Transaction> {
         return current.get();
     }
 
-    public static synchronized int getCommitted() {
-        return commited;
+    public static int getCommitted() {
+        return committed;
     }
 
-    public static synchronized void setCommitted(int number) {
-        commited = Math.max(number, commited);
+    public static void setCommitted(int number) {
+        committed = Math.max(number, committed);
     }
 
     public static void addTxQueueListener(TxQueueListener listener) {
@@ -115,16 +143,17 @@ public abstract class Transaction implements Comparable<Transaction> {
     }
 
     protected int number;
-    protected Transaction parent;
+    protected final Transaction parent;
     protected volatile boolean finished = false;
     protected volatile Thread thread = Thread.currentThread();
     
     public Transaction(int number) {
         this.number = number;
+        this.parent = null;
     }
 
     public Transaction(Transaction parent) {
-        this(parent.getNumber());
+        this.number = parent.getNumber();
         this.parent = parent;
     }
 
@@ -196,11 +225,9 @@ public abstract class Transaction implements Comparable<Transaction> {
 
     protected abstract Transaction makeNestedTransaction();
 
-    protected abstract <T> void register(VBox<T> vbox, VBoxBody<T> body);
+    protected abstract <T> T getBoxValue(VBox<T> vbox);
 
-    protected abstract <T> VBoxBody<T> getBodyForRead(VBox<T> vbox);
-
-    protected abstract <T> VBoxBody<T> getBodyForWrite(VBox<T> vbox);
+    protected abstract <T> void setBoxValue(VBox<T> vbox, T value);
     
     protected abstract <T> T getPerTxValue(PerTxBox<T> box, T initial);
 

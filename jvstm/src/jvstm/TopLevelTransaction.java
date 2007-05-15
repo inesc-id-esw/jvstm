@@ -35,14 +35,16 @@ import java.util.concurrent.locks.ReentrantLock;
 public class TopLevelTransaction extends ReadWriteTransaction {
     private static final ReentrantLock COMMIT_LOCK = new ReentrantLock(true);
 
-    protected List<VBoxBody> bodiesCommitted = null;
+    // this field must be volatile because it may be accessed by the
+    // clean-up thread that GCs old transactions
+    protected volatile List<VBoxBody> bodiesCommitted = null;
 
     public TopLevelTransaction(int number) {
         super(number);
     }
 
     protected boolean isWriteTransaction() {
-	return (! bodiesWritten.isEmpty()) || (! perTxValues.isEmpty());
+	return (! boxesWritten.isEmpty()) || (! perTxValues.isEmpty());
     }
 
     protected void tryCommit() {
@@ -87,20 +89,20 @@ public class TopLevelTransaction extends ReadWriteTransaction {
     }
 
     protected void doCommit(int newTxNumber) {
-        for (Map.Entry<VBox,VBoxBody> entry : bodiesWritten.entrySet()) {
-            VBox vbox = entry.getKey();
-            VBoxBody body = entry.getValue();
-
-            body.version = newTxNumber;
-	    vbox.commit(body);
+        List<VBoxBody> newBodies = bodiesCommitted;
+	if (newBodies == null) {
+	    newBodies = new ArrayList<VBoxBody>(boxesWritten.size());
         }
 
-	// save them for future GC
-	if (bodiesCommitted == null) {
-	    bodiesCommitted = new ArrayList<VBoxBody>(bodiesWritten.values());
-	} else {
-	    bodiesCommitted.addAll(bodiesWritten.values());
-	}
+        for (Map.Entry<VBox,Object> entry : boxesWritten.entrySet()) {
+            VBox vbox = entry.getKey();
+            Object newValue = entry.getValue();
+
+	    VBoxBody newBody = vbox.commit((newValue == NULL_VALUE) ? null : newValue, newTxNumber);
+            newBodies.add(newBody);
+        }
+
+        bodiesCommitted = newBodies;
     }
 
     protected void gcTransaction() {

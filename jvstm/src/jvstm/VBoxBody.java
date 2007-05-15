@@ -26,18 +26,15 @@
 package jvstm;
 
 public abstract class VBoxBody<E> {
-    public volatile int version = -1;
-    public E value;
+    public final int version;
+    public final E value;
     
+    VBoxBody(E value, int version) {
+        this.value = value;
+        this.version = version;
+    }
+
     public abstract VBoxBody<E> getBody(int maxVersion);
 
-    public abstract void setPrevious(VBoxBody<E> previous);
-
     public abstract void clearPrevious();
-
-    // in the future, if more than one subclass of body exists, we may need a factory here
-    // but, for now, it's simpler to have it like this
-    public static <T> VBoxBody<T> makeNewBody() {
-	return new MultiVersionBoxBody<T>();
-    }
 }

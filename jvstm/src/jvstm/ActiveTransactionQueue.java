@@ -35,18 +35,20 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class ActiveTransactionQueue {
     private final static int ACTIVE_THRESHOLD_TO_NOTIFY = 1000;
-    private final static int WAIT_TIME_BETWEEN_CLEANUPS = 1000;
+    private final static int WAIT_TIME_BETWEEN_CLEANUPS = 100;
 
     public final ReentrantLock LOCK = new ReentrantLock(false);
 
-    protected Queue<Transaction> txs = new PriorityQueue<Transaction>();
+    protected final Queue<Transaction> txs = new PriorityQueue<Transaction>();
+    protected final List<TxQueueListener> listeners = new ArrayList<TxQueueListener>();
 
-    protected int previousOldestTxNumber = 0;
-    protected List<TxQueueListener> listeners = new ArrayList<TxQueueListener>();
-
-    protected Thread cleanUpThread = new CleanUpThread(WAIT_TIME_BETWEEN_CLEANUPS);
+    protected final Thread cleanUpThread = new CleanUpThread(WAIT_TIME_BETWEEN_CLEANUPS);
 
     ActiveTransactionQueue() {
+    }
+
+    void enable() {
+        cleanUpThread.start();
     }
 
     public void startMonitoringQueue(long monitoringSleepInterval, long longTransactionThreshold) {
@@ -83,11 +85,13 @@ public class ActiveTransactionQueue {
         LOCK.lock();
         try {
             txs.offer(tx);
-            if (txs.size() > ACTIVE_THRESHOLD_TO_NOTIFY) {
-                synchronized (cleanUpThread) {
-                    cleanUpThread.notify();
-                }
-            }
+
+            // is this necessary?  I'll leave it disabled for now...
+            //if (txs.size() > ACTIVE_THRESHOLD_TO_NOTIFY) {
+            //    synchronized (cleanUpThread) {
+            //        cleanUpThread.notify();
+            //    }
+            //}
         } finally {
             LOCK.unlock();
         }
@@ -144,7 +148,7 @@ public class ActiveTransactionQueue {
         }
     }
 
-    protected void cleanOldTransactions() {
+    protected int cleanOldTransactions(int previousOldestTxNumber) {
         LOCK.lock();
         try {
             Transaction oldestTx = txs.peek();
@@ -166,6 +170,8 @@ public class ActiveTransactionQueue {
                 notifyListeners(previousOldestTxNumber, newOldest);
                 previousOldestTxNumber = newOldest;
             }
+
+            return previousOldestTxNumber;
         } finally {
             LOCK.unlock();
         }
@@ -180,10 +186,11 @@ public class ActiveTransactionQueue {
         }
 
         public void run() {
+            int previousOldestTxNumber = 0;
             while (true) {
                 try {
+                    previousOldestTxNumber = cleanOldTransactions(previousOldestTxNumber);
                     synchronized (this) {
-                        cleanOldTransactions();
                         wait(waitTime);
                     }
                 } catch (Throwable t) {

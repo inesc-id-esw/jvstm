@@ -33,7 +33,7 @@ class NestedTransaction extends ReadWriteTransaction {
 
     protected void tryCommit() {
         getRWParent().bodiesRead.putAll(bodiesRead);
-        getRWParent().bodiesWritten.putAll(bodiesWritten);
+        getRWParent().boxesWritten.putAll(boxesWritten);
         getRWParent().perTxValues.putAll(perTxValues);
     }
 }

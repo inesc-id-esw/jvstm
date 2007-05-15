@@ -25,8 +25,28 @@
  */
 package jvstm;
 
+import java.lang.reflect.Field;
+
 public class MultiVersionBoxBody<E> extends VBoxBody<E> {
-    volatile MultiVersionBoxBody<E> next = null;
+    // this static field is used to change the non-static final field "next"
+    // see the comments on the clearPrevious method
+    private static final Field NEXT_FIELD;
+    
+    static {
+        try {
+            NEXT_FIELD = MultiVersionBoxBody.class.getDeclaredField("next");
+            NEXT_FIELD.setAccessible(true);
+        } catch (NoSuchFieldException nsfe) {
+            throw new Error("JVSTM error: couldn't get access to the MultiVersionBoxBody.next field");
+        }
+    }
+
+    public final MultiVersionBoxBody<E> next;
+
+    MultiVersionBoxBody(E value, int version, MultiVersionBoxBody<E> next) {
+        super(value, version);
+        this.next = next;
+    }
     
     public VBoxBody<E> getBody(int maxVersion) {
         return ((version > maxVersion) 
@@ -34,11 +54,27 @@ public class MultiVersionBoxBody<E> extends VBoxBody<E> {
                 : this);
     }
 
-    public void setPrevious(VBoxBody<E> previous) {
-	next = (MultiVersionBoxBody<E>)previous;
-    }
-
     public void clearPrevious() {
-	next = null;
+        // we set the next field to null via reflection because it is
+        // a final field 
+
+        // making the field final is crucial to ensure that the field
+        // is properly initialized (and visible to other threads)
+        // after an instance of MultiVersionBoxBody is constructed, as
+        // per the new Java Memory Model (JSR133)
+
+        // also, according to the Java specification, we may change a
+        // final field only via reflection and in some specific cases
+        // (such as object reconstruction after deserialization)
+
+        // even though this use is not the case, the potential
+        // problems that may occur do not affect the correcteness of
+        // the system: we just want to set the field to null to allow
+        // the garbage collector to do its thing...
+        try {
+            NEXT_FIELD.set(this, null);
+        } catch (IllegalAccessException iae) {
+            throw new Error("JVSTM error: cannot set the next field to null");
+        }
     }
 }

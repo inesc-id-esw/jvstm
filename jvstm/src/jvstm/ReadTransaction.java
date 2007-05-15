@@ -39,15 +39,11 @@ class ReadTransaction extends Transaction {
 	return new ReadTransaction(this);
     }
 
-    protected <T> void register(VBox<T> vbox, VBoxBody<T> body) {
-        throw new WriteOnReadException();
+    protected <T> T getBoxValue(VBox<T> vbox) {
+        return vbox.body.getBody(number).value;
     }
 
-    protected <T> VBoxBody<T> getBodyForRead(VBox<T> vbox) {
-        return vbox.body.getBody(number);
-    }
-
-    protected <T> VBoxBody<T> getBodyForWrite(VBox<T> vbox) {
+    protected <T> void setBoxValue(VBox<T> vbox, T value) {
         throw new WriteOnReadException();
     }
 

@@ -30,9 +30,10 @@ import java.util.IdentityHashMap;
 
 
 abstract class ReadWriteTransaction extends Transaction {
+    protected static final Object NULL_VALUE = new Object();
 
     protected Map<VBox,VBoxBody> bodiesRead = new IdentityHashMap<VBox,VBoxBody>();
-    protected Map<VBox,VBoxBody> bodiesWritten = new IdentityHashMap<VBox,VBoxBody>();
+    protected Map<VBox,Object> boxesWritten = new IdentityHashMap<VBox,Object>();
     protected Map<PerTxBox,Object> perTxValues = new IdentityHashMap<PerTxBox,Object>();
 
 
@@ -56,7 +57,7 @@ abstract class ReadWriteTransaction extends Transaction {
 	super.finish();
 	// to allow garbage collecting the collections
 	bodiesRead = null;
-	bodiesWritten = null;
+	boxesWritten = null;
 	perTxValues = null;
     }
 
@@ -64,24 +65,19 @@ abstract class ReadWriteTransaction extends Transaction {
 	tryCommit();
 	// if commit is successful, then clear all records
 	bodiesRead.clear();
-	bodiesWritten.clear();
+	boxesWritten.clear();
 	perTxValues.clear();
     }
 
     protected abstract void tryCommit();
 
-
-    protected <T> void register(VBox<T> vbox, VBoxBody<T> body) {
-        bodiesWritten.put(vbox, body);
-    }
-
-    protected <T> VBoxBody<T> getBodyWritten(VBox<T> vbox) {
-        VBoxBody<T> body = bodiesWritten.get(vbox);
-        if ((body == null) && (parent != null)) {
-            body = getRWParent().getBodyWritten(vbox);
+    protected <T> T getLocalValue(VBox<T> vbox) {
+        T value = (T)boxesWritten.get(vbox);
+        if ((value == null) && (parent != null)) {
+            value = getRWParent().getLocalValue(vbox);
         }
         
-        return body;
+        return value;
     }
 
     protected <T> VBoxBody<T> getBodyRead(VBox<T> vbox) {
@@ -93,26 +89,23 @@ abstract class ReadWriteTransaction extends Transaction {
         return body;
     }
 
-    protected <T> VBoxBody<T> getBodyForRead(VBox<T> vbox) {
-        VBoxBody<T> body = getBodyWritten(vbox);
-        if (body == null) {
-            body = getBodyRead(vbox);
+    protected <T> T getBoxValue(VBox<T> vbox) {
+        T value = getLocalValue(vbox);
+        if (value == null) {
+            VBoxBody<T> body = getBodyRead(vbox);
+
+            if (body == null) {
+                body = vbox.body.getBody(number);
+                bodiesRead.put(vbox, body);
+            }
+
+            value = body.value;
         }
-        if (body == null) {
-            body = vbox.body.getBody(number);
-            bodiesRead.put(vbox, body);
-        }
-        return body;
+        return value;
     }
 
-    protected <T> VBoxBody<T> getBodyForWrite(VBox<T> vbox) {
-        VBoxBody<T> body = (VBoxBody<T>)bodiesWritten.get(vbox);
-        if (body == null) {
-            body = VBoxBody.makeNewBody();
-            register(vbox, body);
-        }
-
-        return body;
+    protected <T> void setBoxValue(VBox<T> vbox, T value) {
+        boxesWritten.put(vbox, value == null ? NULL_VALUE : value);
     }
 
     protected <T> T getPerTxValue(PerTxBox<T> box) {

@@ -26,7 +26,7 @@
 package jvstm;
 
 public class PerTxBox<E> {
-    E initial;
+    private final E initial;
 
     public PerTxBox(E initial) {
         this.initial = initial;
