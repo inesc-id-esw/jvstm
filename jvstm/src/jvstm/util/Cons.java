@@ -35,12 +35,8 @@ public class Cons<E> implements Iterable<E> {
         return (Cons<T>)EMPTY;
     }
 
-    protected E first;
-    protected Cons<E> rest;
-
-    private Cons(E first) {
-        this.first = first;
-    }
+    protected final E first;
+    protected final Cons<E> rest;
 
     private Cons(E first, Cons<E> rest) {
         this.first = first;
@@ -101,31 +97,28 @@ public class Cons<E> implements Iterable<E> {
             }
 
             // We have to allocate new Cons cells until we reach the lastFound cons
-            Cons<E> result = new Cons<E>(next.first);
+            Cons<E> newCons = ((Cons<E>)EMPTY).cons(next.first);
             next = next.rest;
 
-            Cons<E> newCons = result;
             if (elem == null) {
                 while (next != lastFound) {
                     if (next.first != null) {
-                        newCons.rest = new Cons<E>(next.first);
-                        newCons = newCons.rest;
+                        newCons = newCons.cons(next.first);
                     }
                     next = next.rest;
                 }
             } else {
                 while (next != lastFound) {
                     if (! elem.equals(next.first)) {
-                        newCons.rest = new Cons<E>(next.first);
-                        newCons = newCons.rest;
+                        newCons = newCons.cons(next.first);
                     }
                     next = next.rest;
                 }
             }
             
             // share the rest
-            newCons.rest = next.rest;
-            return result;
+            newCons = newCons.reverseInto(next.rest);
+            return newCons;
         }
     }
 
@@ -147,19 +140,16 @@ public class Cons<E> implements Iterable<E> {
             return rest;
         } else {
             // We have to allocate new Cons cells until we reach the cons to remove
-            Cons<E> result = new Cons<E>(first);
-
-            Cons<E> newCons = result;
+            Cons<E> newCons = ((Cons<E>)EMPTY).cons(first);
             Cons<E> next = rest;
             while (next != cons) {
-                newCons.rest = new Cons<E>(next.first);
-                newCons = newCons.rest;
+                newCons = newCons.cons(next.first);
                 next = next.rest;
             }
             
             // share the rest
-            newCons.rest = next.rest;
-            return result;
+            newCons = newCons.reverseInto(next.rest);
+            return newCons;
         }
     }
 
@@ -224,7 +214,11 @@ public class Cons<E> implements Iterable<E> {
     }
 
     public Cons<E> reverse() {
-        Cons<E> result = empty();
+        return reverseInto((Cons<E>)EMPTY);
+    }
+
+    public Cons<E> reverseInto(Cons<E> tail) {
+        Cons<E> result = tail;
         Cons<E> iter = this;
         while (iter != EMPTY) {
             result = result.cons(iter.first);
