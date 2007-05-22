@@ -25,9 +25,9 @@
  */
 package jvstm;
 
-class NestedTransaction extends ReadWriteTransaction {
+public class NestedTransaction extends ReadWriteTransaction {
 
-    NestedTransaction(ReadWriteTransaction parent) {
+    public NestedTransaction(ReadWriteTransaction parent) {
         super(parent);
     }
 

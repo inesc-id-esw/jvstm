@@ -65,14 +65,7 @@ public abstract class Transaction implements Comparable<Transaction> {
 
     protected static final ThreadLocal<Transaction> current = new ThreadLocal<Transaction>();
 
-    private static TransactionFactory TRANSACTION_FACTORY = new TransactionFactory() {
-	    public Transaction makeTopLevelTransaction(int txNumber) {
-		return new TopLevelTransaction(txNumber);
-	    }
-            public Transaction makeReadOnlyTopLevelTransaction(int txNumber) {
-                return new ReadTransaction(txNumber);
-            }
-	};
+    private static TransactionFactory TRANSACTION_FACTORY = new DefaultTransactionFactory();
 
     public static void setTransactionFactory(TransactionFactory factory) {
 	TRANSACTION_FACTORY = factory;
@@ -117,7 +110,7 @@ public abstract class Transaction implements Comparable<Transaction> {
 	    } else {
 		tx = parent.makeNestedTransaction();
 	    }
-	    current.set(tx);
+            tx.start();
 	    ACTIVE_TXS.add(tx);
 	} finally {
             ACTIVE_TXS.LOCK.unlock();
@@ -155,6 +148,10 @@ public abstract class Transaction implements Comparable<Transaction> {
     public Transaction(Transaction parent) {
         this.number = parent.getNumber();
         this.parent = parent;
+    }
+
+    public void start() {
+        current.set(this);
     }
 
     public Thread getThread() {
@@ -223,15 +220,15 @@ public abstract class Transaction implements Comparable<Transaction> {
 	// by default, do nothing
     }
 
-    protected abstract Transaction makeNestedTransaction();
+    public abstract Transaction makeNestedTransaction();
 
-    protected abstract <T> T getBoxValue(VBox<T> vbox);
+    public abstract <T> T getBoxValue(VBox<T> vbox);
 
-    protected abstract <T> void setBoxValue(VBox<T> vbox, T value);
+    public abstract <T> void setBoxValue(VBox<T> vbox, T value);
     
-    protected abstract <T> T getPerTxValue(PerTxBox<T> box, T initial);
+    public abstract <T> T getPerTxValue(PerTxBox<T> box, T initial);
 
-    protected abstract <T> void setPerTxValue(PerTxBox<T> box, T value);
+    public abstract <T> void setPerTxValue(PerTxBox<T> box, T value);
 
     protected abstract void doCommit();
 

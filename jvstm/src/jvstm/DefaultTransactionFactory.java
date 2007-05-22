@@ -25,37 +25,11 @@
  */
 package jvstm;
 
-public class ReadTransaction extends Transaction {
-
-    public ReadTransaction(int number) {
-        super(number);
+public class DefaultTransactionFactory implements TransactionFactory {
+    public Transaction makeTopLevelTransaction(int txNumber) {
+        return new TopLevelTransaction(txNumber);
     }
-
-    public ReadTransaction(Transaction parent) {
-	super(parent);
-    }
-
-    public Transaction makeNestedTransaction() {
-	return new ReadTransaction(this);
-    }
-
-    public <T> T getBoxValue(VBox<T> vbox) {
-        return vbox.body.getBody(number).value;
-    }
-
-    public <T> void setBoxValue(VBox<T> vbox, T value) {
-        throw new WriteOnReadException();
-    }
-
-    public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
-	return initial;
-    }
-    
-    public <T> void setPerTxValue(PerTxBox<T> box, T value) {
-        throw new WriteOnReadException();
-    }
-
-    protected void doCommit() {
-        // do nothing
+    public Transaction makeReadOnlyTopLevelTransaction(int txNumber) {
+        return new ReadTransaction(txNumber);
     }
 }

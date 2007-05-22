@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.IdentityHashMap;
 
 
-abstract class ReadWriteTransaction extends Transaction {
+public abstract class ReadWriteTransaction extends Transaction {
     protected static final Object NULL_VALUE = new Object();
 
     protected Map<VBox,VBoxBody> bodiesRead = new IdentityHashMap<VBox,VBoxBody>();
@@ -37,15 +37,15 @@ abstract class ReadWriteTransaction extends Transaction {
     protected Map<PerTxBox,Object> perTxValues = new IdentityHashMap<PerTxBox,Object>();
 
 
-    ReadWriteTransaction(int number) {
+    public ReadWriteTransaction(int number) {
         super(number);
     }
 
-    ReadWriteTransaction(ReadWriteTransaction parent) {
+    public ReadWriteTransaction(ReadWriteTransaction parent) {
         super(parent);
     }
 
-    protected Transaction makeNestedTransaction() {
+    public Transaction makeNestedTransaction() {
 	return new NestedTransaction(this);
     }
 
@@ -89,7 +89,7 @@ abstract class ReadWriteTransaction extends Transaction {
         return body;
     }
 
-    protected <T> T getBoxValue(VBox<T> vbox) {
+    public <T> T getBoxValue(VBox<T> vbox) {
         T value = getLocalValue(vbox);
         if (value == null) {
             VBoxBody<T> body = getBodyRead(vbox);
@@ -104,7 +104,7 @@ abstract class ReadWriteTransaction extends Transaction {
         return value;
     }
 
-    protected <T> void setBoxValue(VBox<T> vbox, T value) {
+    public <T> void setBoxValue(VBox<T> vbox, T value) {
         boxesWritten.put(vbox, value == null ? NULL_VALUE : value);
     }
 
@@ -116,7 +116,7 @@ abstract class ReadWriteTransaction extends Transaction {
 	return value;
     }
 
-    protected <T> T getPerTxValue(PerTxBox<T> box, T initial) {
+    public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
         T value = getPerTxValue(box);
         if (value == null) {
             value = initial;
@@ -125,7 +125,7 @@ abstract class ReadWriteTransaction extends Transaction {
         return value;
     }
 
-    protected <T> void setPerTxValue(PerTxBox<T> box, T value) {
+    public <T> void setPerTxValue(PerTxBox<T> box, T value) {
 	perTxValues.put(box, value);
     }
 }
