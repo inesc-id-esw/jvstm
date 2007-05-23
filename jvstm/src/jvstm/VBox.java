@@ -74,6 +74,6 @@ public class VBox<E> {
     // need a factory here but, for now, it's simpler to have it like
     // this
     public static <T> VBoxBody<T> makeNewBody(T value, int version, VBoxBody<T> next) {
-	return new MultiVersionBoxBody<T>(value, version, (MultiVersionBoxBody<T>)next);
+	return new VBoxBody<T>(value, version, next);
     }
 }
