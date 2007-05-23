@@ -110,7 +110,7 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
     }
 
     protected Set<Depended> checkOnePredicate(Object obj, Method predicate) {
-        ConsistencyCheckTransaction tx = makeConsistencyCheckTransaction();
+        ConsistencyCheckTransaction tx = makeConsistencyCheckTransaction(obj);
         tx.start();
 
         boolean finished = false;
@@ -145,7 +145,7 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
         }
     }
 
-    protected ConsistencyCheckTransaction makeConsistencyCheckTransaction() {
+    protected ConsistencyCheckTransaction makeConsistencyCheckTransaction(Object obj) {
         return new DefaultConsistencyCheckTransaction(this);
     }
 
