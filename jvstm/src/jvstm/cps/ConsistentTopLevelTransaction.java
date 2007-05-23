@@ -102,9 +102,11 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
     protected void checkConsistencyPredicates(Object obj) {
         for (Method predicate : ConsistencyPredicateSystem.getPredicatesFor(obj)) {
             Set<Depended> depended = checkOnePredicate(obj, predicate);
-            DependenceRecord dependence = makeDependenceRecord(obj, predicate, depended);
-            for (Depended dep : depended) {
-                dep.addDependence(dependence);
+            if (! depended.isEmpty()) {
+                DependenceRecord dependence = makeDependenceRecord(obj, predicate, depended);
+                for (Depended dep : depended) {
+                    dep.addDependence(dependence);
+                }
             }
         }
     }
