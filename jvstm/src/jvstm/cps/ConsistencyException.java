@@ -47,4 +47,12 @@ public class ConsistencyException extends RuntimeException {
     public String getMethodName() {
         return method.getName();
     }
+
+    public String getMethodFullname() {
+        return getMethodClassname() + "." + getMethodName();
+    }
+
+    public String getMethodClassname() {
+        return method.getDeclaringClass().getName();
+    }
 }
