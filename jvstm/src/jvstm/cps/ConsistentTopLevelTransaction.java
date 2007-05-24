@@ -132,13 +132,20 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
             return tx.getDepended();
         } catch (Throwable t) {
             ConsistencyException exc;
-            try {
-                exc = excClass.newInstance();
-            } catch (Throwable t2) {
-                throw new Error(t2);
+
+            if (t instanceof ConsistencyException) {
+                exc = (ConsistencyException) t;
+            } else {
+                // only wrap throwable if it is not a ConsistencyException already
+                try {
+                    exc = excClass.newInstance();
+                } catch (Throwable t2) {
+                    throw new Error(t2);
+                }
+                exc.initCause(t);
             }
+
             exc.init(obj, predicate);
-            exc.initCause(t);
             throw exc;
         } finally {
             if (! finished) {
