@@ -34,11 +34,13 @@ import jvstm.util.Cons;
 import java.lang.reflect.Method;
 
 import java.util.Set;
+import java.util.HashSet;
 import java.util.Iterator;
 
 public class ConsistentTopLevelTransaction extends TopLevelTransaction implements ConsistentTransaction {
 
-    private Cons newObjects = Cons.empty();
+    protected Cons newObjects = Cons.empty();
+    protected Set alreadyChecked = null;
 
     public ConsistentTopLevelTransaction(int number) {
         super(number);
@@ -58,7 +60,9 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
 
     protected void tryCommit() {
         if (isWriteTransaction()) {
+            alreadyChecked = new HashSet();
             checkConsistencyPredicates();
+            alreadyChecked = null; // allow gc of set
         }
         super.tryCommit();
     }
@@ -78,6 +82,11 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
 
     protected void recheckDependenceRecord(DependenceRecord dependence) {
         Set<Depended> newDepended = checkOnePredicate(dependence.getDependent(), dependence.getPredicate());
+
+        if (newDepended == null) {
+            // a null return means that the predicate was already checked
+            return;
+        }
 
         Iterator<Depended> oldDeps = dependence.getDepended();
         while (oldDeps.hasNext()) {
@@ -102,7 +111,7 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
     protected void checkConsistencyPredicates(Object obj) {
         for (Method predicate : ConsistencyPredicateSystem.getPredicatesFor(obj)) {
             Set<Depended> depended = checkOnePredicate(obj, predicate);
-            if (! depended.isEmpty()) {
+            if ((depended != null) && (! depended.isEmpty())) {
                 DependenceRecord dependence = makeDependenceRecord(obj, predicate, depended);
                 for (Depended dep : depended) {
                     dep.addDependence(dependence);
@@ -111,7 +120,23 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
         }
     }
 
+
+    /*
+     * This method checks one predicate, returning the set of objects
+     * on which the check depended.  If this same predicate was
+     * already checked for this object, the check is skipped and the
+     * method returns null to indicate it.
+     */
     protected Set<Depended> checkOnePredicate(Object obj, Method predicate) {
+        Pair toCheck = new Pair(obj, predicate);
+
+        if (alreadyChecked.contains(toCheck)) {
+            // returning null means that no check was actually done, because it is repeated
+            return null;
+        }
+
+        alreadyChecked.add(toCheck);
+
         ConsistencyCheckTransaction tx = makeConsistencyCheckTransaction(obj);
         tx.start();
 
@@ -173,5 +198,30 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
         }
 
         return new ChainedIterator<DependenceRecord>(iteratorsList.iterator());
+    }
+
+
+    static final class Pair {
+        final Object first;
+        final Object second;
+
+        Pair(Object first, Object second) {
+            this.first = first;
+            this.second = second;
+        }
+
+        public int hashCode() {
+            return first.hashCode() + second.hashCode();
+        }
+
+        public boolean equals(Object other) {
+            if (other.getClass() != Pair.class) {
+                return false;
+            }
+
+            Pair p2 = (Pair)other;
+
+            return (p2.first == first) && (p2.second == second);
+        }
     }
 }
