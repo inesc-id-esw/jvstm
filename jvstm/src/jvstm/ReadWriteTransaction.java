@@ -101,7 +101,7 @@ public abstract class ReadWriteTransaction extends Transaction {
 
             value = body.value;
         }
-        return value;
+        return (value == NULL_VALUE) ? null : value;
     }
 
     public <T> void setBoxValue(VBox<T> vbox, T value) {
