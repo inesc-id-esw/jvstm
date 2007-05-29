@@ -32,6 +32,7 @@ import jvstm.TopLevelTransaction;
 import jvstm.util.Cons;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.InvocationTargetException;
 
 import java.util.Set;
 import java.util.HashSet;
@@ -155,23 +156,28 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
             finished = true;
 
             return tx.getDepended();
-        } catch (Throwable t) {
+        } catch (InvocationTargetException ite) {
+            Throwable cause = ite.getCause();
+
             ConsistencyException exc;
 
-            if (t instanceof ConsistencyException) {
-                exc = (ConsistencyException) t;
+            // only wrap the cause if it is not a ConsistencyException already
+            if (cause instanceof ConsistencyException) {
+                exc = (ConsistencyException) cause;
             } else {
-                // only wrap throwable if it is not a ConsistencyException already
                 try {
                     exc = excClass.newInstance();
-                } catch (Throwable t2) {
-                    throw new Error(t2);
+                } catch (Throwable t) {
+                    throw new Error(t);
                 }
-                exc.initCause(t);
+                exc.initCause(cause);
             }
 
             exc.init(obj, predicate);
             throw exc;
+        } catch (Throwable t) {
+            // any other kind of throwable is an Error in the JVSTM that should be fixed
+            throw new Error(t);
         } finally {
             if (! finished) {
                 Transaction.abort();
