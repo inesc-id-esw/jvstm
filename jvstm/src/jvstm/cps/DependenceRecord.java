@@ -28,9 +28,9 @@ package jvstm.cps;
 import java.lang.reflect.Method;
 import java.util.Iterator;
 
-public interface DependenceRecord {
+public interface DependenceRecord<E extends Depended> {
     public Object getDependent();
     public Method getPredicate();
-    public Iterator<Depended> getDepended();
-    public void addDepended(Depended dep);
+    public Iterator<E> getDepended();
+    public void addDepended(E dep);
 }

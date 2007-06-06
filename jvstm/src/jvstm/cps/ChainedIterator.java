@@ -30,10 +30,10 @@ import java.util.NoSuchElementException;
 
 public class ChainedIterator<E> implements Iterator<E> {
     
-    private Iterator<Iterator<E>> iterators;
-    private Iterator<E> current;
+    private Iterator<? extends Iterator<? extends E>> iterators;
+    private Iterator<? extends E> current;
 
-    public ChainedIterator(Iterator<Iterator<E>> iterators) {
+    public ChainedIterator(Iterator<? extends Iterator<? extends E>> iterators) {
         this.iterators = iterators;
 
         if (iterators.hasNext()) {

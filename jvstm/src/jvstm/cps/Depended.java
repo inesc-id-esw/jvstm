@@ -27,8 +27,8 @@ package jvstm.cps;
 
 import java.util.Set;
 
-public interface Depended {
-    public void addDependence(DependenceRecord record);
-    public void removeDependence(DependenceRecord record);
-    public Set<DependenceRecord> getDependenceRecords();
+public interface Depended<E extends DependenceRecord> {
+    public void addDependence(E record);
+    public void removeDependence(E record);
+    public Set<E> getDependenceRecords();
 }

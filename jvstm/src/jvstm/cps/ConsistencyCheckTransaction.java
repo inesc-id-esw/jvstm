@@ -27,7 +27,7 @@ package jvstm.cps;
 
 import java.util.Set;
 
-public interface ConsistencyCheckTransaction {
+public interface ConsistencyCheckTransaction<E extends Depended> {
     public void start();
-    public Set<Depended> getDepended();
+    public Set<E> getDepended();
 }

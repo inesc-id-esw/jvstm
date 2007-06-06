@@ -36,7 +36,7 @@ public class DefaultDependenceRecord implements DependenceRecord {
     protected final Method predicate;
     protected final VLinkedSet<Depended> depended;
 
-    public DefaultDependenceRecord(Object dependent, Method predicate, Set<Depended> depended) {
+    public DefaultDependenceRecord(Object dependent, Method predicate, Set<? extends Depended> depended) {
         this.dependent = dependent;
         this.predicate = predicate;
         this.depended = new VLinkedSet<Depended>(depended);
