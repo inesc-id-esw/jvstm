@@ -17,7 +17,7 @@
 
   <target name="compile" description="Compiles the jvstm source">
     <mkdir dir="${build.dir}"/>
-    <javac srcdir="${src.dir}" destdir="${build.dir}" extdirs="${lib.dir}" debug="on"/>
+    <javac srcdir="${src.dir}" destdir="${build.dir}" extdirs="${lib.dir}" target="1.5" debug="on"/>
     <java classname="jvstm.ProcessAtomicAnnotations" fork="true">
       <arg value="${build.dir}"/>
       <classpath>
