@@ -81,25 +81,11 @@ public abstract class ReadWriteTransaction extends Transaction {
         return value;
     }
 
-    protected <T> VBoxBody<T> getBodyRead(VBox<T> vbox) {
-        VBoxBody<T> body = bodiesRead.get(vbox);
-        if ((body == null) && (parent != null)) {
-            body = getRWParent().getBodyRead(vbox);
-        }
-        
-        return body;
-    }
-
     public <T> T getBoxValue(VBox<T> vbox) {
         T value = getLocalValue(vbox);
         if (value == null) {
-            VBoxBody<T> body = getBodyRead(vbox);
-
-            if (body == null) {
-                body = vbox.body.getBody(number);
-                bodiesRead.put(vbox, body);
-            }
-
+            VBoxBody<T> body = vbox.body.getBody(number);
+            bodiesRead.put(vbox, body);
             value = body.value;
         }
         return (value == NULL_VALUE) ? null : value;
