@@ -55,10 +55,12 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
         newObjects = objs.reverseInto(newObjects);
     }
 
+    @Override
     public Transaction makeNestedTransaction() {
 	return new ConsistentNestedTransaction(this);
     }
 
+    @Override
     protected void tryCommit() {
         if (isWriteTransaction()) {
             alreadyChecked = new HashSet();

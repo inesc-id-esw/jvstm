@@ -46,6 +46,7 @@ public class ConsistentNestedTransaction extends NestedTransaction implements Co
         newObjects = objs.reverseInto(newObjects);
     }
 
+    @Override
     protected void tryCommit() {
         ((ConsistentTransaction)getParent()).registerNewObjects(newObjects);
         super.tryCommit();

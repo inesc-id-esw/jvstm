@@ -53,6 +53,7 @@ public abstract class ReadWriteTransaction extends Transaction {
 	return (ReadWriteTransaction)getParent();
     }
 
+    @Override
     protected void finish() {
 	super.finish();
 	// to allow garbage collecting the collections
