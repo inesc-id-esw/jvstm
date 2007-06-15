@@ -26,15 +26,15 @@
 package jvstm;
 
 import java.util.Map;
-import java.util.IdentityHashMap;
+import java.util.HashMap;
 
 
 public abstract class ReadWriteTransaction extends Transaction {
     protected static final Object NULL_VALUE = new Object();
 
-    protected Map<VBox,VBoxBody> bodiesRead = new IdentityHashMap<VBox,VBoxBody>();
-    protected Map<VBox,Object> boxesWritten = new IdentityHashMap<VBox,Object>();
-    protected Map<PerTxBox,Object> perTxValues = new IdentityHashMap<PerTxBox,Object>();
+    protected Map<VBox,VBoxBody> bodiesRead = new HashMap<VBox,VBoxBody>();
+    protected Map<VBox,Object> boxesWritten = new HashMap<VBox,Object>();
+    protected Map<PerTxBox,Object> perTxValues = new HashMap<PerTxBox,Object>();
 
 
     public ReadWriteTransaction(int number) {
