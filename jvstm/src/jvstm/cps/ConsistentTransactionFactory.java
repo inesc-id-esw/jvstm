@@ -27,9 +27,10 @@ package jvstm.cps;
 
 import jvstm.Transaction;
 import jvstm.DefaultTransactionFactory;
+import jvstm.ActiveTransactionsRecord;
 
 public class ConsistentTransactionFactory extends DefaultTransactionFactory {
-    public Transaction makeTopLevelTransaction(int txNumber) {
-        return new ConsistentTopLevelTransaction(txNumber);
+    public Transaction makeTopLevelTransaction(ActiveTransactionsRecord record) {
+        return new ConsistentTopLevelTransaction(record);
     }
 }

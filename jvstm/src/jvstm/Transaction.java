@@ -25,15 +25,13 @@
  */
 package jvstm;
 
-import java.util.concurrent.atomic.AtomicReference;
-
-public abstract class Transaction implements Comparable<Transaction> {
+public abstract class Transaction {
 
     // static part starts here
 
 
     /*
-     * The committed static field is volatile to ensure correct
+     * The mostRecentRecord static field is volatile to ensure correct
      * synchronization among different threads:
      *
      * - A newly created transaction reads the value of this field at
@@ -54,14 +52,7 @@ public abstract class Transaction implements Comparable<Transaction> {
      * guarantees, even if we remove all the remaining volatile
      * declarations from the VBox and VBoxBody classes.
      */
-    private static volatile int committed = 0;
-
-    protected static final ActiveTransactionQueue ACTIVE_TXS;
-
-    static {
-        ACTIVE_TXS = new ActiveTransactionQueue();
-        ACTIVE_TXS.enable();
-    }
+    private static volatile ActiveTransactionsRecord mostRecentRecord = new ActiveTransactionsRecord(0, null);
 
     protected static final ThreadLocal<Transaction> current = new ThreadLocal<Transaction>();
 
@@ -75,16 +66,19 @@ public abstract class Transaction implements Comparable<Transaction> {
         return current.get();
     }
 
-    public static int getCommitted() {
-        return committed;
+    public static int getMostRecentCommitedNumber() {
+        return mostRecentRecord.transactionNumber;
     }
 
-    public static void setCommitted(int number) {
-        committed = Math.max(number, committed);
+    // this method is called during the commit of a write transaction
+    // the commits are already synchronized, so this method doesn't need to be
+    public static void setMostRecentActiveRecord(ActiveTransactionsRecord record) {
+        mostRecentRecord.setNext(record);
+        mostRecentRecord = record;
     }
 
     public static void addTxQueueListener(TxQueueListener listener) {
-	ACTIVE_TXS.addListener(listener);
+	ActiveTransactionsRecord.addListener(listener);
     }
 
     public static Transaction begin() {
@@ -95,26 +89,17 @@ public abstract class Transaction implements Comparable<Transaction> {
         Transaction parent = current.get();
         Transaction tx = null;
 
-	// we need to synchronize on the queue LOCK to inhibit the queue clean-up because we 
-	// don't want that a transaction that commits between we get the last committed number 
-	// and we add the new transaction cleans up the version number that we got before 
-	// the new transaction is added to the queue
-        ACTIVE_TXS.LOCK.lock();
-        try {
-	    if (parent == null) {
-                if (readOnly) {
-                    tx = TRANSACTION_FACTORY.makeReadOnlyTopLevelTransaction(getCommitted());
-                } else {
-                    tx = TRANSACTION_FACTORY.makeTopLevelTransaction(getCommitted());
-                }
-	    } else {
-		tx = parent.makeNestedTransaction();
-	    }
-            tx.start();
-	    ACTIVE_TXS.add(tx);
-	} finally {
-            ACTIVE_TXS.LOCK.unlock();
+        if (parent == null) {
+            ActiveTransactionsRecord activeRecord = mostRecentRecord.getRecordForNewTransaction();
+            if (readOnly) {
+                tx = TRANSACTION_FACTORY.makeReadOnlyTopLevelTransaction(activeRecord);
+            } else {
+                tx = TRANSACTION_FACTORY.makeTopLevelTransaction(activeRecord);
+            }
+        } else {
+            tx = parent.makeNestedTransaction();
         }
+        tx.start();
 
         return tx;
     }
@@ -137,8 +122,6 @@ public abstract class Transaction implements Comparable<Transaction> {
 
     protected int number;
     protected final Transaction parent;
-    protected volatile boolean finished = false;
-    protected volatile Thread thread = Thread.currentThread();
     
     public Transaction(int number) {
         this.number = number;
@@ -154,10 +137,6 @@ public abstract class Transaction implements Comparable<Transaction> {
         current.set(this);
     }
 
-    public Thread getThread() {
-        return thread;
-    }
-
     protected Transaction getParent() {
         return parent;
     }
@@ -168,15 +147,6 @@ public abstract class Transaction implements Comparable<Transaction> {
 
     protected void setNumber(int number) {
         this.number = number;
-    }
-
-    public int compareTo(Transaction o) {
-	return (this.getNumber() - o.getNumber());
-    }
-
-    protected void renumber(int txNumber) {
-	// To keep the queue ordered, we have to remove and reinsert the TX when it is renumbered
-	ACTIVE_TXS.renumberTransaction(this, txNumber);
     }
 
     protected void abortTx() {
@@ -192,32 +162,13 @@ public abstract class Transaction implements Comparable<Transaction> {
     }
 
     private void finishTx() {
-        // ensure that this method is called only by the thread "owning" the transaction, 
-        // because, otherwise, we may not set the current ThreadLocal variable of the correct thread
-        if (Thread.currentThread() != this.thread) {
-            throw new Error("ERROR: Cannot finish a transaction from another thread than the one running it");
-        }
-
         finish();
 
         current.set(this.getParent());
-
-        this.finished = true;
-
-        // clean up the reference to the thread
-        this.thread = null;
-    }
-
-    public boolean isFinished() {
-        return finished;
     }
 
     protected void finish() {
         // intentionally empty
-    }
-
-    protected void gcTransaction() {
-	// by default, do nothing
     }
 
     public abstract Transaction makeNestedTransaction();

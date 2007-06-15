@@ -25,22 +25,25 @@
  */
 package jvstm;
 
-import java.util.List;
 import java.util.Map;
-import java.util.ArrayList;
-
 import java.util.concurrent.locks.ReentrantLock;
 
+import jvstm.util.Cons;
 
 public class TopLevelTransaction extends ReadWriteTransaction {
     private static final ReentrantLock COMMIT_LOCK = new ReentrantLock(true);
 
-    // this field must be volatile because it may be accessed by the
-    // clean-up thread that GCs old transactions
-    protected volatile List<VBoxBody> bodiesCommitted = null;
+    private ActiveTransactionsRecord activeTxRecord;
 
-    public TopLevelTransaction(int number) {
-        super(number);
+    public TopLevelTransaction(ActiveTransactionsRecord activeRecord) {
+        super(activeRecord.transactionNumber);
+        this.activeTxRecord = activeRecord;
+    }
+
+    @Override
+    protected void finish() {
+        super.finish();
+        activeTxRecord.decrementRunning();
     }
 
     protected boolean isWriteTransaction() {
@@ -55,7 +58,19 @@ public class TopLevelTransaction extends ReadWriteTransaction {
             COMMIT_LOCK.lock();
             try {
 		if (validateCommit()) {
-		    setCommitted(performValidCommit());
+                    Cons<VBoxBody> bodiesCommitted = performValidCommit();
+                    // the commit is already done, so create a new ActiveTransactionsRecord
+                    ActiveTransactionsRecord newRecord = new ActiveTransactionsRecord(getNumber(), bodiesCommitted);
+                    setMostRecentActiveRecord(newRecord);
+
+                    // as this transaction changed number, we must
+                    // update the activeRecords accordingly
+
+                    // the correct order is to increment first the
+                    // new, and only then decrement the old
+                    newRecord.incrementRunning();
+                    this.activeTxRecord.decrementRunning();
+                    this.activeTxRecord = newRecord;
 		} else {
 		    throw new CommitException();
 		}
@@ -66,17 +81,16 @@ public class TopLevelTransaction extends ReadWriteTransaction {
         }
     }
 
-    protected int performValidCommit() {
-	int newTxNumber = getCommitted() + 1;
+    protected Cons<VBoxBody> performValidCommit() {
+	int newTxNumber = getMostRecentCommitedNumber() + 1;
         
 	// renumber the TX to the new number
-	renumber(newTxNumber);
+	setNumber(newTxNumber);
 	for (Map.Entry<PerTxBox,Object> entry : perTxValues.entrySet()) {
 	    entry.getKey().commit(entry.getValue());
 	}
 	
-	doCommit(newTxNumber);
-	return newTxNumber;
+	return doCommit(newTxNumber);
     }
 
     protected boolean validateCommit() {
@@ -88,31 +102,17 @@ public class TopLevelTransaction extends ReadWriteTransaction {
         return true;
     }
 
-    protected void doCommit(int newTxNumber) {
-        List<VBoxBody> newBodies = bodiesCommitted;
-	if (newBodies == null) {
-	    newBodies = new ArrayList<VBoxBody>(boxesWritten.size());
-        }
+    protected Cons<VBoxBody> doCommit(int newTxNumber) {
+        Cons<VBoxBody> newBodies = Cons.empty();
 
         for (Map.Entry<VBox,Object> entry : boxesWritten.entrySet()) {
             VBox vbox = entry.getKey();
             Object newValue = entry.getValue();
 
 	    VBoxBody newBody = vbox.commit((newValue == NULL_VALUE) ? null : newValue, newTxNumber);
-            newBodies.add(newBody);
+            newBodies = newBodies.cons(newBody);
         }
 
-        bodiesCommitted = newBodies;
-    }
-
-    protected void gcTransaction() {
-	if (bodiesCommitted != null) {
-	    // clean old versions of committed bodies
-	    for (VBoxBody body : bodiesCommitted) {
-		body.clearPrevious();
-	    }
-	    
-	    bodiesCommitted = null;
-	}
+        return newBodies;
     }
 }

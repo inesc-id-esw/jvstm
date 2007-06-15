@@ -28,6 +28,7 @@ package jvstm.cps;
 import jvstm.VBox;
 import jvstm.Transaction;
 import jvstm.TopLevelTransaction;
+import jvstm.ActiveTransactionsRecord;
 
 import jvstm.util.Cons;
 
@@ -43,8 +44,8 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
     protected Cons newObjects = Cons.empty();
     protected Set alreadyChecked = null;
 
-    public ConsistentTopLevelTransaction(int number) {
-        super(number);
+    public ConsistentTopLevelTransaction(ActiveTransactionsRecord record) {
+        super(record);
     }
 
     public void registerNewObject(Object obj) {

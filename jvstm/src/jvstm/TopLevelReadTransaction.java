@@ -25,11 +25,18 @@
  */
 package jvstm;
 
-public class DefaultTransactionFactory implements TransactionFactory {
-    public Transaction makeTopLevelTransaction(ActiveTransactionsRecord record) {
-        return new TopLevelTransaction(record);
+public class TopLevelReadTransaction extends ReadTransaction {
+
+    private ActiveTransactionsRecord activeTxRecord;
+
+    public TopLevelReadTransaction(ActiveTransactionsRecord activeRecord) {
+        super(activeRecord.transactionNumber);
+        this.activeTxRecord = activeRecord;
     }
-    public Transaction makeReadOnlyTopLevelTransaction(ActiveTransactionsRecord record) {
-        return new TopLevelReadTransaction(record);
+
+    @Override
+    protected void finish() {
+        super.finish();
+        activeTxRecord.decrementRunning();
     }
 }
