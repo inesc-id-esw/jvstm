@@ -33,7 +33,7 @@ import jvstm.util.Cons;
 public class TopLevelTransaction extends ReadWriteTransaction {
     private static final ReentrantLock COMMIT_LOCK = new ReentrantLock(true);
 
-    private ActiveTransactionsRecord activeTxRecord;
+    protected ActiveTransactionsRecord activeTxRecord;
 
     public TopLevelTransaction(ActiveTransactionsRecord activeRecord) {
         super(activeRecord.transactionNumber);

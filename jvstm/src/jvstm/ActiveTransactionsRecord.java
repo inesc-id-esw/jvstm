@@ -244,13 +244,17 @@ public class ActiveTransactionsRecord {
      */
 
 
-    ActiveTransactionsRecord(int txNumber, Cons<VBoxBody> bodiesToGC) {
+    public ActiveTransactionsRecord(int txNumber, Cons<VBoxBody> bodiesToGC) {
         this.transactionNumber = txNumber;
         this.bodiesToGC = new AtomicReference<Cons<VBoxBody>>(bodiesToGC);
     }
 
-    protected void incrementRunning() {
+    public void incrementRunning() {
         running.incrementAndGet();
+    }
+
+    public ActiveTransactionsRecord getNext() {
+        return next;
     }
 
     protected void setNext(ActiveTransactionsRecord next) {
@@ -263,7 +267,7 @@ public class ActiveTransactionsRecord {
         // possible to clean the successor yet.
     }
 
-    ActiveTransactionsRecord getRecordForNewTransaction() {
+    public ActiveTransactionsRecord getRecordForNewTransaction() {
         ActiveTransactionsRecord rec = this;
         while (true) {
             rec.running.incrementAndGet();
@@ -280,7 +284,7 @@ public class ActiveTransactionsRecord {
         }
     }
 
-    void decrementRunning() {
+    public void decrementRunning() {
         if (running.decrementAndGet() == 0) {
             // when running reachs 0 maybe it's time to clean our successor
             maybeCleanSuc();
@@ -326,7 +330,7 @@ public class ActiveTransactionsRecord {
 	    }
 
             notifyListeners(transactionNumber);
-            
+
             return true;
         } else {
             return false;

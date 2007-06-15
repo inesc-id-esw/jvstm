@@ -52,7 +52,7 @@ public abstract class Transaction {
      * guarantees, even if we remove all the remaining volatile
      * declarations from the VBox and VBoxBody classes.
      */
-    private static volatile ActiveTransactionsRecord mostRecentRecord = new ActiveTransactionsRecord(0, null);
+    protected static volatile ActiveTransactionsRecord mostRecentRecord = new ActiveTransactionsRecord(0, null);
 
     protected static final ThreadLocal<Transaction> current = new ThreadLocal<Transaction>();
 
