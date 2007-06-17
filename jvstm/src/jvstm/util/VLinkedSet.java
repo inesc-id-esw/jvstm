@@ -63,7 +63,7 @@ public class VLinkedSet<E> implements Set<E> {
         return new VLinkedSetIterator<E>();
     }
 
-    @Atomic
+    @Atomic(readOnly = true)
     public Object[] toArray() {
         int size = size();
         Cons<E> elems = entries.get();
@@ -77,7 +77,7 @@ public class VLinkedSet<E> implements Set<E> {
         return result;
     }
 
-    @Atomic
+    @Atomic(readOnly = true)
     public <T> T[] toArray(T[] a) {
         int size = size();
         Cons<E> elems = entries.get();
@@ -99,7 +99,7 @@ public class VLinkedSet<E> implements Set<E> {
         return a;
     }
 
-    @Atomic
+    @Atomic(canFail = false)
     public boolean add(E o) {
         Cons<E> oldElems = entries.get();
         Cons<E> newElems = adjoin(oldElems, o);
@@ -113,7 +113,7 @@ public class VLinkedSet<E> implements Set<E> {
         }
     }
 
-    @Atomic
+    @Atomic(canFail = false)
     public boolean remove(Object o) {
         Cons<E> oldElems = entries.get();
         Cons<E> newElems = oldElems.removeFirst(o);
@@ -139,7 +139,7 @@ public class VLinkedSet<E> implements Set<E> {
         return true;
     }
 
-    @Atomic
+    @Atomic(canFail = false)
     public boolean addAll(Collection<? extends E> c) {
         Cons<E> prev = entries.get();
         int added = 0;
@@ -160,7 +160,7 @@ public class VLinkedSet<E> implements Set<E> {
         return added > 0;
     }
 
-    @Atomic
+    @Atomic(canFail = false)
     public boolean retainAll(Collection<?> c) {
         Cons<E> result = Cons.empty();
         Cons<E> elems = entries.get();
@@ -183,7 +183,7 @@ public class VLinkedSet<E> implements Set<E> {
         return removed > 0;
     }
 
-    @Atomic
+    @Atomic(canFail = false)
     public boolean removeAll(Collection<?> c) {
         Cons<E> prev = entries.get();
         int removed = 0;
@@ -204,13 +204,13 @@ public class VLinkedSet<E> implements Set<E> {
         return removed > 0;
     }
 
-    @Atomic
+    @Atomic(canFail = false)
     public void clear() {
         entries.put((Cons<E>)Cons.empty());
         size.putInt(0);
     }
 
-    @Atomic
+    @Atomic(readOnly = true)
     public boolean equals(Object o) {
         if (o == this) {
             return true;
@@ -228,7 +228,7 @@ public class VLinkedSet<E> implements Set<E> {
         return containsAll(otherSet);
     }
    
-    @Atomic
+    @Atomic(readOnly = true)
     public int hashCode() {
         int value = 0;
         for (E o : entries.get()) {

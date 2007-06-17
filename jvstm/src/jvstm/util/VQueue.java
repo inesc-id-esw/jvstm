@@ -58,7 +58,7 @@ public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
 
     // the Queue interface methods
 
-    @Atomic
+    @Atomic(canFail = false)
     public boolean offer(E o) {
         Cons<E> frontElems = front.get();
         if (frontElems.isEmpty()) {
@@ -72,7 +72,7 @@ public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
         return true;
     }
 
-    @Atomic
+    @Atomic(canFail = false)
     public E poll() {
         Cons<E> frontElems = front.get();
         if (frontElems.isEmpty()) {
@@ -107,7 +107,7 @@ public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
         return result;
     }
 
-    @Atomic
+    @Atomic(readOnly = true)
     public E peek() {
         Cons<E> frontElems = front.get();
         if (frontElems.isEmpty()) {
@@ -117,7 +117,7 @@ public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
         }
     }
 
-    @Atomic
+    @Atomic(readOnly = true)
     public E element() {
         Cons<E> frontElems = front.get();
         if (frontElems.isEmpty()) {
@@ -129,7 +129,7 @@ public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
 
     // override some methods with better performing implementations
 
-    @Atomic
+    @Atomic(readOnly = true)
     public boolean contains(Object o) {
         return front.get().contains(o) || rear.get().contains(o);
     }
@@ -138,7 +138,7 @@ public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
         return new VQueueIterator<E>();
     }
 
-    @Atomic
+    @Atomic(canFail = false)
     public void clear() {
         front.put((Cons<E>)Cons.empty());
         rear.put((Cons<E>)Cons.empty());

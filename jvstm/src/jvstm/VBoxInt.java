@@ -43,22 +43,22 @@ public class VBoxInt extends VBox<Integer> {
         super.put(newValue);
     }
 
-    @Atomic
+    @Atomic(canFail = false)
     public void inc() {
         putInt(getInt() + 1);
     }
 
-    @Atomic
+    @Atomic(canFail = false)
     public void inc(int n) {
         putInt(getInt() + n);
     }
 
-    @Atomic
+    @Atomic(canFail = false)
     public void dec() {
         putInt(getInt() - 1);
     }
 
-    @Atomic
+    @Atomic(canFail = false)
     public void dec(int n) {
         putInt(getInt() - n);
     }

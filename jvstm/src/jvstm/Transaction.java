@@ -81,6 +81,10 @@ public abstract class Transaction {
 	ActiveTransactionsRecord.addListener(listener);
     }
 
+    public static boolean isInTransaction() {
+        return current.get() != null;
+    }
+
     public static Transaction begin() {
         return begin(false);
     }

@@ -29,5 +29,6 @@ import java.lang.annotation.*;
 
 @Target(ElementType.METHOD)
 public @interface Atomic { 
-    TxType value() default TxType.RO;
+    boolean readOnly() default false;
+    boolean canFail()  default true;
 }
