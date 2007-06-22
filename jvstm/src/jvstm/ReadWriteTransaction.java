@@ -28,11 +28,13 @@ package jvstm;
 import java.util.Map;
 import java.util.HashMap;
 
+import jvstm.util.Cons;
+import jvstm.util.Pair;
 
 public abstract class ReadWriteTransaction extends Transaction {
     protected static final Object NULL_VALUE = new Object();
 
-    protected Map<VBox,VBoxBody> bodiesRead = new HashMap<VBox,VBoxBody>();
+    protected Cons<Pair<VBox,VBoxBody>> bodiesRead = Cons.empty();
     protected Map<VBox,Object> boxesWritten = new HashMap<VBox,Object>();
     protected Map<PerTxBox,Object> perTxValues = new HashMap<PerTxBox,Object>();
 
@@ -65,7 +67,7 @@ public abstract class ReadWriteTransaction extends Transaction {
     protected void doCommit() {
 	tryCommit();
 	// if commit is successful, then clear all records
-	bodiesRead.clear();
+	bodiesRead = Cons.empty();
 	boxesWritten.clear();
 	perTxValues.clear();
     }
@@ -85,7 +87,7 @@ public abstract class ReadWriteTransaction extends Transaction {
         T value = getLocalValue(vbox);
         if (value == null) {
             VBoxBody<T> body = vbox.body.getBody(number);
-            bodiesRead.put(vbox, body);
+            bodiesRead = bodiesRead.cons(new Pair<VBox,VBoxBody>(vbox, body));
             value = body.value;
         }
         return (value == NULL_VALUE) ? null : value;

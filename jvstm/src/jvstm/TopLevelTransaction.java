@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
 import jvstm.util.Cons;
+import jvstm.util.Pair;
 
 public class TopLevelTransaction extends ReadWriteTransaction {
     private static final ReentrantLock COMMIT_LOCK = new ReentrantLock(true);
@@ -94,8 +95,8 @@ public class TopLevelTransaction extends ReadWriteTransaction {
     }
 
     protected boolean validateCommit() {
-        for (Map.Entry<VBox,VBoxBody> entry : bodiesRead.entrySet()) {
-            if (entry.getKey().body != entry.getValue()) {
+        for (Pair<VBox,VBoxBody> entry : bodiesRead) {
+            if (entry.first.body != entry.second) {
                 return false;
             }
         }
