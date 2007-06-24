@@ -34,9 +34,11 @@ import jvstm.util.Pair;
 public abstract class ReadWriteTransaction extends Transaction {
     protected static final Object NULL_VALUE = new Object();
 
+    protected static final Map EMPTY_MAP = new HashMap();
+
     protected Cons<Pair<VBox,VBoxBody>> bodiesRead = Cons.empty();
-    protected Map<VBox,Object> boxesWritten = new HashMap<VBox,Object>();
-    protected Map<PerTxBox,Object> perTxValues = new HashMap<PerTxBox,Object>();
+    protected Map<VBox,Object> boxesWritten = EMPTY_MAP;
+    protected Map<PerTxBox,Object> perTxValues = EMPTY_MAP;
 
 
     public ReadWriteTransaction(int number) {
@@ -68,14 +70,21 @@ public abstract class ReadWriteTransaction extends Transaction {
 	tryCommit();
 	// if commit is successful, then clear all records
 	bodiesRead = Cons.empty();
-	boxesWritten.clear();
-	perTxValues.clear();
+        if (boxesWritten != EMPTY_MAP) {
+            boxesWritten.clear();
+        }
+        if (perTxValues != EMPTY_MAP) {
+            perTxValues.clear();
+        }
     }
 
     protected abstract void tryCommit();
 
     protected <T> T getLocalValue(VBox<T> vbox) {
-        T value = (T)boxesWritten.get(vbox);
+        T value = null;
+        if (boxesWritten != EMPTY_MAP) {
+            value = (T)boxesWritten.get(vbox);
+        }
         if ((value == null) && (parent != null)) {
             value = getRWParent().getLocalValue(vbox);
         }
@@ -94,11 +103,17 @@ public abstract class ReadWriteTransaction extends Transaction {
     }
 
     public <T> void setBoxValue(VBox<T> vbox, T value) {
+        if (boxesWritten == EMPTY_MAP) {
+            boxesWritten = new HashMap<VBox,Object>();
+        }
         boxesWritten.put(vbox, value == null ? NULL_VALUE : value);
     }
 
     protected <T> T getPerTxValue(PerTxBox<T> box) {
-        T value = (T)perTxValues.get(box);
+        T value = null;
+        if (perTxValues != EMPTY_MAP) {
+            value = (T)perTxValues.get(box);
+        }
         if ((value == null) && (parent != null)) {
 	    value = getRWParent().getPerTxValue(box);
 	}
@@ -115,6 +130,9 @@ public abstract class ReadWriteTransaction extends Transaction {
     }
 
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
+        if (perTxValues == EMPTY_MAP) {
+            perTxValues = new HashMap<PerTxBox,Object>();
+        }
 	perTxValues.put(box, value);
     }
 }
