@@ -25,6 +25,8 @@
  */
 package jvstm;
 
+import java.util.concurrent.Callable;
+
 public abstract class Transaction {
 
     // static part starts here
@@ -202,6 +204,35 @@ public abstract class Transaction {
             } finally {
                 if (tx != null) {
                     tx.abort();
+                }
+            }
+        }
+    }
+
+    public static <T> T doIt(Callable<T> xaction) throws Exception {
+        return doIt(xaction, false);
+    }
+
+    public static <T> T doIt(Callable<T> xaction, boolean tryReadOnly) throws Exception {
+        T result = null;
+        while (true) {
+            Transaction.begin(tryReadOnly);
+            boolean finished = false;
+            try {
+                result = xaction.call();
+                Transaction.commit();
+                finished = true;
+                return result;
+            } catch (CommitException ce) {
+                Transaction.abort();
+                finished = true;
+            } catch (WriteOnReadException wore) {
+                Transaction.abort();
+                finished = true;
+                tryReadOnly = false;
+            } finally {
+                if (! finished) {
+                    Transaction.abort();
                 }
             }
         }
