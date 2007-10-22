@@ -10,7 +10,7 @@ public class TestTransfers {
     int restarts = 0;
 
     TestTransfers(int numAccounts) {
-        counter = new Counter();
+        //counter = new Counter();
         ac = new Account[numAccounts];
         
         for (int i = 0; i < numAccounts; i++) {

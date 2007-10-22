@@ -1,4 +1,5 @@
 import java.util.Random;
+import jvstm.Transaction;
 
 public class TestReads {
 
