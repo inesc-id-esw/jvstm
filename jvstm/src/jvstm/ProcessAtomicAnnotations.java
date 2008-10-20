@@ -47,10 +47,17 @@ public class ProcessAtomicAnnotations {
     private static final String ATOMIC_DESC = Type.getDescriptor(Atomic.class);
 
     private String[] files;
+    private String txClassInternalName = Type.getInternalName(Transaction.class);
 
-    ProcessAtomicAnnotations(String[] files) {
+    public ProcessAtomicAnnotations(String[] files) {
 	this.files = files;
     }
+
+    public ProcessAtomicAnnotations(Class txClassToUse, String[] files) {
+        this(files);
+        this.txClassInternalName = Type.getInternalName(txClassToUse);
+    }
+
     
     public void start() {
         for (String file : files) {
@@ -72,6 +79,7 @@ public class ProcessAtomicAnnotations {
     }
 
     protected void processClassFile(File classFile) {
+        //System.out.println("Processing file " + classFile + " for atomic annotations");
 	AtomicMethodsInfo atomicMethods = collectAtomicMethods(classFile);
 	if (! atomicMethods.isEmpty()) {
 	    transformClassFile(classFile, atomicMethods);
@@ -112,7 +120,7 @@ public class ProcessAtomicAnnotations {
             is = new FileInputStream(classFile);
             ClassReader cr = new ClassReader(is);
             ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-            AtomicMethodTransformer cv = new AtomicMethodTransformer(cw, atomicMethods);
+            AtomicMethodTransformer cv = new AtomicMethodTransformer(cw, atomicMethods, txClassInternalName);
             cr.accept(cv, 0);
 	    writeNewClassFile(classFile, cw.toByteArray());
         } catch (Exception e) {
@@ -222,13 +230,15 @@ public class ProcessAtomicAnnotations {
 
     static class AtomicMethodTransformer extends ClassAdapter implements Opcodes {
 	private AtomicMethodsInfo atomicMethods;
+        private String txClassInternalName;
         private String className = null;
 	private boolean renameMethods = true;
 	private ArrayList<MethodWrapper> methods = new ArrayList<MethodWrapper>();
 
-        public AtomicMethodTransformer(ClassWriter cw, AtomicMethodsInfo atomicMethods) {
+        public AtomicMethodTransformer(ClassWriter cw, AtomicMethodsInfo atomicMethods, String txClassInternalName) {
             super(cw);
 	    this.atomicMethods = atomicMethods;
+            this.txClassInternalName = txClassInternalName;
         }
 
         public void visitEnd() {
@@ -269,7 +279,7 @@ public class ProcessAtomicAnnotations {
                 mv.visitTryCatchBlock(l3, l5, l3, null);
 
                 if (flattenNested) {
-                    mv.visitMethodInsn(INVOKESTATIC, "jvstm/Transaction", "isInTransaction", "()Z");
+                    mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "isInTransaction", "()Z");
                 }
 
                 Label l6 = new Label();
@@ -287,7 +297,7 @@ public class ProcessAtomicAnnotations {
                 }
 
                 mv.visitLabel(l6);
-                mv.visitMethodInsn(INVOKESTATIC, "jvstm/Transaction", "begin", "()Ljvstm/Transaction;");
+                mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "begin", "()Ljvstm/Transaction;");
                 mv.visitInsn(POP);
                 mv.visitInsn(ICONST_0);
                 mv.visitVarInsn(ISTORE, boolVarPos);
@@ -298,7 +308,7 @@ public class ProcessAtomicAnnotations {
                     mv.visitVarInsn(returnType.getOpcode(ISTORE), boolVarPos + 1);
                 }
 
-                mv.visitMethodInsn(INVOKESTATIC, "jvstm/Transaction", "commit", "()V");
+                mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "commit", "()V");
                 mv.visitInsn(ICONST_1);
                 mv.visitVarInsn(ISTORE, boolVarPos);
 
@@ -311,7 +321,7 @@ public class ProcessAtomicAnnotations {
                 mv.visitVarInsn(ILOAD, boolVarPos);
                 Label l7 = new Label();
                 mv.visitJumpInsn(IFNE, l7);
-                mv.visitMethodInsn(INVOKESTATIC, "jvstm/Transaction", "abort", "()V");
+                mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
                 mv.visitLabel(l7);
 
                 if (returnType == Type.VOID_TYPE) {
@@ -323,14 +333,14 @@ public class ProcessAtomicAnnotations {
 
                 mv.visitLabel(l2);
                 mv.visitVarInsn(ASTORE, boolVarPos + 1);
-                mv.visitMethodInsn(INVOKESTATIC, "jvstm/Transaction", "abort", "()V");
+                mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
                 mv.visitInsn(ICONST_1);
                 mv.visitVarInsn(ISTORE, boolVarPos);
                 mv.visitLabel(l4);
                 mv.visitVarInsn(ILOAD, boolVarPos);
                 Label l8 = new Label();
                 mv.visitJumpInsn(IFNE, l8);
-                mv.visitMethodInsn(INVOKESTATIC, "jvstm/Transaction", "abort", "()V");
+                mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
                 mv.visitJumpInsn(GOTO, l8);
                 mv.visitLabel(l3);
                 mv.visitVarInsn(ASTORE, boolVarPos + 1 + (2 * retSize));
@@ -338,7 +348,7 @@ public class ProcessAtomicAnnotations {
                 mv.visitVarInsn(ILOAD, boolVarPos);
                 Label l9 = new Label();
                 mv.visitJumpInsn(IFNE, l9);
-                mv.visitMethodInsn(INVOKESTATIC, "jvstm/Transaction", "abort", "()V");
+                mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
                 mv.visitLabel(l9);
                 mv.visitVarInsn(ALOAD, boolVarPos + 1 + (2 * retSize));
                 mv.visitInsn(ATHROW);
