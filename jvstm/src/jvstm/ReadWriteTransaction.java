@@ -25,6 +25,7 @@
  */
 package jvstm;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -34,7 +35,7 @@ import jvstm.util.Pair;
 public abstract class ReadWriteTransaction extends Transaction {
     protected static final Object NULL_VALUE = new Object();
 
-    protected static final Map EMPTY_MAP = new HashMap();
+    protected static final Map EMPTY_MAP = Collections.emptyMap();
 
     protected Cons<Pair<VBox,VBoxBody>> bodiesRead = Cons.empty();
     protected Map<VBox,Object> boxesWritten = EMPTY_MAP;
