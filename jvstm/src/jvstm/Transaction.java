@@ -126,6 +126,33 @@ public abstract class Transaction {
         tx.commitTx(false);
     }
 
+    public static Transaction suspend() {
+	Transaction tx = current.get();
+        current.set(null);
+        return tx;
+    }
+
+    public static void resume(Transaction tx) {
+        if (current.get() != null) {
+            throw new ResumeException("Can't resume a transaction into a thread with an active transaction already");
+        }
+
+        // In the previous lines I'm checking that the current thread
+        // has no transaction, because, otherwise, we would lost the
+        // current transaction.
+        //
+        // Likewise, I should not allow that the same transaction is
+        // associated with more than one thread.  For that, however, I
+        // would have to keep track of which thread owns each
+        // transaction and change that atomically.  I recall having
+        // the thread in each transaction but I removed sometime ago.
+        // So, until I investigate this further, whoever is using this
+        // resume stuff must be carefull, because the system will not
+        // detect that the same transaction is being used in two
+        // different threads.
+        current.set(tx);
+    }
+
     protected int number;
     protected final Transaction parent;
     
@@ -149,6 +176,10 @@ public abstract class Transaction {
 
     public int getNumber() {
         return number;
+    }
+
+    public void resume() {
+        Transaction.resume(this);
     }
 
     protected void setNumber(int number) {
