@@ -128,7 +128,7 @@ public abstract class Transaction {
 
     public static Transaction suspend() {
 	Transaction tx = current.get();
-        current.set(null);
+        tx.suspendTx();
         return tx;
     }
 
@@ -150,7 +150,8 @@ public abstract class Transaction {
         // resume stuff must be carefull, because the system will not
         // detect that the same transaction is being used in two
         // different threads.
-        current.set(tx);
+
+        tx.resumeTx();
     }
 
     protected int number;
@@ -178,10 +179,6 @@ public abstract class Transaction {
         return number;
     }
 
-    public void resume() {
-        Transaction.resume(this);
-    }
-
     protected void setNumber(int number) {
         this.number = number;
     }
@@ -206,6 +203,14 @@ public abstract class Transaction {
 
     protected void finish() {
         // intentionally empty
+    }
+
+    protected void suspendTx() {
+        current.set(null);
+    }
+
+    protected void resumeTx() {
+        current.set(this);
     }
 
     public abstract Transaction makeNestedTransaction();
