@@ -69,14 +69,10 @@ public abstract class ReadWriteTransaction extends Transaction {
 
     protected void doCommit() {
 	tryCommit();
-	// if commit is successful, then clear all records
+	// if commit is successful, then reset transaction to a clean state
 	bodiesRead = Cons.empty();
-        if (boxesWritten != EMPTY_MAP) {
-            boxesWritten.clear();
-        }
-        if (perTxValues != EMPTY_MAP) {
-            perTxValues.clear();
-        }
+        boxesWritten = EMPTY_MAP;
+        perTxValues = EMPTY_MAP;
     }
 
     protected abstract void tryCommit();
