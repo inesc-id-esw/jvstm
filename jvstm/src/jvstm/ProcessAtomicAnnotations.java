@@ -32,9 +32,7 @@ import java.io.InputStream;
 
 import java.util.ArrayList;
 import java.util.Map;
-import java.util.Set;
 import java.util.HashMap;
-import java.util.HashSet;
 
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.*;
