@@ -27,6 +27,8 @@ package jvstm;
 
 
 public class ResumeException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
     public ResumeException(String message) {
         super(message);
     }

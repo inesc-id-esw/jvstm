@@ -28,6 +28,7 @@ package jvstm.cps;
 import java.lang.reflect.Method;
 
 public class ConsistencyException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
 
     Object target;
     Method method;
