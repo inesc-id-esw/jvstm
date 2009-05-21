@@ -325,7 +325,7 @@ public class ActiveTransactionsRecord {
         // yet, because of the atomic getAndSet above, only one will
         // actually clean the bodies
         if (toClean != null) {
-	    for (VBoxBody body : toClean) {
+	    for (VBoxBody<?> body : toClean) {
 		body.clearPrevious();
 	    }
 

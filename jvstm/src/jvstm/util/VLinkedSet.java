@@ -69,7 +69,7 @@ public class VLinkedSet<E> implements Set<E> {
         Cons<E> elems = entries.get();
         Object[] result = new Object[size];
 
-        Iterator iter = elems.iterator();
+        Iterator<?> iter = elems.iterator();
         for (int i = 0; i < size; i++) {
             result[i] = iter.next();
         }
@@ -220,7 +220,7 @@ public class VLinkedSet<E> implements Set<E> {
             return false;
         }
 
-        Set otherSet = (Set)o;
+        Set<?> otherSet = (Set<?>)o;
         if (this.size() != otherSet.size()) {
             return false;
         }
@@ -243,7 +243,7 @@ public class VLinkedSet<E> implements Set<E> {
         return (list.contains(elem)) ? list : list.cons(elem);
     }
 
-    protected void removeCons(Cons cons) {
+    protected void removeCons(Cons<?> cons) {
         Cons<E> oldElems = entries.get();
         Cons<E> newElems = oldElems.removeCons(cons);
 

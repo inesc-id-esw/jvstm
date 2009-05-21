@@ -51,7 +51,7 @@ public class ProcessAtomicAnnotations {
 	this.files = files;
     }
 
-    public ProcessAtomicAnnotations(Class txClassToUse, String[] files) {
+    public ProcessAtomicAnnotations(Class<?> txClassToUse, String[] files) {
         this(files);
         this.txClassInternalName = Type.getInternalName(txClassToUse);
     }

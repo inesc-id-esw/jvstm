@@ -45,7 +45,7 @@ public class Pair<E1,E2> {
     @Override
     public boolean equals(Object other) {
         if ((other != null) && (other.getClass() == this.getClass())) {
-            Pair p2 = (Pair)other;
+            Pair<?,?> p2 = (Pair)other;
             return eq(this.first, p2.first) && eq(this.second, p2.second);
         }
         return false;

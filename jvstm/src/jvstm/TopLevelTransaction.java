@@ -110,7 +110,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
             VBox vbox = entry.getKey();
             Object newValue = entry.getValue();
 
-	    VBoxBody newBody = vbox.commit((newValue == NULL_VALUE) ? null : newValue, newTxNumber);
+	    VBoxBody<?> newBody = vbox.commit((newValue == NULL_VALUE) ? null : newValue, newTxNumber);
             newBodies = newBodies.cons(newBody);
         }
 

@@ -122,8 +122,8 @@ public class Cons<E> implements Iterable<E> {
         }
     }
 
-    public Cons<E> removeCons(Cons cons) {
-        Cons iter = this;
+    public Cons<E> removeCons(Cons<?> cons) {
+        Cons<?> iter = this;
         while ((iter != cons) && (iter != EMPTY)) {
             iter = iter.rest;
         }
@@ -135,7 +135,7 @@ public class Cons<E> implements Iterable<E> {
         }
     }
 
-    private Cons<E> removeExistingCons(Cons cons) {
+    private Cons<E> removeExistingCons(Cons<?> cons) {
         if (cons == this) {
             return rest;
         } else {
@@ -155,7 +155,7 @@ public class Cons<E> implements Iterable<E> {
 
     public int size() {
         int size = 0;
-        Cons iter = this;
+        Cons<?> iter = this;
         while (iter != EMPTY) {
             size++;
             iter = iter.rest;

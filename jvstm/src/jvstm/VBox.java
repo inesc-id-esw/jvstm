@@ -64,7 +64,7 @@ public class VBox<E> {
         }
     }
 
-    public VBoxBody commit(E newValue, int txNumber) {
+    public VBoxBody<?> commit(E newValue, int txNumber) {
         VBoxBody<E> newBody = makeNewBody(newValue, txNumber, this.body);
 	this.body = newBody;
         return newBody;
