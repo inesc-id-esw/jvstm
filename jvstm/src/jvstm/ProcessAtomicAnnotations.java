@@ -247,6 +247,7 @@ public class ProcessAtomicAnnotations {
                 boolean canFail = mw.annParams.getParamAsBoolean("canFail");
                 boolean readOnly = mw.annParams.getParamAsBoolean("readOnly");
                 boolean flattenNested = (readOnly || (! canFail));
+		boolean speculativeReadOnly = mw.annParams.getParamAsBoolean("speculativeReadOnly");
 
 		Type returnType = Type.getReturnType(mw.desc);
 		Type[] argsType = Type.getArgumentTypes(mw.desc);
@@ -260,7 +261,8 @@ public class ProcessAtomicAnnotations {
                     argsSize++;
                 }
 
-		int boolVarPos = argsSize;
+		int tryReadOnlyVarPos = argsSize;
+		int txFinishedVarPos = argsSize + 1;
 		int retSize = (returnType == Type.VOID_TYPE) ? 0 : returnType.getSize();
 
 		MethodVisitor mv = visitMethod(mw.access, mw.name, mw.desc, mw.signature, mw.exceptions);
@@ -271,22 +273,27 @@ public class ProcessAtomicAnnotations {
                 Label l1 = new Label();
                 Label l2 = new Label();
                 mv.visitTryCatchBlock(l0, l1, l2, "jvstm/CommitException");
-                Label l3 = new Label();
-                mv.visitTryCatchBlock(l0, l1, l3, null);
+		Label l3 = new Label();
+		mv.visitTryCatchBlock(l0, l1, l3, "jvstm/WriteOnReadException");
                 Label l4 = new Label();
-                mv.visitTryCatchBlock(l2, l4, l3, null);
+                mv.visitTryCatchBlock(l0, l1, l4, null);
                 Label l5 = new Label();
-                mv.visitTryCatchBlock(l3, l5, l3, null);
-
-                if (flattenNested) {
-                    mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "isInTransaction", "()Z");
-                }
-
+                mv.visitTryCatchBlock(l2, l5, l4, null);
                 Label l6 = new Label();
-
+                mv.visitTryCatchBlock(l3, l6, l4, null);
+		Label l7 = new Label();
+		mv.visitTryCatchBlock(l4, l7, l4, null);
+		if (speculativeReadOnly) {
+		    mv.visitInsn(ICONST_1);
+		} else {
+		    mv.visitInsn(ICONST_0);
+		}
+		mv.visitVarInsn(ISTORE, tryReadOnlyVarPos);
+                Label l8 = new Label();
                 Label lExit = null;
                 if (flattenNested) {
-                    mv.visitJumpInsn(IFEQ, l6);
+                    mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "isInTransaction", "()Z");
+                    mv.visitJumpInsn(IFEQ, l8);
                     generateInternalMethodCall(mv, mw, argsType);
                     if (returnType == Type.VOID_TYPE) {
                         lExit = new Label();
@@ -296,64 +303,83 @@ public class ProcessAtomicAnnotations {
                     }
                 }
 
-                mv.visitLabel(l6);
-                mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "begin", "()Ljvstm/Transaction;");
+                mv.visitLabel(l8);
+		// mv.visitFrame(Opcodes.F_APPEND,1, new Object[] {Opcodes.INTEGER}, 0, null);
+		mv.visitVarInsn(ILOAD, tryReadOnlyVarPos);
+                mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "begin", "(Z)Ljvstm/Transaction;");
                 mv.visitInsn(POP);
                 mv.visitInsn(ICONST_0);
-                mv.visitVarInsn(ISTORE, boolVarPos);
+                mv.visitVarInsn(ISTORE, txFinishedVarPos);
                 mv.visitLabel(l0);
                 generateInternalMethodCall(mv, mw, argsType);
 
                 if (returnType != Type.VOID_TYPE) {
-                    mv.visitVarInsn(returnType.getOpcode(ISTORE), boolVarPos + 1);
+                    mv.visitVarInsn(returnType.getOpcode(ISTORE), txFinishedVarPos + 1);
                 }
 
                 mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "commit", "()V");
                 mv.visitInsn(ICONST_1);
-                mv.visitVarInsn(ISTORE, boolVarPos);
+                mv.visitVarInsn(ISTORE, txFinishedVarPos);
 
                 if (returnType != Type.VOID_TYPE) {
-                    mv.visitVarInsn(returnType.getOpcode(ILOAD), boolVarPos + 1);
-                    mv.visitVarInsn(returnType.getOpcode(ISTORE), boolVarPos + 1 + retSize);
+                    mv.visitVarInsn(returnType.getOpcode(ILOAD), txFinishedVarPos + 1);
+                    mv.visitVarInsn(returnType.getOpcode(ISTORE), txFinishedVarPos + 1 + retSize);
                 }
 
                 mv.visitLabel(l1);
-                mv.visitVarInsn(ILOAD, boolVarPos);
-                Label l7 = new Label();
-                mv.visitJumpInsn(IFNE, l7);
-                mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
-                mv.visitLabel(l7);
-
-                if (returnType == Type.VOID_TYPE) {
-                    mv.visitInsn(RETURN);
-                } else {
-                    mv.visitVarInsn(returnType.getOpcode(ILOAD), boolVarPos + 1 + retSize);
-                    mv.visitInsn(returnType.getOpcode(IRETURN));
-                }
-
-                mv.visitLabel(l2);
-                mv.visitVarInsn(ASTORE, boolVarPos + 1);
-                mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
-                mv.visitInsn(ICONST_1);
-                mv.visitVarInsn(ISTORE, boolVarPos);
-                mv.visitLabel(l4);
-                mv.visitVarInsn(ILOAD, boolVarPos);
-                Label l8 = new Label();
-                mv.visitJumpInsn(IFNE, l8);
-                mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
-                mv.visitJumpInsn(GOTO, l8);
-                mv.visitLabel(l3);
-                mv.visitVarInsn(ASTORE, boolVarPos + 1 + (2 * retSize));
-                mv.visitLabel(l5);
-                mv.visitVarInsn(ILOAD, boolVarPos);
+                mv.visitVarInsn(ILOAD, txFinishedVarPos);
                 Label l9 = new Label();
                 mv.visitJumpInsn(IFNE, l9);
                 mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
                 mv.visitLabel(l9);
-                mv.visitVarInsn(ALOAD, boolVarPos + 1 + (2 * retSize));
+		// mv.visitFrame(Opcodes.F_APPEND,1, new Object[] {Opcodes.INTEGER}, 0, null);
+                if (returnType == Type.VOID_TYPE) {
+                    mv.visitInsn(RETURN);
+                } else {
+                    mv.visitVarInsn(returnType.getOpcode(ILOAD), txFinishedVarPos + 1 + retSize);
+                    mv.visitInsn(returnType.getOpcode(IRETURN));
+                }
+
+                mv.visitLabel(l2);
+		// mv.visitFrame(Opcodes.F_SAME1, 0, null, 1, new Object[] {"jvstm/CommitException"});
+                mv.visitVarInsn(ASTORE, txFinishedVarPos + 1);
+                mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
+                mv.visitInsn(ICONST_1);
+                mv.visitVarInsn(ISTORE, txFinishedVarPos);
+                mv.visitLabel(l5);
+                mv.visitVarInsn(ILOAD, txFinishedVarPos);
+                Label l10 = new Label();
+                mv.visitJumpInsn(IFNE, l10);
+                mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
+                mv.visitJumpInsn(GOTO, l10);
+		mv.visitLabel(l3);
+		// mv.visitFrame(Opcodes.F_SAME1, 0, null, 1, new Object[] {"jvstm/WriteOnReadException"});
+		mv.visitVarInsn(ASTORE, txFinishedVarPos + 1);
+		mv.visitMethodInsn(INVOKESTATIC, "jvstm/Transaction", "abort", "()V");
+		mv.visitInsn(ICONST_1);
+		mv.visitVarInsn(ISTORE, txFinishedVarPos);
+		mv.visitInsn(ICONST_0);
+		mv.visitVarInsn(ISTORE, tryReadOnlyVarPos);
+		mv.visitLabel(l6);
+		mv.visitVarInsn(ILOAD, txFinishedVarPos);
+		mv.visitJumpInsn(IFNE, l10);
+		mv.visitMethodInsn(INVOKESTATIC, "jvstm/Transaction", "abort", "()V");
+		mv.visitJumpInsn(GOTO, l10);
+                mv.visitLabel(l4);
+		// mv.visitFrame(Opcodes.F_SAME1, 0, null, 1, new Object[] {"java/lang/Throwable"});
+                mv.visitVarInsn(ASTORE, txFinishedVarPos + 1 + (2 * retSize));
+                mv.visitLabel(l7);
+                mv.visitVarInsn(ILOAD, txFinishedVarPos);
+                Label l11 = new Label();
+                mv.visitJumpInsn(IFNE, l11);
+                mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
+                mv.visitLabel(l11);
+		// mv.visitFrame(Opcodes.F_APPEND,2, new Object[] {Opcodes.TOP, "java/lang/Throwable"}, 0, null);
+                mv.visitVarInsn(ALOAD, txFinishedVarPos + 1 + (2 * retSize));
                 mv.visitInsn(ATHROW);
-                mv.visitLabel(l8);
-                mv.visitJumpInsn(GOTO, l6);
+                mv.visitLabel(l10);
+		// mv.visitFrame(Opcodes.F_CHOP,3, null, 0, null);
+                mv.visitJumpInsn(GOTO, l8);
 
                 if (flattenNested && (returnType == Type.VOID_TYPE)) {
                     mv.visitLabel(lExit);

@@ -31,4 +31,5 @@ import java.lang.annotation.*;
 public @interface Atomic { 
     boolean readOnly() default false;
     boolean canFail()  default true;
+    boolean speculativeReadOnly() default true;
 }
