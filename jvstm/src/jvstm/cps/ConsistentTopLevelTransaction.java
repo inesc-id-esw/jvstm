@@ -56,6 +56,10 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
         newObjects = objs.reverseInto(newObjects);
     }
 
+    public Cons getNewObjectsRegister() {
+	return newObjects;
+    }
+
     @Override
     public Transaction makeNestedTransaction() {
 	return new ConsistentNestedTransaction(this);

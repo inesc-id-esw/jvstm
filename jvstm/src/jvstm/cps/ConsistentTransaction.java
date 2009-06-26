@@ -30,4 +30,5 @@ import jvstm.util.Cons;
 public interface ConsistentTransaction {
     public void registerNewObject(Object obj);
     public void registerNewObjects(Cons objs);
+    public Cons getNewObjectsRegister();
 }
