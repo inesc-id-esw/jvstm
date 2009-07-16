@@ -87,6 +87,18 @@ public abstract class Transaction {
         return current.get() != null;
     }
 
+    public static Transaction beginInevitable() {
+        Transaction parent = current.get();
+        if (parent != null) {
+            throw new Error("Inevitable transactions cannot be nested");
+        }
+
+        ActiveTransactionsRecord activeRecord = mostRecentRecord.getRecordForNewTransaction();
+        Transaction tx = new InevitableTransaction(activeRecord);
+        tx.start();
+        return tx;
+    }
+
     public static Transaction begin() {
         return begin(false);
     }
