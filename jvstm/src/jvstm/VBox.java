@@ -44,10 +44,21 @@ public class VBox<E> {
     public E get() {
         Transaction tx = Transaction.current();
         if (tx == null) {
-            tx = Transaction.begin();
-            E result = tx.getBoxValue(this);
-            tx.commit();
-            return result;
+            // Access the box body without creating a full transaction, while
+            // still preserving ordering guarantees by 'piggybacking' on the
+            // version from the latest commited transaction.
+            // If the box body is GC'd before we can reach it, the process
+            // re-starts with a newer transaction.
+            while (true) {
+                int transactionNumber = Transaction.mostRecentRecord.transactionNumber;
+                VBoxBody<E> boxBody = this.body;
+                do {
+                    if (boxBody.version <= transactionNumber) {
+                        return boxBody.value;
+                    }
+                    boxBody = boxBody.next;
+                } while (boxBody != null);
+            }
         } else {
             return tx.getBoxValue(this);
         }
