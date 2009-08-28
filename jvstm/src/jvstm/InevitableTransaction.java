@@ -79,7 +79,7 @@ public class InevitableTransaction extends Transaction {
         TopLevelTransaction.COMMIT_LOCK.unlock();
     }
 
-    public Transaction makeNestedTransaction() {
+    public Transaction makeNestedTransaction(boolean readOnly) {
 	throw new Error("Inevitable transactions don't support nesting yet");
     }
 

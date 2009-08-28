@@ -61,7 +61,7 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
     }
 
     @Override
-    public Transaction makeNestedTransaction() {
+    public Transaction makeNestedTransaction(boolean readOnly) {
 	return new ConsistentNestedTransaction(this);
     }
 

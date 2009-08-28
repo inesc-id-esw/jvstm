@@ -115,7 +115,11 @@ public abstract class Transaction {
                 tx = TRANSACTION_FACTORY.makeTopLevelTransaction(activeRecord);
             }
         } else {
-            tx = parent.makeNestedTransaction();
+	    // passing the readOnly parameter to makeNestedTransaction is a temporary solution to
+	    // support the correct semantics in the composition of @Atomic annotations.  Ideally, we
+	    // should adjust the code generation of @Atomic to let WriteOnReadExceptions pass to the
+	    // parent
+            tx = parent.makeNestedTransaction(readOnly);
         }
         tx.start();
 
@@ -225,7 +229,7 @@ public abstract class Transaction {
         current.set(this);
     }
 
-    public abstract Transaction makeNestedTransaction();
+    public abstract Transaction makeNestedTransaction(boolean readOnly);
 
     public abstract <T> T getBoxValue(VBox<T> vbox);
 

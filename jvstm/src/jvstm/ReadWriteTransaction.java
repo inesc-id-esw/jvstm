@@ -50,7 +50,8 @@ public abstract class ReadWriteTransaction extends Transaction {
         super(parent);
     }
 
-    public Transaction makeNestedTransaction() {
+    public Transaction makeNestedTransaction(boolean readOnly) {
+	// always create a RW nested transaction, because we need its read-set
 	return new NestedTransaction(this);
     }
 
