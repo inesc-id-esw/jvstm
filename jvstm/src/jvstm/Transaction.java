@@ -87,6 +87,20 @@ public abstract class Transaction {
         return current.get() != null;
     }
 
+    /** Warning: this method has limited usability.  See the UnsafeSingleThreaded class for
+     * details */
+    public static Transaction beginUnsafeSingleThreaded() {
+	Transaction parent = current.get();
+        if (parent != null) {
+            throw new Error("Unsafe single-threaded transactions cannot be nested");
+        }
+
+        ActiveTransactionsRecord activeRecord = mostRecentRecord.getRecordForNewTransaction();
+        Transaction tx = new UnsafeSingleThreadedTransaction(activeRecord);
+        tx.start();
+        return tx;
+    }
+
     public static Transaction beginInevitable() {
         Transaction parent = current.get();
         if (parent != null) {
