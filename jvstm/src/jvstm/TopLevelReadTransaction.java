@@ -35,6 +35,12 @@ public class TopLevelReadTransaction extends ReadTransaction {
     }
 
     @Override
+    protected ActiveTransactionsRecord getSameRecordForNewTransaction() {
+	this.activeTxRecord.incrementRunning();
+	return this.activeTxRecord;
+    }
+
+    @Override
     protected void finish() {
         super.finish();
         activeTxRecord.decrementRunning();

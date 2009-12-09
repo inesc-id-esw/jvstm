@@ -118,16 +118,26 @@ public abstract class Transaction {
     }
 
     public static Transaction begin(boolean readOnly) {
+	ActiveTransactionsRecord activeRecord = null;
+        Transaction parent = current.get();
+
+        if (parent == null) {
+            activeRecord = mostRecentRecord.getRecordForNewTransaction();
+        }
+
+	return beginWithActiveRecord(readOnly, activeRecord);
+    }
+
+    private static Transaction beginWithActiveRecord(boolean readOnly, ActiveTransactionsRecord activeRecord) {
         Transaction parent = current.get();
         Transaction tx = null;
 
         if (parent == null) {
-            ActiveTransactionsRecord activeRecord = mostRecentRecord.getRecordForNewTransaction();
-            if (readOnly) {
-                tx = TRANSACTION_FACTORY.makeReadOnlyTopLevelTransaction(activeRecord);
-            } else {
-                tx = TRANSACTION_FACTORY.makeTopLevelTransaction(activeRecord);
-            }
+	    if (readOnly) {
+		tx = TRANSACTION_FACTORY.makeReadOnlyTopLevelTransaction(activeRecord);
+	    } else {
+		tx = TRANSACTION_FACTORY.makeTopLevelTransaction(activeRecord);
+	    }
         } else {
 	    // passing the readOnly parameter to makeNestedTransaction is a temporary solution to
 	    // support the correct semantics in the composition of @Atomic annotations.  Ideally, we
@@ -140,6 +150,23 @@ public abstract class Transaction {
         return tx;
     }
 
+    public static void commitAndBegin(boolean readOnly) {
+	Transaction tx = current.get();
+	tx.commitTx(false);
+
+	// prevent
+	ActiveTransactionsRecord activeRecord = tx.getSameRecordForNewTransaction();
+
+	// now it is safe to finish
+	tx.finishTx();
+
+	beginWithActiveRecord(readOnly, activeRecord);
+    }
+
+    // This method must be overridden in sub-classes that have an ActiveTransactionsRecord
+    protected ActiveTransactionsRecord getSameRecordForNewTransaction() {
+	return null;
+    }
 
     public static void abort() {
 	Transaction tx = current.get();
