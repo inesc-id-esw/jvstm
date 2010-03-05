@@ -88,10 +88,13 @@ public class InevitableTransaction extends Transaction {
     }
 
     public <T> void setBoxValue(VBox<T> vbox, T value) {
-        VBoxBody<T> next = ((vbox.body != null) && (vbox.body.version == number)) ? vbox.body.next : vbox.body;
-        VBoxBody<T> newBody = VBox.makeNewBody(value, number, next);
-	vbox.body = newBody;
-        bodiesCommitted = bodiesCommitted.cons(newBody);
+        if ((vbox.body != null) && (vbox.body.version == number)) {
+            vbox.body.value = value;
+        } else {
+            VBoxBody<T> newBody = VBox.makeNewBody(value, number, vbox.body);
+            if (vbox.body != null) bodiesCommitted = bodiesCommitted.cons(newBody);
+            vbox.body = newBody;
+        }
     }
 
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
