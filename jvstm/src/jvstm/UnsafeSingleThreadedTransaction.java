@@ -30,70 +30,17 @@ package jvstm;
  * concurrent transactions can run, but *WILL BREAK* the system.  UnsafeSingleThreadedTransactions
  * are useful for setup scenarios, where an application is single-threadedly initialized before
  * being concurrently available. */
-public class UnsafeSingleThreadedTransaction extends Transaction {
-
-    private ActiveTransactionsRecord activeTxRecord;
+public class UnsafeSingleThreadedTransaction extends InevitableTransaction {
 
     public UnsafeSingleThreadedTransaction(ActiveTransactionsRecord activeRecord) {
-        super(activeRecord.transactionNumber);
-        this.activeTxRecord = activeRecord;
-    }
-
-    @Override
-    public void start() {
-        // once we get here, we may already increment the transaction
-        // number
-        int newTxNumber = this.activeTxRecord.transactionNumber + 1;
-        
-	// renumber the TX to the new number
-	setNumber(newTxNumber);
-
-        super.start();
-    }
-
-    @Override
-    protected void abortTx() {
-        commitTx(true);
-        //throw new Error("An UnsafeSingleThreaded transaction cannot abort.  I've committed it instead.");
-    }
-
-    @Override
-    protected void finish() {
-        super.finish();
-        activeTxRecord.decrementRunning();
-    }
-
-    public Transaction makeNestedTransaction(boolean readOnly) {
-	throw new Error("UnsafeSingleThreaded transactions don't support nesting yet");
-    }
-
-    public <T> T getBoxValue(VBox<T> vbox) {
-        return vbox.body.value;
+        super(activeRecord);
     }
 
     public <T> void setBoxValue(VBox<T> vbox, T value) {
-	vbox.body = VBox.makeNewBody(value, number, null); // we immediatly clean old unused values
-    }
-
-    public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
-	throw new Error("UnsafeSingleThreaded transactions don't support PerTxBoxes yet");
-    }
-    
-    public <T> void setPerTxValue(PerTxBox<T> box, T value) {
-	throw new Error("UnsafeSingleThreaded transactions don't support PerTxBoxes yet");
-    }
-
-    protected void doCommit() {
-        // the commit is already done, so create a new ActiveTransactionsRecord
-        ActiveTransactionsRecord newRecord = new ActiveTransactionsRecord(getNumber(), null);
-        setMostRecentActiveRecord(newRecord);
-        
-        // we must update the activeRecords accordingly
-        
-        // the correct order is to increment first the
-        // new, and only then decrement the old
-        newRecord.incrementRunning();
-        this.activeTxRecord.decrementRunning();
-        this.activeTxRecord = newRecord;
+        if ((vbox.body != null) && (vbox.body.version == number)) {
+            vbox.body.value = value;
+        } else {
+            vbox.body = VBox.makeNewBody(value, number, null); // we immediatly clean old unused values
+        }
     }
 }

@@ -80,7 +80,7 @@ public class InevitableTransaction extends Transaction {
     }
 
     public Transaction makeNestedTransaction(boolean readOnly) {
-	throw new Error("Inevitable transactions don't support nesting yet");
+	throw new Error(getClass().getSimpleName() + " doesn't support nesting yet");
     }
 
     public <T> T getBoxValue(VBox<T> vbox) {
@@ -98,11 +98,11 @@ public class InevitableTransaction extends Transaction {
     }
 
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
-	throw new Error("Inevitable transactions don't support PerTxBoxes yet");
+	throw new Error(getClass().getSimpleName() + " doesn't support PerTxBoxes yet");
     }
     
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
-	throw new Error("Inevitable transactions don't support PerTxBoxes yet");
+	throw new Error(getClass().getSimpleName() + " doesn't support PerTxBoxes yet");
     }
 
     protected void doCommit() {
