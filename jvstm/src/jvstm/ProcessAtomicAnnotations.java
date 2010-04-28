@@ -31,11 +31,13 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.*;
+import org.objectweb.asm.tree.AnnotationNode;
 
 import jvstm.util.Cons;
 import jvstm.util.Pair;
@@ -178,20 +180,31 @@ public class ProcessAtomicAnnotations {
 
 	
 	class MethodCollector extends MethodAdapter {
-	    private String methodName;
-	    private String methodDesc;
+	    final MethodInfo mInfo;
 
 	    MethodCollector(MethodVisitor mv, String name, String desc) {
 		super(mv);
-		this.methodName = name;
-		this.methodDesc = desc;
+		this.mInfo = new MethodInfo(name, desc);
 	    }
+
+            public void visitEnd() {
+                // if we found an atomic annotation, then collect this method
+                if (mInfo.atomicParams != null) {
+		    atomicMethods.addAtomicMethod(mInfo);
+                }
+            }
 
 	    public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
 		if (ATOMIC_DESC.equals(desc)) {
                     return new AtomicAnnotationVisitor();
 		} else {
-                    return super.visitAnnotation(desc, visible);
+                    // all other annotations are transformed into
+                    // AnnotationNodes to be later applied to the method
+                    // that will be generated to start the transaction and
+                    // call the renamed method
+                    AnnotationNode an = new AnnotationNode(desc);
+                    mInfo.addAnnotation(an, visible);
+                    return an;
                 }
 	    }
 
@@ -211,7 +224,7 @@ public class ProcessAtomicAnnotations {
                 }
 
                 public void visitEnd() {
-		    atomicMethods.addAtomicMethod(methodName, methodDesc, annotationParams);
+		    mInfo.atomicParams = annotationParams;
                 }
 
                 public void visitEnum(String name, String desc, String value) {
@@ -242,10 +255,11 @@ public class ProcessAtomicAnnotations {
         public void visitEnd() {
 	    renameMethods = false;
 	    for (MethodWrapper mw : methods) {
-                boolean canFail = mw.annParams.getParamAsBoolean("canFail");
-                boolean readOnly = mw.annParams.getParamAsBoolean("readOnly");
+                AtomicParams annParams = mw.mInfo.atomicParams;
+                boolean canFail = annParams.getParamAsBoolean("canFail");
+                boolean readOnly = annParams.getParamAsBoolean("readOnly");
                 boolean flattenNested = (readOnly || (! canFail));
-		boolean speculativeReadOnly = mw.annParams.getParamAsBoolean("speculativeReadOnly");
+		boolean speculativeReadOnly = annParams.getParamAsBoolean("speculativeReadOnly");
 
 		Type returnType = Type.getReturnType(mw.desc);
 		Type[] argsType = Type.getArgumentTypes(mw.desc);
@@ -264,6 +278,12 @@ public class ProcessAtomicAnnotations {
 		int retSize = (returnType == Type.VOID_TYPE) ? 0 : returnType.getSize();
 
 		MethodVisitor mv = visitMethod(mw.access, mw.name, mw.desc, mw.signature, mw.exceptions);
+
+                for (Pair<AnnotationNode,Boolean> p : mw.mInfo.annotations) {
+                    AnnotationNode node = p.first;
+                    AnnotationVisitor av = mv.visitAnnotation(node.desc, p.second);
+                    node.accept(av);
+                }
 
                 // the following code comes originally from the ASMfier
 		mv.visitCode();
@@ -420,29 +440,26 @@ public class ProcessAtomicAnnotations {
 
         public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
 	    if (renameMethods) {
-                AtomicParams params = atomicMethods.getAtomicParams(name, desc);
-                if (params != null) {
-                    methods.add(new MethodWrapper(access, name, desc, signature, exceptions, params));
+                MethodInfo mInfo = atomicMethods.getMethodInfo(name, desc);
+                if (mInfo != null) {
+                    methods.add(new MethodWrapper(access, name, desc, signature, exceptions, mInfo));
                     access &= (~ Opcodes.ACC_PUBLIC);
                     access &= (~ Opcodes.ACC_PROTECTED);
                     access |= Opcodes.ACC_PRIVATE;
-                    return new RemoveAtomicAnnotation(super.visitMethod(access, getInternalMethodName(name), desc, signature, exceptions));
+                    return new RemoveAnnotations(super.visitMethod(access, getInternalMethodName(name), desc, signature, exceptions));
                 }
 	    }
 
             return super.visitMethod(access, name, desc, signature, exceptions);
         }
 
-	static class RemoveAtomicAnnotation extends MethodAdapter {
-	    RemoveAtomicAnnotation(MethodVisitor mv) {
+	static class RemoveAnnotations extends MethodAdapter {
+	    RemoveAnnotations(MethodVisitor mv) {
 		super(mv);
 	    }
 
             public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
- 		if (ATOMIC_DESC.equals(desc)) {
- 		    return null;
- 		}
- 		return super.visitAnnotation(desc, visible);
+                return null;
             }
 	}
 
@@ -452,31 +469,31 @@ public class ProcessAtomicAnnotations {
 	    final String desc;
 	    final String signature;
 	    final String[] exceptions;
-            final AtomicParams annParams;
+            final MethodInfo mInfo;
 
-	    MethodWrapper(int access, String name, String desc, String signature, String[] exceptions, AtomicParams annParams) {
+	    MethodWrapper(int access, String name, String desc, String signature, String[] exceptions, MethodInfo mInfo) {
 		this.access = access;
 		this.name = name;
 		this.desc = desc;
 		this.signature = signature;
 		this.exceptions = exceptions;
-                this.annParams = annParams;
+                this.mInfo = mInfo;
 	    }
 	}
     }
 
     static class AtomicMethodsInfo {
-	private Map<Pair<String,String>,AtomicParams> atomicMethods = new HashMap<Pair<String,String>,AtomicParams>();
+	private Map<Pair<String,String>,MethodInfo> atomicMethods = new HashMap<Pair<String,String>,MethodInfo>();
 
 	public boolean isEmpty() {
 	    return atomicMethods.isEmpty();
 	}
 
-	public void addAtomicMethod(String name, String desc, AtomicParams params) {
-            atomicMethods.put(new Pair<String,String>(name, desc), params);
+	public void addAtomicMethod(MethodInfo mInfo) {
+            atomicMethods.put(new Pair<String,String>(mInfo.methodName, mInfo.methodDesc), mInfo);
 	}
 
-	public AtomicParams getAtomicParams(String name, String desc) {
+	public MethodInfo getMethodInfo(String name, String desc) {
 	    return atomicMethods.get(new Pair<String,String>(name, desc));
 	}
     }
@@ -505,6 +522,23 @@ public class ProcessAtomicAnnotations {
 
             // check default value
             return ((Boolean)defaults.get(name)).booleanValue();
+        }
+    }
+
+    static class MethodInfo {
+        final String methodName;
+        final String methodDesc;
+        final List<Pair<AnnotationNode,Boolean>> annotations;
+        AtomicParams atomicParams;
+
+        MethodInfo(String methodName, String methodDesc) {
+            this.methodName = methodName;
+            this.methodDesc = methodDesc;
+            this.annotations = new ArrayList<Pair<AnnotationNode,Boolean>>();
+        }
+
+        void addAnnotation(AnnotationNode node, boolean visible) {
+            this.annotations.add(new Pair(node, visible));
         }
     }
 }
