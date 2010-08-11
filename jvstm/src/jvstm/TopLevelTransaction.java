@@ -33,6 +33,7 @@ import jvstm.util.Pair;
 
 public class TopLevelTransaction extends ReadWriteTransaction {
     static final ReentrantLock COMMIT_LOCK = new ReentrantLock(true);
+    static final CommitException COMMIT_EXCEPTION = new CommitException();
 
     protected ActiveTransactionsRecord activeTxRecord;
 
@@ -79,7 +80,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
                     this.activeTxRecord.decrementRunning();
                     this.activeTxRecord = newRecord;
 		} else {
-		    throw new CommitException();
+		    throw COMMIT_EXCEPTION;
 		}
             } finally {
                 COMMIT_LOCK.unlock();

@@ -26,6 +26,7 @@
 package jvstm;
 
 public class ReadTransaction extends Transaction {
+    static final WriteOnReadException WRITE_ON_READ_EXCEPTION = new WriteOnReadException();
 
     public ReadTransaction(int number) {
         super(number);
@@ -37,7 +38,7 @@ public class ReadTransaction extends Transaction {
 
     public Transaction makeNestedTransaction(boolean readOnly) {
 	if (!readOnly) {
-	    throw new WriteOnReadException();
+	    throw WRITE_ON_READ_EXCEPTION;
 	}
 	return new ReadTransaction(this);
     }
@@ -47,7 +48,7 @@ public class ReadTransaction extends Transaction {
     }
 
     public <T> void setBoxValue(VBox<T> vbox, T value) {
-        throw new WriteOnReadException();
+        throw WRITE_ON_READ_EXCEPTION;
     }
 
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
@@ -55,7 +56,7 @@ public class ReadTransaction extends Transaction {
     }
     
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
-        throw new WriteOnReadException();
+        throw WRITE_ON_READ_EXCEPTION;
     }
 
     protected void doCommit() {
