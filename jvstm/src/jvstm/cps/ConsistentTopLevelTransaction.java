@@ -148,21 +148,14 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
         ConsistencyCheckTransaction tx = makeConsistencyCheckTransaction(obj);
         tx.start();
 
+        boolean predicateOk = false;
         boolean finished = false;
 
         Class<? extends ConsistencyException> excClass = predicate.getAnnotation(ConsistencyPredicate.class).value();
         try {
-            if (! ((Boolean)predicate.invoke(obj)).booleanValue()) {
-                ConsistencyException exc = excClass.newInstance();
-                exc.init(obj, predicate);
-                throw exc;
-            }
-            
+            predicateOk = (Boolean) (predicate.invoke(obj));
             Transaction.commit();
-
             finished = true;
-
-            return tx.getDepended();
         } catch (InvocationTargetException ite) {
             Throwable cause = ite.getCause();
 
@@ -189,6 +182,19 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
             if (! finished) {
                 Transaction.abort();
             }
+        }
+
+        if (predicateOk) {
+            return tx.getDepended();
+        } else {
+            ConsistencyException exc;
+            try {
+                exc = excClass.newInstance();
+            } catch (Throwable t) {
+                throw new Error(t);
+            }
+            exc.init(obj, predicate);
+            throw exc;
         }
     }
 
