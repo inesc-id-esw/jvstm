@@ -37,7 +37,8 @@ public abstract class ReadWriteTransaction extends Transaction {
 
     protected static final Map EMPTY_MAP = Collections.emptyMap();
 
-    protected Cons<Pair<VBox,VBoxBody>> bodiesRead = Cons.empty();
+    //protected Cons<Pair<VBox,VBoxBody>> bodiesRead = Cons.empty();
+    protected Map<VBox,VBoxBody> bodiesRead = EMPTY_MAP;
     protected Map<VBox,Object> boxesWritten = EMPTY_MAP;
     protected Map<PerTxBox,Object> perTxValues = EMPTY_MAP;
 
@@ -71,7 +72,8 @@ public abstract class ReadWriteTransaction extends Transaction {
     protected void doCommit() {
 	tryCommit();
 	// if commit is successful, then reset transaction to a clean state
-	bodiesRead = Cons.empty();
+	//bodiesRead = Cons.empty();
+        bodiesRead = EMPTY_MAP;
         boxesWritten = EMPTY_MAP;
         perTxValues = EMPTY_MAP;
     }
@@ -94,7 +96,11 @@ public abstract class ReadWriteTransaction extends Transaction {
         T value = getLocalValue(vbox);
         if (value == null) {
             VBoxBody<T> body = vbox.body.getBody(number);
-            bodiesRead = bodiesRead.cons(new Pair<VBox,VBoxBody>(vbox, body));
+            //bodiesRead = bodiesRead.cons(new Pair<VBox,VBoxBody>(vbox, body));
+            if (bodiesRead == EMPTY_MAP) {
+                bodiesRead = new HashMap<VBox,VBoxBody>();
+            }
+            bodiesRead.put(vbox, body);
             value = body.value;
         }
         return (value == NULL_VALUE) ? null : value;

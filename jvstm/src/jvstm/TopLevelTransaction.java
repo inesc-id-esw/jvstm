@@ -102,8 +102,13 @@ public class TopLevelTransaction extends ReadWriteTransaction {
     }
 
     protected boolean validateCommit() {
-        for (Pair<VBox,VBoxBody> entry : bodiesRead) {
-            if (entry.first.body != entry.second) {
+        //for (Pair<VBox,VBoxBody> entry : bodiesRead) {
+        //    if (entry.first.body != entry.second) {
+        //        return false;
+        //    }
+        //}
+        for (Map.Entry<VBox,VBoxBody> entry : bodiesRead.entrySet()) {
+            if (entry.getKey().body != entry.getValue()) {
                 return false;
             }
         }
