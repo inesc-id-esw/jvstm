@@ -1,0 +1,51 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>jvstm</groupId>
+  <artifactId>jvstm</artifactId>
+  <packaging>jar</packaging>
+  <version>1.0-SNAPSHOT</version>
+  <name>jvstm</name>
+  <url>http://web.ist.utl.pt/joao.cachopo/jvstm/</url>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>2.0.2</version>
+                <configuration>
+                    <source>1.5</source>
+                    <target>1.5</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <dependencies>
+    <dependency>
+        <groupId>asm</groupId>
+        <artifactId>asm</artifactId>
+        <version>3.0</version>
+    </dependency>
+
+    <dependency>
+        <groupId>asm</groupId>
+        <artifactId>asm-commons</artifactId>
+        <version>3.0</version>
+    </dependency>
+
+  </dependencies>
+
+	<distributionManagement>
+	    <repository>
+	      <id>jvstm-release</id>
+	      <url>https://fenix-ashes.ist.utl.pt/nexus/content/repositories/jvstm-release</url>
+	    </repository>
+	    <snapshotRepository>
+	      <id>jvstm-snapshot</id>
+	      <url>https://fenix-ashes.ist.utl.pt/nexus/content/repositories/jvstm-snapshot</url>
+	    </snapshotRepository>
+	</distributionManagement>
+
+
+</project>
