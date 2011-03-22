@@ -36,6 +36,14 @@ public class ConsistencyException extends RuntimeException {
     public ConsistencyException() {
     }
 
+    @Override
+    public String getMessage() {
+        return "Object " 
+            + getTarget() 
+            + " is inconsistent according to the consistency predicate: " 
+            + getMethodFullname();
+    }
+
     public void init(Object target, Method method) {
         this.target = target;
         this.method = method;
