@@ -117,11 +117,21 @@ public abstract class Transaction {
     }
 
     public static Transaction begin(boolean readOnly) {
+	ActiveTransactionsRecord activeRecord = null;
+        Transaction parent = current.get();
+
+        if (parent == null) {
+            activeRecord = mostRecentCommittedRecord.getRecordForNewTransaction();
+        }
+
+	return beginWithActiveRecord(readOnly, activeRecord);
+    }
+
+    private static Transaction beginWithActiveRecord(boolean readOnly, ActiveTransactionsRecord activeRecord) {
         Transaction parent = current.get();
         Transaction tx = null;
 
         if (parent == null) {
-            ActiveTransactionsRecord activeRecord = mostRecentCommittedRecord.getRecordForNewTransaction();
             if (readOnly) {
                 tx = TRANSACTION_FACTORY.makeReadOnlyTopLevelTransaction(activeRecord);
             } else {
@@ -139,6 +149,23 @@ public abstract class Transaction {
         return tx;
     }
 
+    public static void commitAndBegin(boolean readOnly) {
+	Transaction tx = current.get();
+	tx.commitTx(false);
+
+	// prevent
+	ActiveTransactionsRecord activeRecord = tx.getSameRecordForNewTransaction();
+
+	// now it is safe to finish
+	tx.finishTx();
+
+	beginWithActiveRecord(readOnly, activeRecord);
+    }
+
+    // This method must be overridden in sub-classes that have an ActiveTransactionsRecord
+    protected ActiveTransactionsRecord getSameRecordForNewTransaction() {
+	return null;
+    }
 
     public static void abort() {
 	Transaction tx = current.get();

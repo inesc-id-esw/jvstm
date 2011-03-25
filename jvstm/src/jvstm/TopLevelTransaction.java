@@ -45,6 +45,12 @@ public class TopLevelTransaction extends ReadWriteTransaction {
     }
 
     @Override
+    protected ActiveTransactionsRecord getSameRecordForNewTransaction() {
+	this.activeTxRecord.incrementRunning();
+	return this.activeTxRecord;
+    }
+
+    @Override
     protected void finish() {
         super.finish();
         activeTxRecord.decrementRunning();
@@ -76,10 +82,10 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 //      * If validation suceeds the transaction is upgraded to the latest valid read state (which is
 //      * the record previous to the commitTxRecord)
      */
-    private void validateCommitAndEnqueue() {
+    private void validateCommitAndEnqueue(ActiveTransactionsRecord lastValid) {
 	WriteSet writeSet = makeWriteSet();
 
-	ActiveTransactionsRecord lastValid = this.activeTxRecord;
+// 	ActiveTransactionsRecord lastValid = this.activeTxRecord;
 	do {
 	    lastValid = validate(lastValid);
 	    this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
@@ -91,11 +97,41 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 
     protected void tryCommit() {
 	if (isWriteTransaction()) {
-	    validateCommitAndEnqueue();
+	    validate();
 	    // for now we don't support PerTxBoxes :-(
 	    ensureCommitStatus();
 	    upgradeTx(this.commitTxRecord);
 	}
+    }
+
+    // this may be heavier than simply doing the new validateAndEnqueue when running on a small
+    // number of cores.  We might improve by using an adaptive validation that only used the more
+    // complex solution whenever relevant. Idea for relevant: compare "the average write-set size
+    // multiplied by the distance between activeTx # and last enqueued #" with the read-set size.
+    protected void validate() {
+	ActiveTransactionsRecord lastSeenCommitted = ensureCommitStatusBeforeValidation();
+	oldStyleValidation(); // this validates up to the last seen committed at least
+	validateCommitAndEnqueue(lastSeenCommitted);
+    }
+
+    protected ActiveTransactionsRecord ensureCommitStatusBeforeValidation() {
+	ActiveTransactionsRecord lastSeenCommitted = Transaction.mostRecentCommittedRecord;
+	ActiveTransactionsRecord recordToCommit = lastSeenCommitted.getNext();
+	
+        while (recordToCommit != null) {
+	    helpCommit(recordToCommit);
+	    lastSeenCommitted = recordToCommit;
+	    recordToCommit = recordToCommit.getNext();
+        }
+	return lastSeenCommitted;
+    }
+
+    protected void oldStyleValidation() {
+        for (Map.Entry<VBox,VBoxBody> entry : bodiesRead.entrySet()) {
+            if (entry.getKey().body != entry.getValue()) {
+                throw new CommitException();
+            }
+        }
     }
 
     protected void ensureCommitStatus() {
