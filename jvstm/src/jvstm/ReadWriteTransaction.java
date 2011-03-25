@@ -37,8 +37,8 @@ public abstract class ReadWriteTransaction extends Transaction {
 
     protected static final Map EMPTY_MAP = Collections.emptyMap();
 
-    protected Cons<Pair<VBox,VBoxBody>> bodiesRead = Cons.empty();
-    protected Map<VBox,Object> boxesWritten = EMPTY_MAP;
+    protected Map<VBox, VBoxBody> bodiesRead = EMPTY_MAP;
+    protected Map<VBox, Object> boxesWritten = EMPTY_MAP;
     protected Map<PerTxBox,Object> perTxValues = EMPTY_MAP;
 
 
@@ -50,8 +50,7 @@ public abstract class ReadWriteTransaction extends Transaction {
         super(parent);
     }
 
-    public Transaction makeNestedTransaction(boolean readOnly) {
-	// always create a RW nested transaction, because we need its read-set
+    public Transaction makeNestedTransaction() {
 	return new NestedTransaction(this);
     }
 
@@ -71,7 +70,7 @@ public abstract class ReadWriteTransaction extends Transaction {
     protected void doCommit() {
 	tryCommit();
 	// if commit is successful, then reset transaction to a clean state
-	bodiesRead = Cons.empty();
+	bodiesRead = EMPTY_MAP;
         boxesWritten = EMPTY_MAP;
         perTxValues = EMPTY_MAP;
     }
@@ -94,7 +93,12 @@ public abstract class ReadWriteTransaction extends Transaction {
         T value = getLocalValue(vbox);
         if (value == null) {
             VBoxBody<T> body = vbox.body.getBody(number);
-            bodiesRead = bodiesRead.cons(new Pair<VBox,VBoxBody>(vbox, body));
+	    if (bodiesRead == EMPTY_MAP) {
+		bodiesRead = new HashMap<VBox, VBoxBody>();
+	    }
+	    bodiesRead.put(vbox, body);
+
+
             value = body.value;
         }
         return (value == NULL_VALUE) ? null : value;
@@ -102,7 +106,7 @@ public abstract class ReadWriteTransaction extends Transaction {
 
     public <T> void setBoxValue(VBox<T> vbox, T value) {
         if (boxesWritten == EMPTY_MAP) {
-            boxesWritten = new HashMap<VBox,Object>();
+            boxesWritten = new HashMap<VBox, Object>();
         }
         boxesWritten.put(vbox, value == null ? NULL_VALUE : value);
     }
@@ -132,5 +136,36 @@ public abstract class ReadWriteTransaction extends Transaction {
             perTxValues = new HashMap<PerTxBox,Object>();
         }
 	perTxValues.put(box, value);
+    }
+
+    /**
+     * Validates this read-set against all active transaction records more recent that the one
+     * <code>lastChecked</code>.
+     *
+     * @return The last successfully validated ActiveTransactionsRecord
+     * @throws CommitException if the validation fails
+     */
+    protected ActiveTransactionsRecord validate(ActiveTransactionsRecord lastChecked) {
+	ActiveTransactionsRecord recordToCheck = lastChecked.getNext();
+
+	while (recordToCheck != null) {
+	    if (!validFor(recordToCheck)) {
+		throw new CommitException();
+	    }
+	    lastChecked = recordToCheck;
+	    recordToCheck = recordToCheck.getNext();
+	}
+	return lastChecked;
+    }
+	
+    protected boolean validFor(ActiveTransactionsRecord recordToCheck) {
+	Map<VBox, Object> writeSet = recordToCheck.getWriteSet();
+
+	for (VBox vbox : writeSet.keySet()) {
+	    if (this.bodiesRead.containsKey(vbox)) {
+		return false; // this box was written in the meanwhile
+	    }
+	}
+	return true;
     }
 }

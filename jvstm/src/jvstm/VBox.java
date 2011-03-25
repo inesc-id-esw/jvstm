@@ -50,7 +50,7 @@ public class VBox<E> {
             // If the box body is GC'd before we can reach it, the process
             // re-starts with a newer transaction.
             while (true) {
-                int transactionNumber = Transaction.mostRecentRecord.transactionNumber;
+                int transactionNumber = Transaction.mostRecentCommittedRecord.transactionNumber;
                 VBoxBody<E> boxBody = this.body;
                 do {
                     if (boxBody.version <= transactionNumber) {

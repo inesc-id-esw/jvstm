@@ -26,72 +26,65 @@
 package jvstm;
 
 import jvstm.util.Cons;
+import jvstm.util.Pair;
 
-public class InevitableTransaction extends Transaction {
 
-    private ActiveTransactionsRecord activeTxRecord;
-    private Cons<VBoxBody> bodiesCommitted = Cons.empty();
+/* An inevitable transaction is accomplished as follows: 1) first it tries to enqueue a commit
+ * record using a compare-and-swap; 2) when it succeeds it waits until the previous record is
+ * committed; 3) then it can execute without interference from other write transactions.  The
+ * commit does not need to validate the transaction.
+ *
+ * There are two catches: 1) inevitable transactions must still keep the write-set for the following
+ * transactions to validate against this commit; 2) the write-set cannot be made accessible until
+ * the end of the transaction, thus a special InevitableTransactionsRecord is used that doesn't
+ * return the write-set until the state is COMMITTED.
+ */
+public class InevitableTransaction extends TopLevelTransaction {
 
     public InevitableTransaction(ActiveTransactionsRecord activeRecord) {
-        super(activeRecord.transactionNumber);
-        this.activeTxRecord = activeRecord;
+        super(activeRecord);
     }
 
     @Override
     public void start() {
-        // acquire the lock before starting the transaction, and
-        // release it on transaction finish
-        TopLevelTransaction.COMMIT_LOCK.lock();
+	ActiveTransactionsRecord latestRecord = this.activeTxRecord;
+	// start by enqueueing the request
+	do {
+	    latestRecord = findLatestRecord(latestRecord);
+	    this.commitTxRecord = new InevitableActiveTransactionsRecord(latestRecord.transactionNumber + 1, null);
+	} while (!latestRecord.trySetNext(this.commitTxRecord));
 
-        // we may need to upgrade to a different transaction number if
-        // other transactions have committed since this transaction
-        // was created, to ensure that it is the latest transaction
-        // running
-        ActiveTransactionsRecord newestRecord = mostRecentRecord;
-        if (newestRecord != this.activeTxRecord) {
-            // the correct order is to increment first the
-            // new, and only then decrement the old
-            newestRecord.incrementRunning();
-            this.activeTxRecord.decrementRunning();
-            this.activeTxRecord = newestRecord;
-        }
-
-        // once we get here, we may already increment the transaction
-        // number
-        int newTxNumber = this.activeTxRecord.transactionNumber + 1;
-        
-	// renumber the TX to the new number
-	setNumber(newTxNumber);
+	waitUntilCommitted(latestRecord);
+	upgradeTx(latestRecord);
 
         super.start();
     }
 
+    protected ActiveTransactionsRecord findLatestRecord(ActiveTransactionsRecord from) {
+	ActiveTransactionsRecord latest = from;
+ 	for (ActiveTransactionsRecord aux; (aux = latest.getNext()) != null; latest = aux);
+	return latest;
+    }
+
+    // Also, InevitableTransactions cannot abort because their commit record as already been created
     @Override
     protected void abortTx() {
         commitTx(true);
         //throw new Error("An Inevitable transaction cannot abort.  I've committed it instead.");
     }
 
-    @Override
-    protected void finish() {
-        super.finish();
-        activeTxRecord.decrementRunning();
-        TopLevelTransaction.COMMIT_LOCK.unlock();
-    }
-
-    public Transaction makeNestedTransaction(boolean readOnly) {
+    public Transaction makeNestedTransaction() {
 	throw new Error("Inevitable transactions don't support nesting yet");
     }
 
+    @Override
     public <T> T getBoxValue(VBox<T> vbox) {
-        return vbox.body.value;
-    }
-
-    public <T> void setBoxValue(VBox<T> vbox, T value) {
-        VBoxBody<T> next = ((vbox.body != null) && (vbox.body.version == number)) ? vbox.body.next : vbox.body;
-        VBoxBody<T> newBody = VBox.makeNewBody(value, number, next);
-	vbox.body = newBody;
-        bodiesCommitted = bodiesCommitted.cons(newBody);
+        T value = getLocalValue(vbox);
+        if (value == null) {
+            value = vbox.body.value;
+	    // we don't keep a read-set because this transaction will be valid for sure
+        }
+        return (value == NULL_VALUE) ? null : value;
     }
 
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
@@ -102,17 +95,12 @@ public class InevitableTransaction extends Transaction {
 	throw new Error("Inevitable transactions don't support PerTxBoxes yet");
     }
 
-    protected void doCommit() {
-        // the commit is already done, so create a new ActiveTransactionsRecord
-        ActiveTransactionsRecord newRecord = new ActiveTransactionsRecord(getNumber(), bodiesCommitted);
-        setMostRecentActiveRecord(newRecord);
-        
-        // we must update the activeRecords accordingly
-        
-        // the correct order is to increment first the
-        // new, and only then decrement the old
-        newRecord.incrementRunning();
-        this.activeTxRecord.decrementRunning();
-        this.activeTxRecord = newRecord;
+    @Override
+    protected void tryCommit() {
+	// we know we're valid and we're already enqueued. just set the writeset
+	((InevitableActiveTransactionsRecord)commitTxRecord).setWriteSet(boxesWritten);
+
+	reallyCommit();
     }
+   
 }

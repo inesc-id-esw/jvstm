@@ -35,10 +35,7 @@ public class ReadTransaction extends Transaction {
 	super(parent);
     }
 
-    public Transaction makeNestedTransaction(boolean readOnly) {
-	if (!readOnly) {
-	    throw new WriteOnReadException();
-	}
+    public Transaction makeNestedTransaction() {
 	return new ReadTransaction(this);
     }
 

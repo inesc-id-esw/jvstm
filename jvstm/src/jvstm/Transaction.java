@@ -27,13 +27,15 @@ package jvstm;
 
 import java.util.concurrent.Callable;
 
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ThreadFactory;
+
 public abstract class Transaction {
 
     // static part starts here
 
-
     /*
-     * The mostRecentRecord static field is volatile to ensure correct
+     * The mostRecentCommittedRecord static field is volatile to ensure correct
      * synchronization among different threads:
      *
      * - A newly created transaction reads the value of this field at
@@ -54,7 +56,12 @@ public abstract class Transaction {
      * guarantees, even if we remove all the remaining volatile
      * declarations from the VBox and VBoxBody classes.
      */
-    protected static volatile ActiveTransactionsRecord mostRecentRecord = new ActiveTransactionsRecord(0, null);
+    protected static volatile ActiveTransactionsRecord mostRecentCommittedRecord = makeSentinelRecord();
+    private static ActiveTransactionsRecord makeSentinelRecord() {
+	ActiveTransactionsRecord record = new ActiveTransactionsRecord(0, null, null);
+	record.setCommitted();
+	return record;
+    }
 
     protected static final ThreadLocal<Transaction> current = new ThreadLocal<Transaction>();
 
@@ -68,15 +75,12 @@ public abstract class Transaction {
         return current.get();
     }
 
-    public static int getMostRecentCommitedNumber() {
-        return mostRecentRecord.transactionNumber;
-    }
-
-    // this method is called during the commit of a write transaction
-    // the commits are already synchronized, so this method doesn't need to be
-    public static void setMostRecentActiveRecord(ActiveTransactionsRecord record) {
-        mostRecentRecord.setNext(record);
-        mostRecentRecord = record;
+    // This method is called during the commit of a write transaction.  Even though it is possible
+    // for more than one method to write to this slot at the same time, this could only cause a new
+    // transaction to see some record that might not be the most recent one.  However, this is ok,
+    // because when a transactio begin it will check for another more recent record.
+    public static void setMostRecentCommittedRecord(ActiveTransactionsRecord record) {
+        mostRecentCommittedRecord = record;
     }
 
     public static void addTxQueueListener(TxQueueListener listener) {
@@ -93,7 +97,7 @@ public abstract class Transaction {
             throw new Error("Inevitable transactions cannot be nested");
         }
 
-        ActiveTransactionsRecord activeRecord = mostRecentRecord.getRecordForNewTransaction();
+        ActiveTransactionsRecord activeRecord = mostRecentCommittedRecord.getRecordForNewTransaction();
         Transaction tx = new InevitableTransaction(activeRecord);
         tx.start();
         return tx;
@@ -108,18 +112,14 @@ public abstract class Transaction {
         Transaction tx = null;
 
         if (parent == null) {
-            ActiveTransactionsRecord activeRecord = mostRecentRecord.getRecordForNewTransaction();
+            ActiveTransactionsRecord activeRecord = mostRecentCommittedRecord.getRecordForNewTransaction();
             if (readOnly) {
                 tx = TRANSACTION_FACTORY.makeReadOnlyTopLevelTransaction(activeRecord);
             } else {
                 tx = TRANSACTION_FACTORY.makeTopLevelTransaction(activeRecord);
             }
         } else {
-	    // passing the readOnly parameter to makeNestedTransaction is a temporary solution to
-	    // support the correct semantics in the composition of @Atomic annotations.  Ideally, we
-	    // should adjust the code generation of @Atomic to let WriteOnReadExceptions pass to the
-	    // parent
-            tx = parent.makeNestedTransaction(readOnly);
+            tx = parent.makeNestedTransaction();
         }
         tx.start();
 
@@ -154,7 +154,7 @@ public abstract class Transaction {
         }
 
         // In the previous lines I'm checking that the current thread
-        // has no transaction, because, otherwise, we would lost the
+        // has no transaction, because, otherwise, we would lose the
         // current transaction.
         //
         // Likewise, I should not allow that the same transaction is
@@ -170,6 +170,8 @@ public abstract class Transaction {
         tx.resumeTx();
     }
 
+    // the transaction version that is used to read boxes. Must always represent a consistent state
+    // of the world
     protected int number;
     protected final Transaction parent;
     
@@ -196,7 +198,7 @@ public abstract class Transaction {
     }
 
     protected void setNumber(int number) {
-        this.number = number;
+	this.number = number;
     }
 
     protected void abortTx() {
@@ -229,7 +231,7 @@ public abstract class Transaction {
         current.set(this);
     }
 
-    public abstract Transaction makeNestedTransaction(boolean readOnly);
+    public abstract Transaction makeNestedTransaction();
 
     public abstract <T> T getBoxValue(VBox<T> vbox);
 

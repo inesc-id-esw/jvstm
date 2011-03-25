@@ -33,11 +33,16 @@ public class NestedTransaction extends ReadWriteTransaction {
 
     protected void tryCommit() {
         ReadWriteTransaction parent = getRWParent();
-        parent.bodiesRead = this.bodiesRead.reverseInto(parent.bodiesRead);
+        //parent.bodiesRead = this.bodiesRead.reverseInto(parent.bodiesRead);
+	if (parent.bodiesRead == EMPTY_MAP) {
+	    parent.bodiesRead = this.bodiesRead;
+	} else {
+	    parent.bodiesRead.putAll(this.bodiesRead);
+	}
         if (parent.boxesWritten == EMPTY_MAP) {
-            parent.boxesWritten = boxesWritten;
+            parent.boxesWritten = this.boxesWritten;
         } else {
-            parent.boxesWritten.putAll(boxesWritten);
+            parent.boxesWritten.putAll(this.boxesWritten);
         }
         if (parent.perTxValues == EMPTY_MAP) {
             parent.perTxValues = perTxValues;
