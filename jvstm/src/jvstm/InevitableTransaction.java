@@ -30,14 +30,15 @@ import jvstm.util.Pair;
 
 
 /* An inevitable transaction is accomplished as follows: 1) first it tries to enqueue a commit
- * record using a compare-and-swap; 2) when it succeeds it waits until the previous record is
- * committed; 3) then it can execute without interference from other write transactions.  The
- * commit does not need to validate the transaction.
+ * record using a compare-and-swap; 2) when it succeeds it ensures that the previous record is
+ * committed; 3) then it can execute without interference from other write transactions.  The commit
+ * does not need to validate the transaction, because it will read from the immediately previous
+ * state.
  *
  * There are two catches: 1) inevitable transactions must still keep the write-set for the following
  * transactions to validate against this commit; 2) the write-set cannot be made accessible until
  * the end of the transaction, thus a special InevitableTransactionsRecord is used that doesn't
- * return the write-set until the state is COMMITTED.
+ * return the write-set until it has been computed, even though its commit record may already exist.
  */
 public class InevitableTransaction extends TopLevelTransaction {
 
@@ -51,13 +52,26 @@ public class InevitableTransaction extends TopLevelTransaction {
 	// start by enqueueing the request
 	do {
 	    latestRecord = findLatestRecord(latestRecord);
-	    this.commitTxRecord = new InevitableActiveTransactionsRecord(latestRecord.transactionNumber + 1, null);
+	    this.commitTxRecord = new InevitableActiveTransactionsRecord(latestRecord.transactionNumber + 1);
 	} while (!latestRecord.trySetNext(this.commitTxRecord));
 
-	waitUntilCommitted(latestRecord);
+	ensureCommitStatus();
 	upgradeTx(latestRecord);
 
         super.start();
+    }
+
+    // Note that this method differs from the one in the superclass.  The loop guard doesn't include
+    // our own record.  We don't want to commit it just yet.
+    @Override
+    protected void ensureCommitStatus() {
+	ActiveTransactionsRecord recordToCommit = Transaction.mostRecentCommittedRecord.getNext();
+
+        while ((recordToCommit != null)
+	       && (recordToCommit.transactionNumber < this.commitTxRecord.transactionNumber)) {
+	    helpCommit(recordToCommit);
+	    recordToCommit = recordToCommit.getNext();
+        }
     }
 
     protected ActiveTransactionsRecord findLatestRecord(ActiveTransactionsRecord from) {
@@ -73,7 +87,7 @@ public class InevitableTransaction extends TopLevelTransaction {
         //throw new Error("An Inevitable transaction cannot abort.  I've committed it instead.");
     }
 
-    public Transaction makeNestedTransaction() {
+    public Transaction makeNestedTransaction(boolean readOnly) {
 	throw new Error("Inevitable transactions don't support nesting yet");
     }
 
@@ -98,9 +112,10 @@ public class InevitableTransaction extends TopLevelTransaction {
     @Override
     protected void tryCommit() {
 	// we know we're valid and we're already enqueued. just set the writeset
-	((InevitableActiveTransactionsRecord)commitTxRecord).setWriteSet(boxesWritten);
+	((InevitableActiveTransactionsRecord)commitTxRecord).setWriteSet(makeWriteSet());
 
-	reallyCommit();
+	helpCommit(this.commitTxRecord);
+	upgradeTx(this.commitTxRecord);
     }
    
 }

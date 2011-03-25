@@ -25,9 +25,12 @@
  */
 package jvstm;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import jvstm.util.Cons;
@@ -85,39 +88,34 @@ public class ActiveTransactionsRecord {
 
 
     /*
-     * The ActiveTransactionsRecord class was designed as a
-     * lock-free data structure.  Its goal is to maintain a record
-     * of active transactions for the purpose of garbage collecting
-     * old values.
+     * The ActiveTransactionsRecord class was designed as a lock-free data structure.  Its goal is
+     * twofold: 1) to maintain a record of active transactions for the purpose of garbage collecting
+     * old values; 2) to hold transaction's write-sets to enable future transaction's to validate
+     * their read state.
      *
      * It is composed of the following fields:
      */
 
-    // the transactionNumber is assigned when the record is created and never changes thereafter
-    // its value corresponds to the number of a write-transaction that commits
-    // this record (an instance of this class) is used to record all the running transactions 
-    // that have this transaction number, and that, thus, may need to access the values committed
-    // by the transaction that created this record
+    // the transactionNumber is assigned when the record is created and never changes thereafter its
+    // value corresponds to the number of a write-transaction that commits this record (an instance
+    // of this class) is used to record all the running transactions that have this transaction
+    // number, and that, thus, may need to access the values committed by the transaction that
+    // created this record
     public final int transactionNumber;
 
-    // the bodiesToGC field stores the VBoxes and the bodies that were committed by the transaction
-    // that created this record these are the bodies that must be GCed when no older active
-    // transactions exist.  This field is set to null when this record is cleaned-up so; If this
-    // record isCommitted(), then a null value in this field indicates that no transactions older
+    // the clean field indicates whether this record has been clean or not.  It is atomically set
+    // from false to true only once.  The thread that accomplishes this transition will be in charge
+    // of cleaning the record.  A true value in this field also indicates that no transactions older
     // than this record exist
-    private final AtomicReference<Cons<VBoxBody>> bodiesToGC;
+    private final AtomicBoolean clean;
 
-    /* This is the write-set of the transaction that created this record.  Note that transaction
-     * records may be enqueued as soon as a write transaction is validated, but the bodiesToGC are
-     * only set after performing a valid commit (write-back).  Thus, in the meanwhile, another write
-     * transaction might need to access this write-set to validate itself.  This slot ensures that
-     * the write-set for an enqueued record is always accessible.
+    /* This is the write-set of the transaction that created this record.
      *
      * This slot is not final, because it is set to null, in clean().  This is safe, because then,
      * no other transaction will ever need to read it.  Setting this slot to null helps (a lot!) the
      * Java GC.
      */
-    protected Map<VBox, Object> writeSet;
+    protected WriteSet writeSet;
 
     // the running field indicates how many transactions with 
     // this record's transactionNumber are still running
@@ -146,12 +144,10 @@ public class ActiveTransactionsRecord {
      * process necessary to allow the garbage collection of
      * unreachable old-values.
      *
-     * The thread that is responsible for discarding the old-values
-     * made obsolete by transaction number N (these values are kept in
-     * the bodiesToGC field of the record with number N) is the thread
-     * of the last transaction to finish that has a number less than
-     * N, provided that no new transaction may start with a number
-     * less than N.
+     * The thread that is responsible for discarding the old-values made obsolete by transaction
+     * number N (these values are kept in the bodiesPerBlock field of the writeSet for record with
+     * number N) is the thread of the last transaction to finish that has a number less than N,
+     * provided that no new transaction may start with a number less than N.
      *
      * We must be sure, however, that we do not clean-up while there
      * are still old transactions running, and that we do not allow
@@ -179,9 +175,8 @@ public class ActiveTransactionsRecord {
      * must increment the "running" counter, and when a transaction
      * finishes, we must decrement that same counter.
      *
-     * Case 2 corresponds to the creation of a new record and its
-     * linking to the most recent one, via the "next" field of this
-     * latter record.
+     * Case 2 corresponds to the creation of a new record and linking it to the most recent one, via
+     * the "next" field of this latter record.
      *
      * Finally, we must clean-up the records.  When can we do it?  The
      * idea is that a record may be cleaned-up when we are sure that
@@ -294,8 +289,8 @@ public class ActiveTransactionsRecord {
      * until that transaction actually commits, this record cannot be seen by newly starting
      * transactions.
      *
-     * The static slot mostRecentCommittedRecord of the Transaction class always points to the most
-     * recent record that represents a valid committed state.
+     * The static slot mostRecentCommittedRecord of the Transaction class will always point to a
+     * record that represents a valid committed state.
      *
      * For each running transaction:
      *
@@ -315,9 +310,20 @@ public class ActiveTransactionsRecord {
      * immediately commit without the need to validate.
      */
 
-    public ActiveTransactionsRecord(int txNumber, Cons<VBoxBody> bodiesToGC, Map<VBox, Object> writeSet) {
+    // private method to be used only when instantiating the sentinel record
+    private ActiveTransactionsRecord() {
+	this.transactionNumber = 0;
+	this.clean = new AtomicBoolean(true);
+	this.writeSet = WriteSet.empty();
+	this.recordCommitted = true;
+    }
+    protected static ActiveTransactionsRecord makeSentinelRecord() {
+	return new ActiveTransactionsRecord();
+    }
+
+    public ActiveTransactionsRecord(int txNumber, WriteSet writeSet) {
         this.transactionNumber = txNumber;
-        this.bodiesToGC = new AtomicReference<Cons<VBoxBody>>(bodiesToGC);
+	this.clean = new AtomicBoolean(false);
 	this.writeSet = writeSet;
     }
 
@@ -347,15 +353,7 @@ public class ActiveTransactionsRecord {
 	return this.recordCommitted;
     }
 
-    protected Cons<VBoxBody> getBodiesToGC() {
-	return this.bodiesToGC.get();
-    }
-
-    protected void setBodiesToGC(Cons<VBoxBody> bodiesToGC) {
-	this.bodiesToGC.set(bodiesToGC);
-    }
-
-    protected Map<VBox, Object> getWriteSet() {
+    protected WriteSet getWriteSet() {
 	return this.writeSet;
     }
 
@@ -408,21 +406,23 @@ public class ActiveTransactionsRecord {
     }
 
     private boolean isClean() {
-        return (bodiesToGC.get() == null);
+        return this.clean.get();
     }
 
     protected boolean clean() {
-        Cons<VBoxBody> toClean = bodiesToGC.getAndSet(null);
- 	writeSet = null; // this is very helpful for the GC. verified by experimentation
+        Boolean alreadyCleaned = this.clean.getAndSet(true);
 
         // the toClean may be null because more than one thread may
         // race into this method
         // yet, because of the atomic getAndSet above, only one will
         // actually clean the bodies
-        if (toClean != null) {
-	    for (VBoxBody<?> body : toClean) {
-		body.clearPrevious();
+        if (!alreadyCleaned) {
+	    for (Cons<VBoxBody> bodiesPerBlock : this.getWriteSet().bodiesPerBlock) {
+		for (VBoxBody<?> body : bodiesPerBlock) {
+		    body.clearPrevious();
+		}
 	    }
+ 	    writeSet = null; // this is very helpful for the GC. verified by experimentation
 
             notifyListeners(transactionNumber);
 

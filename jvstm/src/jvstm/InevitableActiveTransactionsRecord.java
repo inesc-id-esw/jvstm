@@ -28,25 +28,23 @@ package jvstm;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import java.util.Map;
-
 import jvstm.util.Cons;
 
 /* An InevitableActiveTransactionsRecord is an ActiveTransactionsRecord especially designed to be
  * used with InevitableTransactions.  This record blocks whenever an attempt is made to obtain the
- * write-set until the record is in the committed state. */
+ * write-set until the write-set is known (set via setWriteSet()). */
 public class InevitableActiveTransactionsRecord extends ActiveTransactionsRecord {
     private final Object WRITE_SET_MONITOR = new Object();
-    
-    public InevitableActiveTransactionsRecord(int txNumber, Cons<VBoxBody> bodiesToGC) {
-	super(txNumber, bodiesToGC, null);
+
+    public InevitableActiveTransactionsRecord(int txNumber) {
+	super(txNumber, null);
     }
 
     // anyone doing this will have to be delayed until this transaction sets the write-set
     @Override
-    protected Map<VBox, Object> getWriteSet() {
+    protected WriteSet getWriteSet() {
 	synchronized (WRITE_SET_MONITOR) {
-	    while (writeSet == null) {
+	    while (this.writeSet == null) {
 		try {
 		    WRITE_SET_MONITOR.wait();
 		} catch (InterruptedException ie) {
@@ -54,10 +52,10 @@ public class InevitableActiveTransactionsRecord extends ActiveTransactionsRecord
 		}
 	    }
 	}
-	return writeSet;
+	return this.writeSet;
     }
 
-    protected void setWriteSet(Map<VBox, Object> writeSet) {
+    protected void setWriteSet(WriteSet writeSet) {
 	synchronized(WRITE_SET_MONITOR) {
 	    this.writeSet = writeSet;
 	    WRITE_SET_MONITOR.notifyAll();
@@ -65,7 +63,6 @@ public class InevitableActiveTransactionsRecord extends ActiveTransactionsRecord
     }
 
     protected boolean clean() {
-	writeSet = null;
 	return super.clean();
     }
 }

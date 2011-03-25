@@ -26,6 +26,7 @@
 package jvstm;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -50,7 +51,8 @@ public abstract class ReadWriteTransaction extends Transaction {
         super(parent);
     }
 
-    public Transaction makeNestedTransaction() {
+    public Transaction makeNestedTransaction(boolean readOnly) {
+	// always create a RW nested transaction, because we need its read-set
 	return new NestedTransaction(this);
     }
 
@@ -159,9 +161,10 @@ public abstract class ReadWriteTransaction extends Transaction {
     }
 	
     protected boolean validFor(ActiveTransactionsRecord recordToCheck) {
-	Map<VBox, Object> writeSet = recordToCheck.getWriteSet();
+	Map.Entry<VBox, Object> [] writeSet = recordToCheck.getWriteSet().writeSet;
 
-	for (VBox vbox : writeSet.keySet()) {
+	for (int size = writeSet.length, i = 0; i < size; i++) {
+	    VBox vbox = writeSet[i].getKey();
 	    if (this.bodiesRead.containsKey(vbox)) {
 		return false; // this box was written in the meanwhile
 	    }

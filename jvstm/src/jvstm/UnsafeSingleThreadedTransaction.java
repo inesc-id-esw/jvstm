@@ -29,14 +29,15 @@ package jvstm;
  * because, it assumes that no other transactions are running, but doesn't check it.  Thus,
  * concurrent transactions can run, but *WILL BREAK* the system.  UnsafeSingleThreadedTransactions
  * are useful for setup scenarios, where an application is single-threadedly initialized before
- * being concurrently available. */
+ * being concurrently available.  There are potential problems in using this transaction type, thus
+ * its use is extremely discouraged, except in well controlled cases. Use at your own risk. */
 public class UnsafeSingleThreadedTransaction extends Transaction {
 
     private ActiveTransactionsRecord activeTxRecord;
 
     public UnsafeSingleThreadedTransaction(ActiveTransactionsRecord activeRecord) {
         super(activeRecord.transactionNumber);
-        this.activeTxRecord = activeRecord;
+	this.activeTxRecord = activeRecord;
     }
 
     @Override
@@ -85,9 +86,14 @@ public class UnsafeSingleThreadedTransaction extends Transaction {
 
     protected void doCommit() {
         // the commit is already done, so create a new ActiveTransactionsRecord
-        ActiveTransactionsRecord newRecord = new ActiveTransactionsRecord(getNumber(), null);
-        setMostRecentActiveRecord(newRecord);
-        
+	ActiveTransactionsRecord newRecord = new ActiveTransactionsRecord(getNumber(), WriteSet.empty());
+	newRecord.setCommitted();
+        setMostRecentCommittedRecord(newRecord);
+
+	if (!this.activeTxRecord.trySetNext(newRecord)) {
+	    throw new Error("Unacceptable: UnsafeSingleThreadedTransaction in a concurrent environment");
+	}
+
         // we must update the activeRecords accordingly
         
         // the correct order is to increment first the

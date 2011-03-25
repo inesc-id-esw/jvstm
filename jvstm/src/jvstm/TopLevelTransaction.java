@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
 import jvstm.util.Cons;
+import java.util.Random;
 
 public class TopLevelTransaction extends ReadWriteTransaction {
 
@@ -63,88 +64,89 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 	setNumber(newRecord.transactionNumber);
     }
 
+    protected WriteSet makeWriteSet() {
+	return new WriteSet(boxesWritten);
+    }
+    
     /* validate this transaction and afterwards try to enqueue its commit request with a
      * compare-and-swap. If the CAS doesn't succeed, then it's because other transaction(s) got
      * ahead and entered the commit queue, so we also have to validate against that(those)
      * transaction(s) before re-attempting the CAS.
      *
-     * If validation suceeds the transaction is upgraded to the latest valid read state (which is
-     * the record previous to the commitTxRecord)
+//      * If validation suceeds the transaction is upgraded to the latest valid read state (which is
+//      * the record previous to the commitTxRecord)
      */
-    protected void validateCommitAndEnqueue() {
+    private void validateCommitAndEnqueue() {
+	WriteSet writeSet = makeWriteSet();
+
 	ActiveTransactionsRecord lastValid = this.activeTxRecord;
 	do {
 	    lastValid = validate(lastValid);
-	    this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, null, boxesWritten);
+	    this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
 	} while (!lastValid.trySetNext(this.commitTxRecord));
 
 	// after validating, upgrade the transaction's valid read state
-	upgradeTx(lastValid);
+//   	upgradeTx(lastValid);
     }
 
     protected void tryCommit() {
 	if (isWriteTransaction()) {
 	    validateCommitAndEnqueue();
-	    waitUntilCommitted(activeTxRecord); // we know for sure that the activeTxRecord is the previous record
-	    reallyCommit();
+	    // for now we don't support PerTxBoxes :-(
+	    ensureCommitStatus();
+	    upgradeTx(this.commitTxRecord);
 	}
     }
 
-    /* Wait for a record to be in the committed state, blocking if necessary.  We avoid
-     * synchronization overheads by using the double-checked locking pattern.  According to the Java
-     * Memory Model, this is ok because we're checking a volatile variable.
-     */
-    protected void waitUntilCommitted(ActiveTransactionsRecord recordToCommit) {
-	if (recordToCommit.isCommitted()) {
-	    return;
-	} else {
-	    synchronized(recordToCommit) {
-		// double-checked lock pattern. This is ok because we're checking a volatile variable
-		while (!recordToCommit.isCommitted()) {
-		    try {
-			recordToCommit.wait();
-		    } catch (InterruptedException ie) {
-			// ignore and continue to wait
-		    }
-		}
+    protected void ensureCommitStatus() {
+	ActiveTransactionsRecord recordToCommit = Transaction.mostRecentCommittedRecord.getNext();
+	
+        while ((recordToCommit != null)
+	       && (recordToCommit.transactionNumber <= this.commitTxRecord.transactionNumber)) {
+	    helpCommit(recordToCommit);
+	    recordToCommit = recordToCommit.getNext();
+        }
+    }
+
+    // Help to commit has much as possible.
+    protected void helpCommit(ActiveTransactionsRecord recordToCommit) {
+	if (!recordToCommit.isCommitted()) {
+	    // We must check whether recordToCommit.getWriteSet() could, in the meanwhile, become
+	    // null.  This occurs when this recordToCommit was already committed and even cleaned
+	    // while this thread was waiting to be scheduled
+	    WriteSet writeSet = recordToCommit.getWriteSet();
+	    if ((writeSet != null) && writeSet.helpWriteBack(recordToCommit.transactionNumber)) {
+		// the thread that commits the last body will handle the rest of the commit
+		finishCommit(recordToCommit);
+	    } else { // didn't commit the last body and no more help can be provided
+		waitUntilCommitted(recordToCommit);
 	    }
 	}
     }
 
-    protected void reallyCommit() {
-	Cons<VBoxBody> bodiesCommitted = performValidCommit();
-	commitTxRecord.setBodiesToGC(bodiesCommitted); // must occur before setting the record to committed state!
-
-	synchronized(commitTxRecord) {
-	    commitTxRecord.setCommitted();
-	    // It is safer to notifyAll() than to notify(), because in the future there might be
-	    // more than one transaction waiting here
-	    commitTxRecord.notifyAll();
+    /* Wait for a record to be in the committed state */
+    protected void waitUntilCommitted(ActiveTransactionsRecord recordToCommit) {
+	Random r = new Random();
+  	int time = 1;
+	while (!recordToCommit.isCommitted()) {
+  	    time <<= 1;
+	    // smf: I think that maybe this wait loop keeps the algorithm from being lock-free,
+            // because progress is not guaranteed.  However, this situation will only occur when
+            // enough threads are already busy writing-back this record's write-set. We can ensure
+            // (really?  check!) that in such situation the code that other threads are running will
+            // not fail (unless the whole system breaks, e.g., with an OutOfMemoryException), and
+            // thus this loop will end.  Discuss this.
+ 	    try {
+		Thread.sleep(r.nextInt(time));
+	    } catch(InterruptedException ie) {
+		// ignore
+	    }
+// 	    Thread.yield();
 	}
-
-	setMostRecentCommittedRecord(commitTxRecord);
-	upgradeTx(commitTxRecord);
     }
 
-    protected Cons<VBoxBody> performValidCommit() {
-	// for now we don't support PerTxBoxes :-(
-// 	for (Map.Entry<PerTxBox,Object> entry : perTxValues.entrySet()) {
-// 	    entry.getKey().commit(entry.getValue());
-// 	}
-	return doCommit(commitTxRecord.transactionNumber);
-    }
-
-    protected Cons<VBoxBody> doCommit(int newTxNumber) {
-        Cons<VBoxBody> newBodies = Cons.empty();
-
-        for (Map.Entry<VBox,Object> entry : boxesWritten.entrySet()) {
-            VBox vbox = entry.getKey();
-            Object newValue = entry.getValue();
-
-	    VBoxBody<?> newBody = vbox.commit((newValue == NULL_VALUE) ? null : newValue, newTxNumber);
-            newBodies = newBodies.cons(newBody);
-        }
-
-        return newBodies;
+    protected void finishCommit(ActiveTransactionsRecord recordToCommit) {
+	recordToCommit.setCommitted();
+	Transaction.setMostRecentCommittedRecord(recordToCommit);
     }
 }

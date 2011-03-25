@@ -56,12 +56,7 @@ public abstract class Transaction {
      * guarantees, even if we remove all the remaining volatile
      * declarations from the VBox and VBoxBody classes.
      */
-    protected static volatile ActiveTransactionsRecord mostRecentCommittedRecord = makeSentinelRecord();
-    private static ActiveTransactionsRecord makeSentinelRecord() {
-	ActiveTransactionsRecord record = new ActiveTransactionsRecord(0, null, null);
-	record.setCommitted();
-	return record;
-    }
+    protected static volatile ActiveTransactionsRecord mostRecentCommittedRecord = ActiveTransactionsRecord.makeSentinelRecord();
 
     protected static final ThreadLocal<Transaction> current = new ThreadLocal<Transaction>();
 
@@ -99,7 +94,7 @@ public abstract class Transaction {
             throw new Error("Unsafe single-threaded transactions cannot be nested");
         }
 
-        ActiveTransactionsRecord activeRecord = mostRecentRecord.getRecordForNewTransaction();
+        ActiveTransactionsRecord activeRecord = mostRecentCommittedRecord.getRecordForNewTransaction();
         Transaction tx = new UnsafeSingleThreadedTransaction(activeRecord);
         tx.start();
         return tx;
@@ -133,7 +128,11 @@ public abstract class Transaction {
                 tx = TRANSACTION_FACTORY.makeTopLevelTransaction(activeRecord);
             }
         } else {
-            tx = parent.makeNestedTransaction();
+	    // passing the readOnly parameter to makeNestedTransaction is a temporary solution to
+	    // support the correct semantics in the composition of @Atomic annotations.  Ideally, we
+	    // should adjust the code generation of @Atomic to let WriteOnReadExceptions pass to the
+	    // parent
+            tx = parent.makeNestedTransaction(readOnly);
         }
         tx.start();
 
@@ -245,7 +244,7 @@ public abstract class Transaction {
         current.set(this);
     }
 
-    public abstract Transaction makeNestedTransaction();
+    public abstract Transaction makeNestedTransaction(boolean readOnly);
 
     public abstract <T> T getBoxValue(VBox<T> vbox);
 

@@ -52,9 +52,11 @@ public class VBoxBody<E> {
     }
 
     public VBoxBody<E> getBody(int maxVersion) {
-        return ((version > maxVersion) 
-                ? next.getBody(maxVersion)
-                : this);
+	VBoxBody result = this;
+	while (result.version > maxVersion) {
+	    result = result.next;
+	}
+	return result;
     }
 
     public void clearPrevious() {
