@@ -83,13 +83,13 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 //      * the record previous to the commitTxRecord)
      */
     private void validateCommitAndEnqueue(ActiveTransactionsRecord lastValid) {
+	lastValid = validate(lastValid);
 	WriteSet writeSet = makeWriteSet();
-
-// 	ActiveTransactionsRecord lastValid = this.activeTxRecord;
-	do {
+	this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
+	while (!lastValid.trySetNext(this.commitTxRecord)) {
 	    lastValid = validate(lastValid);
 	    this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
-	} while (!lastValid.trySetNext(this.commitTxRecord));
+	}
 
 	// after validating, upgrade the transaction's valid read state
 //   	upgradeTx(lastValid);
@@ -109,24 +109,46 @@ public class TopLevelTransaction extends ReadWriteTransaction {
     // complex solution whenever relevant. Idea for relevant: compare "the average write-set size
     // multiplied by the distance between activeTx # and last enqueued #" with the read-set size.
     protected void validate() {
-	ActiveTransactionsRecord lastSeenCommitted = ensureCommitStatusBeforeValidation();
-	oldStyleValidation(); // this validates up to the last seen committed at least
-	validateCommitAndEnqueue(lastSeenCommitted);
+	ActiveTransactionsRecord lastSeenCommitted = helpCommitBeforeValidation();
+   	if (isSnapshotValidationWorthIt(lastSeenCommitted)) {
+	    snapshotValidation(lastSeenCommitted.transactionNumber); // this validates up to the last seen committed at least
+	    validateCommitAndEnqueue(lastSeenCommitted);
+   	} else {
+	    validateCommitAndEnqueue(this.activeTxRecord);
+	}
     }
 
-    protected ActiveTransactionsRecord ensureCommitStatusBeforeValidation() {
+    // when the ratio between writes and reads (to validate) is greater than WR_THRESHOLD, then we
+    // assume that snapshotValidation is worth executing
+    private static float WR_THRESHOLD = 0.5f;
+    protected boolean isSnapshotValidationWorthIt(ActiveTransactionsRecord lastRecord) {
+	if (this.bodiesRead.isEmpty()) {
+	    return false;
+	}
+
+ 	int numberOfReadsToCheck = this.bodiesRead.size();
+ 	int numberOfWritesToCheck = 0;
+	for (ActiveTransactionsRecord rec = this.activeTxRecord.getNext(); rec != null; rec = rec.getNext()) {
+	    numberOfWritesToCheck += rec.getWriteSet().size();
+	}
+	return ((float)numberOfWritesToCheck)/numberOfReadsToCheck > WR_THRESHOLD;
+    }
+
+    protected ActiveTransactionsRecord helpCommitBeforeValidation() {
 	ActiveTransactionsRecord lastSeenCommitted = Transaction.mostRecentCommittedRecord;
 	ActiveTransactionsRecord recordToCommit = lastSeenCommitted.getNext();
 	
-        while (recordToCommit != null) {
-	    helpCommit(recordToCommit);
+        while (recordToCommit != null && helpCommit(recordToCommit, true)) {
 	    lastSeenCommitted = recordToCommit;
 	    recordToCommit = recordToCommit.getNext();
         }
 	return lastSeenCommitted;
     }
 
-    protected void oldStyleValidation() {
+    protected void snapshotValidation(int lastSeenCommittedTxNumber) {
+	if (lastSeenCommittedTxNumber == getNumber()) {
+	    return;
+	}
         for (Map.Entry<VBox,VBoxBody> entry : bodiesRead.entrySet()) {
             if (entry.getKey().body != entry.getValue()) {
                 throw new CommitException();
@@ -139,13 +161,21 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 	
         while ((recordToCommit != null)
 	       && (recordToCommit.transactionNumber <= this.commitTxRecord.transactionNumber)) {
-	    helpCommit(recordToCommit);
+	    helpCommit(recordToCommit, true);
 	    recordToCommit = recordToCommit.getNext();
         }
     }
 
-    // Help to commit has much as possible.
-    protected void helpCommit(ActiveTransactionsRecord recordToCommit) {
+    /** Help to commit has much as possible.  If the <code>wait</code> parameter is
+     * <code>true</code> this method never returns false.
+     *
+     * @param recordToCommit the record to help commit
+     * @param wait whether to wait until committed, even if no more help can be provided
+     *
+     * @return <code>true</code> if it committed for sure; <code>false</code> if it could not help
+     * any more and, thus, commit status was not ensured.  
+     */
+    protected boolean helpCommit(ActiveTransactionsRecord recordToCommit, boolean wait) {
 	if (!recordToCommit.isCommitted()) {
 	    // We must check whether recordToCommit.getWriteSet() could, in the meanwhile, become
 	    // null.  This occurs when this recordToCommit was already committed and even cleaned
@@ -155,9 +185,13 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 		// the thread that commits the last body will handle the rest of the commit
 		finishCommit(recordToCommit);
 	    } else { // didn't commit the last body and no more help can be provided
+		if (!wait) {
+		    return false;
+		}
 		waitUntilCommitted(recordToCommit);
 	    }
 	}
+	return true;
     }
 
     /* Wait for a record to be in the committed state */

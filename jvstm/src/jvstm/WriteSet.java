@@ -128,6 +128,10 @@ public class WriteSet {
 	return newBodies;
     }
 
+    protected int size() {
+	return this.writeSet.length;
+    }
+    
     protected static WriteSet empty() {
 	return new WriteSet(ReadWriteTransaction.EMPTY_MAP);
     }

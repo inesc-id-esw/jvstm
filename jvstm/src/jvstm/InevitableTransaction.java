@@ -69,7 +69,7 @@ public class InevitableTransaction extends TopLevelTransaction {
 
         while ((recordToCommit != null)
 	       && (recordToCommit.transactionNumber < this.commitTxRecord.transactionNumber)) {
-	    helpCommit(recordToCommit);
+	    helpCommit(recordToCommit, true);
 	    recordToCommit = recordToCommit.getNext();
         }
     }
@@ -114,7 +114,7 @@ public class InevitableTransaction extends TopLevelTransaction {
 	// we know we're valid and we're already enqueued. just set the writeset
 	((InevitableActiveTransactionsRecord)commitTxRecord).setWriteSet(makeWriteSet());
 
-	helpCommit(this.commitTxRecord);
+	helpCommit(this.commitTxRecord, true);
 	upgradeTx(this.commitTxRecord);
     }
    
