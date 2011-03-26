@@ -30,10 +30,10 @@ public class EmptyListException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
     public EmptyListException() {
-	super();
+        super();
     }
 
     public EmptyListException(String msg) {
-	super(msg);
+        super(msg);
     }
 }

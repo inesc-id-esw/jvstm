@@ -50,7 +50,7 @@ public class ProcessAtomicAnnotations {
     private String txClassInternalName = Type.getInternalName(Transaction.class);
 
     public ProcessAtomicAnnotations(String[] files) {
-	this.files = files;
+        this.files = files;
     }
 
     public ProcessAtomicAnnotations(Class<?> txClassToUse, String[] files) {
@@ -80,10 +80,10 @@ public class ProcessAtomicAnnotations {
 
     protected void processClassFile(File classFile) {
         //System.out.println("Processing file " + classFile + " for atomic annotations");
-	AtomicMethodsInfo atomicMethods = collectAtomicMethods(classFile);
-	if (! atomicMethods.isEmpty()) {
-	    transformClassFile(classFile, atomicMethods);
-	}
+        AtomicMethodsInfo atomicMethods = collectAtomicMethods(classFile);
+        if (! atomicMethods.isEmpty()) {
+            transformClassFile(classFile, atomicMethods);
+        }
     }
 
 
@@ -96,7 +96,7 @@ public class ProcessAtomicAnnotations {
             ClassReader cr = new ClassReader(is);
             AtomicMethodCollector cv = new AtomicMethodCollector();
             cr.accept(cv, 0);
-	    return cv.getAtomicMethods();
+            return cv.getAtomicMethods();
         } catch (Exception e) {
             e.printStackTrace();
             throw new Error("Error processing class file: " + e);
@@ -122,7 +122,7 @@ public class ProcessAtomicAnnotations {
             ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
             AtomicMethodTransformer cv = new AtomicMethodTransformer(cw, atomicMethods, txClassInternalName);
             cr.accept(cv, 0);
-	    writeNewClassFile(classFile, cw.toByteArray());
+            writeNewClassFile(classFile, cw.toByteArray());
         } catch (Exception e) {
             e.printStackTrace();
             throw new Error("Error processing class file: " + e);
@@ -138,21 +138,21 @@ public class ProcessAtomicAnnotations {
     }
 
     protected void writeNewClassFile(File classFile, byte[] bytecode) {
-	FileOutputStream fos = null;
+        FileOutputStream fos = null;
         try {
-	    fos = new FileOutputStream(classFile);
+            fos = new FileOutputStream(classFile);
             fos.write(bytecode);
         } catch (Exception e) {
             throw new Error("Couldn't rewrite class file: " + e);
         } finally {
-	    if (fos != null) {
-		try {
-		    fos.close();
-		} catch (Exception e) {
-		    // intentionally empty
-		}
-	    }
-	}
+            if (fos != null) {
+                try {
+                    fos.close();
+                } catch (Exception e) {
+                    // intentionally empty
+                }
+            }
+        }
     }
 
 
@@ -163,41 +163,41 @@ public class ProcessAtomicAnnotations {
 
 
     static class AtomicMethodCollector extends ClassAdapter {
-	private AtomicMethodsInfo atomicMethods = new AtomicMethodsInfo();
+        private AtomicMethodsInfo atomicMethods = new AtomicMethodsInfo();
 
         public AtomicMethodCollector() {
             super(new EmptyVisitor());
         }
 
-	public AtomicMethodsInfo getAtomicMethods() {
-	    return atomicMethods;
-	}
+        public AtomicMethodsInfo getAtomicMethods() {
+            return atomicMethods;
+        }
 
         public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
             MethodVisitor mv = super.visitMethod(access, name, desc, signature, exceptions);
-	    return new MethodCollector(mv, name, desc);
+            return new MethodCollector(mv, name, desc);
         }
 
-	
-	class MethodCollector extends MethodAdapter {
-	    final MethodInfo mInfo;
+        
+        class MethodCollector extends MethodAdapter {
+            final MethodInfo mInfo;
 
-	    MethodCollector(MethodVisitor mv, String name, String desc) {
-		super(mv);
-		this.mInfo = new MethodInfo(name, desc);
-	    }
+            MethodCollector(MethodVisitor mv, String name, String desc) {
+                super(mv);
+                this.mInfo = new MethodInfo(name, desc);
+            }
 
             public void visitEnd() {
                 // if we found an atomic annotation, then collect this method
                 if (mInfo.atomicParams != null) {
-		    atomicMethods.addAtomicMethod(mInfo);
+                    atomicMethods.addAtomicMethod(mInfo);
                 }
             }
 
-	    public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
-		if (ATOMIC_DESC.equals(desc)) {
+            public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
+                if (ATOMIC_DESC.equals(desc)) {
                     return new AtomicAnnotationVisitor();
-		} else {
+                } else {
                     // all other annotations are transformed into
                     // AnnotationNodes to be later applied to the method
                     // that will be generated to start the transaction and
@@ -206,7 +206,7 @@ public class ProcessAtomicAnnotations {
                     mInfo.addAnnotation(an, visible);
                     return an;
                 }
-	    }
+            }
 
             class AtomicAnnotationVisitor implements AnnotationVisitor {
                 private AtomicParams annotationParams = new AtomicParams();
@@ -224,60 +224,60 @@ public class ProcessAtomicAnnotations {
                 }
 
                 public void visitEnd() {
-		    mInfo.atomicParams = annotationParams;
+                    mInfo.atomicParams = annotationParams;
                 }
 
                 public void visitEnum(String name, String desc, String value) {
                     // empty
                 }
             }
-	}
+        }
     }
 
 
     protected static String getInternalMethodName(String name) {
-	return "atomic$" + name;
+        return "atomic$" + name;
     }
 
     static class AtomicMethodTransformer extends ClassAdapter implements Opcodes {
-	private AtomicMethodsInfo atomicMethods;
+        private AtomicMethodsInfo atomicMethods;
         private String txClassInternalName;
         private String className = null;
-	private boolean renameMethods = true;
-	private ArrayList<MethodWrapper> methods = new ArrayList<MethodWrapper>();
+        private boolean renameMethods = true;
+        private ArrayList<MethodWrapper> methods = new ArrayList<MethodWrapper>();
 
         public AtomicMethodTransformer(ClassWriter cw, AtomicMethodsInfo atomicMethods, String txClassInternalName) {
             super(cw);
-	    this.atomicMethods = atomicMethods;
+            this.atomicMethods = atomicMethods;
             this.txClassInternalName = txClassInternalName;
         }
 
         public void visitEnd() {
-	    renameMethods = false;
-	    for (MethodWrapper mw : methods) {
+            renameMethods = false;
+            for (MethodWrapper mw : methods) {
                 AtomicParams annParams = mw.mInfo.atomicParams;
                 boolean canFail = annParams.getParamAsBoolean("canFail");
                 boolean readOnly = annParams.getParamAsBoolean("readOnly");
                 boolean flattenNested = (readOnly || (! canFail));
-		boolean speculativeReadOnly = annParams.getParamAsBoolean("speculativeReadOnly");
+                boolean speculativeReadOnly = annParams.getParamAsBoolean("speculativeReadOnly");
 
-		Type returnType = Type.getReturnType(mw.desc);
-		Type[] argsType = Type.getArgumentTypes(mw.desc);
+                Type returnType = Type.getReturnType(mw.desc);
+                Type[] argsType = Type.getArgumentTypes(mw.desc);
 
-		int argsSize = 0;
-		for (Type arg : argsType) {
-		    argsSize += arg.getSize();
-		}
+                int argsSize = 0;
+                for (Type arg : argsType) {
+                    argsSize += arg.getSize();
+                }
 
                 if ((mw.access & Opcodes.ACC_STATIC) == 0) {
                     argsSize++;
                 }
 
-		int tryReadOnlyVarPos = argsSize;
-		int txFinishedVarPos = argsSize + 1;
-		int retSize = (returnType == Type.VOID_TYPE) ? 0 : returnType.getSize();
+                int tryReadOnlyVarPos = argsSize;
+                int txFinishedVarPos = argsSize + 1;
+                int retSize = (returnType == Type.VOID_TYPE) ? 0 : returnType.getSize();
 
-		MethodVisitor mv = visitMethod(mw.access, mw.name, mw.desc, mw.signature, mw.exceptions);
+                MethodVisitor mv = visitMethod(mw.access, mw.name, mw.desc, mw.signature, mw.exceptions);
 
                 for (Pair<AnnotationNode,Boolean> p : mw.mInfo.annotations) {
                     AnnotationNode node = p.first;
@@ -286,27 +286,27 @@ public class ProcessAtomicAnnotations {
                 }
 
                 // the following code comes originally from the ASMfier
-		mv.visitCode();
+                mv.visitCode();
                 Label l0 = new Label();
                 Label l1 = new Label();
                 Label l2 = new Label();
                 mv.visitTryCatchBlock(l0, l1, l2, "jvstm/CommitException");
-		Label l3 = new Label();
-		mv.visitTryCatchBlock(l0, l1, l3, "jvstm/WriteOnReadException");
+                Label l3 = new Label();
+                mv.visitTryCatchBlock(l0, l1, l3, "jvstm/WriteOnReadException");
                 Label l4 = new Label();
                 mv.visitTryCatchBlock(l0, l1, l4, null);
                 Label l5 = new Label();
                 mv.visitTryCatchBlock(l2, l5, l4, null);
                 Label l6 = new Label();
                 mv.visitTryCatchBlock(l3, l6, l4, null);
-		Label l7 = new Label();
-		mv.visitTryCatchBlock(l4, l7, l4, null);
-		if (speculativeReadOnly) {
-		    mv.visitInsn(ICONST_1);
-		} else {
-		    mv.visitInsn(ICONST_0);
-		}
-		mv.visitVarInsn(ISTORE, tryReadOnlyVarPos);
+                Label l7 = new Label();
+                mv.visitTryCatchBlock(l4, l7, l4, null);
+                if (speculativeReadOnly) {
+                    mv.visitInsn(ICONST_1);
+                } else {
+                    mv.visitInsn(ICONST_0);
+                }
+                mv.visitVarInsn(ISTORE, tryReadOnlyVarPos);
                 Label l8 = new Label();
                 Label lExit = null;
                 if (flattenNested) {
@@ -322,8 +322,8 @@ public class ProcessAtomicAnnotations {
                 }
 
                 mv.visitLabel(l8);
-		// mv.visitFrame(Opcodes.F_APPEND,1, new Object[] {Opcodes.INTEGER}, 0, null);
-		mv.visitVarInsn(ILOAD, tryReadOnlyVarPos);
+                // mv.visitFrame(Opcodes.F_APPEND,1, new Object[] {Opcodes.INTEGER}, 0, null);
+                mv.visitVarInsn(ILOAD, tryReadOnlyVarPos);
                 mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "begin", "(Z)Ljvstm/Transaction;");
                 mv.visitInsn(POP);
                 mv.visitInsn(ICONST_0);
@@ -350,7 +350,7 @@ public class ProcessAtomicAnnotations {
                 mv.visitJumpInsn(IFNE, l9);
                 mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
                 mv.visitLabel(l9);
-		// mv.visitFrame(Opcodes.F_APPEND,1, new Object[] {Opcodes.INTEGER}, 0, null);
+                // mv.visitFrame(Opcodes.F_APPEND,1, new Object[] {Opcodes.INTEGER}, 0, null);
                 if (returnType == Type.VOID_TYPE) {
                     mv.visitInsn(RETURN);
                 } else {
@@ -359,7 +359,7 @@ public class ProcessAtomicAnnotations {
                 }
 
                 mv.visitLabel(l2);
-		// mv.visitFrame(Opcodes.F_SAME1, 0, null, 1, new Object[] {"jvstm/CommitException"});
+                // mv.visitFrame(Opcodes.F_SAME1, 0, null, 1, new Object[] {"jvstm/CommitException"});
                 mv.visitVarInsn(ASTORE, txFinishedVarPos + 1);
                 mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
                 mv.visitInsn(ICONST_1);
@@ -370,21 +370,21 @@ public class ProcessAtomicAnnotations {
                 mv.visitJumpInsn(IFNE, l10);
                 mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
                 mv.visitJumpInsn(GOTO, l10);
-		mv.visitLabel(l3);
-		// mv.visitFrame(Opcodes.F_SAME1, 0, null, 1, new Object[] {"jvstm/WriteOnReadException"});
-		mv.visitVarInsn(ASTORE, txFinishedVarPos + 1);
-		mv.visitMethodInsn(INVOKESTATIC, "jvstm/Transaction", "abort", "()V");
-		mv.visitInsn(ICONST_1);
-		mv.visitVarInsn(ISTORE, txFinishedVarPos);
-		mv.visitInsn(ICONST_0);
-		mv.visitVarInsn(ISTORE, tryReadOnlyVarPos);
-		mv.visitLabel(l6);
-		mv.visitVarInsn(ILOAD, txFinishedVarPos);
-		mv.visitJumpInsn(IFNE, l10);
-		mv.visitMethodInsn(INVOKESTATIC, "jvstm/Transaction", "abort", "()V");
-		mv.visitJumpInsn(GOTO, l10);
+                mv.visitLabel(l3);
+                // mv.visitFrame(Opcodes.F_SAME1, 0, null, 1, new Object[] {"jvstm/WriteOnReadException"});
+                mv.visitVarInsn(ASTORE, txFinishedVarPos + 1);
+                mv.visitMethodInsn(INVOKESTATIC, "jvstm/Transaction", "abort", "()V");
+                mv.visitInsn(ICONST_1);
+                mv.visitVarInsn(ISTORE, txFinishedVarPos);
+                mv.visitInsn(ICONST_0);
+                mv.visitVarInsn(ISTORE, tryReadOnlyVarPos);
+                mv.visitLabel(l6);
+                mv.visitVarInsn(ILOAD, txFinishedVarPos);
+                mv.visitJumpInsn(IFNE, l10);
+                mv.visitMethodInsn(INVOKESTATIC, "jvstm/Transaction", "abort", "()V");
+                mv.visitJumpInsn(GOTO, l10);
                 mv.visitLabel(l4);
-		// mv.visitFrame(Opcodes.F_SAME1, 0, null, 1, new Object[] {"java/lang/Throwable"});
+                // mv.visitFrame(Opcodes.F_SAME1, 0, null, 1, new Object[] {"java/lang/Throwable"});
                 mv.visitVarInsn(ASTORE, txFinishedVarPos + 1 + (2 * retSize));
                 mv.visitLabel(l7);
                 mv.visitVarInsn(ILOAD, txFinishedVarPos);
@@ -392,11 +392,11 @@ public class ProcessAtomicAnnotations {
                 mv.visitJumpInsn(IFNE, l11);
                 mv.visitMethodInsn(INVOKESTATIC, txClassInternalName, "abort", "()V");
                 mv.visitLabel(l11);
-		// mv.visitFrame(Opcodes.F_APPEND,2, new Object[] {Opcodes.TOP, "java/lang/Throwable"}, 0, null);
+                // mv.visitFrame(Opcodes.F_APPEND,2, new Object[] {Opcodes.TOP, "java/lang/Throwable"}, 0, null);
                 mv.visitVarInsn(ALOAD, txFinishedVarPos + 1 + (2 * retSize));
                 mv.visitInsn(ATHROW);
                 mv.visitLabel(l10);
-		// mv.visitFrame(Opcodes.F_CHOP,3, null, 0, null);
+                // mv.visitFrame(Opcodes.F_CHOP,3, null, 0, null);
                 mv.visitJumpInsn(GOTO, l8);
 
                 if (flattenNested && (returnType == Type.VOID_TYPE)) {
@@ -409,7 +409,7 @@ public class ProcessAtomicAnnotations {
                 // ClassWriter.COMPUTE_MAXS option
                 mv.visitMaxs(0, 0);
                 mv.visitEnd();
-	    }
+            }
         }
 
         private void generateInternalMethodCall(MethodVisitor mv, MethodWrapper mw, Type[] argsType) {
@@ -439,7 +439,7 @@ public class ProcessAtomicAnnotations {
         }
 
         public MethodVisitor visitMethod(int access, String name, String desc, String signature, String[] exceptions) {
-	    if (renameMethods) {
+            if (renameMethods) {
                 MethodInfo mInfo = atomicMethods.getMethodInfo(name, desc);
                 if (mInfo != null) {
                     methods.add(new MethodWrapper(access, name, desc, signature, exceptions, mInfo));
@@ -448,54 +448,54 @@ public class ProcessAtomicAnnotations {
                     access |= Opcodes.ACC_PRIVATE;
                     return new RemoveAnnotations(super.visitMethod(access, getInternalMethodName(name), desc, signature, exceptions));
                 }
-	    }
+            }
 
             return super.visitMethod(access, name, desc, signature, exceptions);
         }
 
-	static class RemoveAnnotations extends MethodAdapter {
-	    RemoveAnnotations(MethodVisitor mv) {
-		super(mv);
-	    }
+        static class RemoveAnnotations extends MethodAdapter {
+            RemoveAnnotations(MethodVisitor mv) {
+                super(mv);
+            }
 
             public AnnotationVisitor visitAnnotation(String desc, boolean visible) {
                 return null;
             }
-	}
+        }
 
-	static class MethodWrapper {
-	    final int access;
-	    final String name;
-	    final String desc;
-	    final String signature;
-	    final String[] exceptions;
+        static class MethodWrapper {
+            final int access;
+            final String name;
+            final String desc;
+            final String signature;
+            final String[] exceptions;
             final MethodInfo mInfo;
 
-	    MethodWrapper(int access, String name, String desc, String signature, String[] exceptions, MethodInfo mInfo) {
-		this.access = access;
-		this.name = name;
-		this.desc = desc;
-		this.signature = signature;
-		this.exceptions = exceptions;
+            MethodWrapper(int access, String name, String desc, String signature, String[] exceptions, MethodInfo mInfo) {
+                this.access = access;
+                this.name = name;
+                this.desc = desc;
+                this.signature = signature;
+                this.exceptions = exceptions;
                 this.mInfo = mInfo;
-	    }
-	}
+            }
+        }
     }
 
     static class AtomicMethodsInfo {
-	private Map<Pair<String,String>,MethodInfo> atomicMethods = new HashMap<Pair<String,String>,MethodInfo>();
+        private Map<Pair<String,String>,MethodInfo> atomicMethods = new HashMap<Pair<String,String>,MethodInfo>();
 
-	public boolean isEmpty() {
-	    return atomicMethods.isEmpty();
-	}
+        public boolean isEmpty() {
+            return atomicMethods.isEmpty();
+        }
 
-	public void addAtomicMethod(MethodInfo mInfo) {
+        public void addAtomicMethod(MethodInfo mInfo) {
             atomicMethods.put(new Pair<String,String>(mInfo.methodName, mInfo.methodDesc), mInfo);
-	}
+        }
 
-	public MethodInfo getMethodInfo(String name, String desc) {
-	    return atomicMethods.get(new Pair<String,String>(name, desc));
-	}
+        public MethodInfo getMethodInfo(String name, String desc) {
+            return atomicMethods.get(new Pair<String,String>(name, desc));
+        }
     }
 
     static class AtomicParams {

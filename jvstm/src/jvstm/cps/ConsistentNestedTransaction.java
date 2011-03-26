@@ -47,7 +47,7 @@ public class ConsistentNestedTransaction extends NestedTransaction implements Co
     }
 
     public Cons getNewObjectsRegister() {
-	return newObjects;
+        return newObjects;
     }
 
     @Override

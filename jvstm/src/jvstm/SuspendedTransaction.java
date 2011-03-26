@@ -25,26 +25,16 @@
  */
 package jvstm;
 
+import jvstm.gc.TxContext;
 
-/**
- * An instance of <code>WriteOnReadException</code> is thrown by a
- * thread whenever a write attempt is made to a VBox within a
- * ReadOnlyTransaction.
- *
- * An application should never catch instances of this class, as the
- * purpose of throwing an instance of this class is to make a
- * non-local exit from the currently running transaction, and restart
- * it with a new type of transaction that is able to deal with writes.
- * This is done by the JVSTM runtime and should not be masked by the
- * application code in anyway.
- *
- * The class <code>WriteOnReadException</code> is specifically a
- * subclass of <code>Error</code> rather than <code>Exception</code>,
- * even though it is a "normal occurrence", because many applications
- * catch all occurrences of <code>Exception</code> and then discard
- * the exception.
- *
- */
-public class WriteOnReadException extends Error {
-    private static final long serialVersionUID = 1L;
+public final class SuspendedTransaction {
+    // NOTE: The TxContext only keeps a WeakReference to the Transaction, so here we must keep a reference to the
+    // Transaction as well!
+    protected final Transaction theTx;
+    protected final TxContext txContext;
+
+    protected SuspendedTransaction(Transaction theTx, TxContext txContext) {
+        this.theTx = theTx;
+        this.txContext = txContext;
+    }
 }

@@ -30,8 +30,10 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.ThreadFactory;
 
-public abstract class Transaction {
+import jvstm.gc.GCTask;
+import jvstm.gc.TxContext;
 
+public abstract class Transaction {
     // static part starts here
 
     /*
@@ -56,18 +58,41 @@ public abstract class Transaction {
      * guarantees, even if we remove all the remaining volatile
      * declarations from the VBox and VBoxBody classes.
      */
-    protected static volatile ActiveTransactionsRecord mostRecentCommittedRecord = ActiveTransactionsRecord.makeSentinelRecord();
+    public static volatile ActiveTransactionsRecord mostRecentCommittedRecord = ActiveTransactionsRecord.makeSentinelRecord();
 
     protected static final ThreadLocal<Transaction> current = new ThreadLocal<Transaction>();
+
+    // a per thread TxContext
+    private static final ThreadLocal<TxContext> threadTxContext = new ThreadLocal<TxContext>() {
+        @Override protected TxContext initialValue() {
+            return Transaction.allTxContexts.enqueue(new TxContext(Thread.currentThread()));
+        }
+    };
+
+    // List of all tx contexts.  The GC thread will iterate this list to GC any unused ActiveTxRecords.
+    public static TxContext allTxContexts = null;
+
+    static {
+        // initialize the allTxContexts
+        Transaction.allTxContexts = new TxContext(null);
+        // start the GC thread.
+        Thread gc = new Thread(new GCTask(mostRecentCommittedRecord));
+        gc.setDaemon(true);
+        gc.start();
+    }
 
     private static TransactionFactory TRANSACTION_FACTORY = new DefaultTransactionFactory();
 
     public static void setTransactionFactory(TransactionFactory factory) {
-	TRANSACTION_FACTORY = factory;
+        TRANSACTION_FACTORY = factory;
     }
 
     public static Transaction current() {
         return current.get();
+    }
+
+    public static TxContext context() {
+        return Transaction.threadTxContext.get();
     }
 
     // This method is called during the commit of a write transaction.  Even though it is possible
@@ -79,22 +104,41 @@ public abstract class Transaction {
     }
 
     public static void addTxQueueListener(TxQueueListener listener) {
-	ActiveTransactionsRecord.addListener(listener);
+        ActiveTransactionsRecord.addListener(listener);
     }
 
     public static boolean isInTransaction() {
         return current.get() != null;
     }
 
+    private static ActiveTransactionsRecord getRecordForNewTransaction() {
+        ActiveTransactionsRecord rec = Transaction.mostRecentCommittedRecord;
+
+        TxContext ctx = threadTxContext.get();
+        ctx.oldestRequiredVersion = rec; // volatile write
+
+        while (true) {
+            while ((rec.getNext() != null) && (rec.getNext().isCommitted())) {
+                rec = rec.getNext();
+            }
+            if (rec != ctx.oldestRequiredVersion) {
+                // a more recent record exists, so backoff and try again with the new one
+                ctx.oldestRequiredVersion = rec; // volatile write
+            } else {
+                return rec;
+            }
+        }
+    }
+
     /** Warning: this method has limited usability.  See the UnsafeSingleThreaded class for
      * details */
     public static Transaction beginUnsafeSingleThreaded() {
-	Transaction parent = current.get();
+        Transaction parent = current.get();
         if (parent != null) {
             throw new Error("Unsafe single-threaded transactions cannot be nested");
         }
 
-        ActiveTransactionsRecord activeRecord = mostRecentCommittedRecord.getRecordForNewTransaction();
+        ActiveTransactionsRecord activeRecord = getRecordForNewTransaction();
         Transaction tx = new UnsafeSingleThreadedTransaction(activeRecord);
         tx.start();
         return tx;
@@ -106,7 +150,7 @@ public abstract class Transaction {
             throw new Error("Inevitable transactions cannot be nested");
         }
 
-        ActiveTransactionsRecord activeRecord = mostRecentCommittedRecord.getRecordForNewTransaction();
+        ActiveTransactionsRecord activeRecord = getRecordForNewTransaction();
         Transaction tx = new InevitableTransaction(activeRecord);
         tx.start();
         return tx;
@@ -117,17 +161,24 @@ public abstract class Transaction {
     }
 
     public static Transaction begin(boolean readOnly) {
-	ActiveTransactionsRecord activeRecord = null;
-        Transaction parent = current.get();
+        ActiveTransactionsRecord activeRecord = null;
+        Transaction parent = current();
 
-        if (parent == null) {
-            activeRecord = mostRecentCommittedRecord.getRecordForNewTransaction();
+        if (parent == null && readOnly) {
+            Transaction tx = getRecordForNewTransaction().tx;
+            tx.start();
+            return tx;
         }
 
-	return beginWithActiveRecord(readOnly, activeRecord);
+        if (parent == null) {
+            activeRecord = getRecordForNewTransaction();
+        }
+
+        return beginWithActiveRecord(readOnly, activeRecord);
     }
 
-    private static Transaction beginWithActiveRecord(boolean readOnly, ActiveTransactionsRecord activeRecord) {
+    // activeRecord may be null, iff the parent is also null, in which case activeRecord is not used, so it's ok!
+    protected static Transaction beginWithActiveRecord(boolean readOnly, ActiveTransactionsRecord activeRecord) {
         Transaction parent = current.get();
         Transaction tx = null;
 
@@ -138,10 +189,10 @@ public abstract class Transaction {
                 tx = TRANSACTION_FACTORY.makeTopLevelTransaction(activeRecord);
             }
         } else {
-	    // passing the readOnly parameter to makeNestedTransaction is a temporary solution to
-	    // support the correct semantics in the composition of @Atomic annotations.  Ideally, we
-	    // should adjust the code generation of @Atomic to let WriteOnReadExceptions pass to the
-	    // parent
+            // passing the readOnly parameter to makeNestedTransaction is a temporary solution to
+            // support the correct semantics in the composition of @Atomic annotations.  Ideally, we
+            // should adjust the code generation of @Atomic to let WriteOnReadExceptions pass to the
+            // parent
             tx = parent.makeNestedTransaction(readOnly);
         }
         tx.start();
@@ -149,31 +200,23 @@ public abstract class Transaction {
         return tx;
     }
 
-    public static void commitAndBegin(boolean readOnly) {
-	Transaction tx = current.get();
-	tx.commitTx(false);
-
-	// prevent
-	ActiveTransactionsRecord activeRecord = tx.getSameRecordForNewTransaction();
-
-	// now it is safe to finish
-	tx.finishTx();
-
-	beginWithActiveRecord(readOnly, activeRecord);
-    }
-
-    // This method must be overridden in sub-classes that have an ActiveTransactionsRecord
-    protected ActiveTransactionsRecord getSameRecordForNewTransaction() {
-	return null;
+    /* When this method succeeds, it commits the current transaction and begins another in a consistent state with the
+     * previous transaction, i.e., if the committing transaction is read-only, then the next transaction begins in the
+     * same version that the read-only transaction used; if the committing transaction is read-write and the commit
+     * succeeds, the new transaction begins in the version that the read-write transaction produced.
+     */
+    public static Transaction commitAndBegin(boolean readOnly) {
+        Transaction tx = current.get();
+        return tx.commitAndBeginTx(readOnly);
     }
 
     public static void abort() {
-	Transaction tx = current.get();
+        Transaction tx = current.get();
         tx.abortTx();
     }
 
     public static void commit() {
-	Transaction tx = current.get();
+        Transaction tx = current.get();
         tx.commitTx(true);
     }
 
@@ -182,13 +225,11 @@ public abstract class Transaction {
         tx.commitTx(false);
     }
 
-    public static Transaction suspend() {
-	Transaction tx = current.get();
-        tx.suspendTx();
-        return tx;
+    public static SuspendedTransaction suspend() {
+        return current.get().suspendTx();
     }
 
-    public static void resume(Transaction tx) {
+    public static Transaction resume(SuspendedTransaction suspendedTx) {
         if (current.get() != null) {
             throw new ResumeException("Can't resume a transaction into a thread with an active transaction already");
         }
@@ -207,7 +248,20 @@ public abstract class Transaction {
         // detect that the same transaction is being used in two
         // different threads.
 
-        tx.resumeTx();
+        TxContext currentTxContext = context();
+        currentTxContext.oldestRequiredVersion = suspendedTx.txContext.oldestRequiredVersion;
+        /* NOTE: we CANNOT set
+         * suspendedTx.txContext.oldestRequiredVersion = null;
+         *
+         * Doing so would allow the GCTask to miss out on this version, by seeing null in the oldestRequiredVersion of
+         * both the currentTxContext and the suspendedTx.txContext.  The TxContext in suspendedTx will be removed from
+         * the list when the now resumed transaction becomes GCed.
+         */
+
+        // set the transaction in this thread
+        current.set(suspendedTx.theTx);
+        // return the resumed transaction
+        return suspendedTx.theTx;
     }
 
     // the transaction version that is used to read boxes. Must always represent a consistent state
@@ -215,14 +269,17 @@ public abstract class Transaction {
     protected int number;
     protected final Transaction parent;
     
-    public Transaction(int number) {
+    public Transaction(Transaction parent, int number) {
+        this.parent = parent;
         this.number = number;
-        this.parent = null;
+    }
+
+    public Transaction(int number) {
+        this(null, number);
     }
 
     public Transaction(Transaction parent) {
-        this.number = parent.getNumber();
-        this.parent = parent;
+        this(parent, parent.getNumber());
     }
 
     public void start() {
@@ -238,7 +295,7 @@ public abstract class Transaction {
     }
 
     protected void setNumber(int number) {
-	this.number = number;
+        this.number = number;
     }
 
     protected void abortTx() {
@@ -263,13 +320,26 @@ public abstract class Transaction {
         // intentionally empty
     }
 
-    protected void suspendTx() {
+    protected SuspendedTransaction suspendTx() {
+        // remove the transaction from the thread
         current.set(null);
+        
+        TxContext newTxContext = new TxContext(this);
+        // create a new SuspendedTransaction holding the transaction and its context.
+        SuspendedTransaction suspendedTx = new SuspendedTransaction(this, newTxContext);
+        // enqueue the new TxContext to hold the transaction's required record
+        Transaction.allTxContexts.enqueue(newTxContext);
+        TxContext currentTxContext = context();
+        // the order is important! We must not let go of the required version, so we set it ahead before clearing it in
+        // the current context
+        newTxContext.oldestRequiredVersion = currentTxContext.oldestRequiredVersion;
+        currentTxContext.oldestRequiredVersion = null;
+
+        return suspendedTx;
+        // the currentTxContext is left to be reused by this thread
     }
 
-    protected void resumeTx() {
-        current.set(this);
-    }
+    protected abstract Transaction commitAndBeginTx(boolean readOnly);
 
     public abstract Transaction makeNestedTransaction(boolean readOnly);
 

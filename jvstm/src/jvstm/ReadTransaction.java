@@ -26,20 +26,27 @@
 package jvstm;
 
 public class ReadTransaction extends Transaction {
+    static final WriteOnReadException WRITE_ON_READ_EXCEPTION = new WriteOnReadException();
 
     public ReadTransaction(int number) {
         super(number);
     }
 
     public ReadTransaction(Transaction parent) {
-	super(parent);
+        super(parent);
+    }
+
+    @Override
+    protected Transaction commitAndBeginTx(boolean readOnly) {
+        commitTx(true);
+        return beginWithActiveRecord(readOnly, null);
     }
 
     public Transaction makeNestedTransaction(boolean readOnly) {
-	if (!readOnly) {
-	    throw new WriteOnReadException();
-	}
-	return new ReadTransaction(this);
+        if (!readOnly) {
+            throw WRITE_ON_READ_EXCEPTION;
+        }
+        return new ReadTransaction(this);
     }
 
     public <T> T getBoxValue(VBox<T> vbox) {
@@ -47,15 +54,15 @@ public class ReadTransaction extends Transaction {
     }
 
     public <T> void setBoxValue(VBox<T> vbox, T value) {
-        throw new WriteOnReadException();
+        throw WRITE_ON_READ_EXCEPTION;
     }
 
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
-	return initial;
+        return initial;
     }
     
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
-        throw new WriteOnReadException();
+        throw WRITE_ON_READ_EXCEPTION;
     }
 
     protected void doCommit() {

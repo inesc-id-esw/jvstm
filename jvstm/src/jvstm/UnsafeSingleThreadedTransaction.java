@@ -37,7 +37,7 @@ public class UnsafeSingleThreadedTransaction extends Transaction {
     
     public UnsafeSingleThreadedTransaction(ActiveTransactionsRecord activeRecord) {
         super(activeRecord.transactionNumber);
-	this.activeTxRecord = activeRecord;
+        this.activeTxRecord = activeRecord;
     }
 
     @Override
@@ -46,10 +46,16 @@ public class UnsafeSingleThreadedTransaction extends Transaction {
         // number
         int newTxNumber = this.activeTxRecord.transactionNumber + 1;
         
-	// renumber the TX to the new number
-	setNumber(newTxNumber);
+        // renumber the TX to the new number
+        setNumber(newTxNumber);
 
         super.start();
+    }
+
+    @Override
+    protected Transaction commitAndBeginTx(boolean readOnly) {
+        commitTx(true);
+        return Transaction.beginUnsafeSingleThreaded();
     }
 
     @Override
@@ -61,11 +67,14 @@ public class UnsafeSingleThreadedTransaction extends Transaction {
     @Override
     protected void finish() {
         super.finish();
-        activeTxRecord.decrementRunning();
+        if (! context().inCommitAndBegin) {
+            context().oldestRequiredVersion = null;
+        }
     }
 
+
     public Transaction makeNestedTransaction(boolean readOnly) {
-	throw new Error("UnsafeSingleThreaded transactions don't support nesting yet");
+        throw new Error("UnsafeSingleThreaded transactions don't support nesting yet");
     }
 
     public <T> T getBoxValue(VBox<T> vbox) {
@@ -73,33 +82,30 @@ public class UnsafeSingleThreadedTransaction extends Transaction {
     }
 
     public <T> void setBoxValue(VBox<T> vbox, T value) {
-	vbox.body = VBox.makeNewBody(value, number, null); // we immediatly clean old unused values
+        vbox.body = VBox.makeNewBody(value, number, null); // we immediately clean old unused values
     }
 
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
-	throw new Error("UnsafeSingleThreaded transactions don't support PerTxBoxes yet");
+        throw new Error("UnsafeSingleThreaded transactions don't support PerTxBoxes yet");
     }
     
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
-	throw new Error("UnsafeSingleThreaded transactions don't support PerTxBoxes yet");
+        throw new Error("UnsafeSingleThreaded transactions don't support PerTxBoxes yet");
     }
 
     protected void doCommit() {
         // the commit is already done, so create a new ActiveTransactionsRecord
-	ActiveTransactionsRecord newRecord = new ActiveTransactionsRecord(getNumber(), WriteSet.empty());
-	newRecord.setCommitted();
+        ActiveTransactionsRecord newRecord = new ActiveTransactionsRecord(getNumber(), WriteSet.empty());
+        newRecord.setCommitted();
         setMostRecentCommittedRecord(newRecord);
 
-	if (!this.activeTxRecord.trySetNext(newRecord)) {
-	    throw new Error("Unacceptable: UnsafeSingleThreadedTransaction in a concurrent environment");
-	}
+        if (!this.activeTxRecord.trySetNext(newRecord)) {
+            throw new Error("Unacceptable: UnsafeSingleThreadedTransaction in a concurrent environment");
+        }
 
         // we must update the activeRecords accordingly
         
-        // the correct order is to increment first the
-        // new, and only then decrement the old
-        newRecord.incrementRunning();
-        this.activeTxRecord.decrementRunning();
+        context().oldestRequiredVersion = newRecord;
         this.activeTxRecord = newRecord;
     }
 }

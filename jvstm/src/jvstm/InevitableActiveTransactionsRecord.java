@@ -37,32 +37,32 @@ public class InevitableActiveTransactionsRecord extends ActiveTransactionsRecord
     private final Object WRITE_SET_MONITOR = new Object();
 
     public InevitableActiveTransactionsRecord(int txNumber) {
-	super(txNumber, null);
+        super(txNumber, null);
     }
 
     // anyone doing this will have to be delayed until this transaction sets the write-set
     @Override
     protected WriteSet getWriteSet() {
-	synchronized (WRITE_SET_MONITOR) {
-	    while (this.writeSet == null) {
-		try {
-		    WRITE_SET_MONITOR.wait();
-		} catch (InterruptedException ie) {
-		    // ignore and continue to wait
-		}
-	    }
-	}
-	return this.writeSet;
+        synchronized (WRITE_SET_MONITOR) {
+            while (this.writeSet == null) {
+                try {
+                    WRITE_SET_MONITOR.wait();
+                } catch (InterruptedException ie) {
+                    // ignore and continue to wait
+                }
+            }
+        }
+        return this.writeSet;
     }
 
     protected void setWriteSet(WriteSet writeSet) {
-	synchronized(WRITE_SET_MONITOR) {
-	    this.writeSet = writeSet;
-	    WRITE_SET_MONITOR.notifyAll();
-	}
+        synchronized(WRITE_SET_MONITOR) {
+            this.writeSet = writeSet;
+            WRITE_SET_MONITOR.notifyAll();
+        }
     }
 
-    protected boolean clean() {
-	return super.clean();
-    }
+    // protected boolean clean() {
+    //  return super.clean();
+    // }
 }

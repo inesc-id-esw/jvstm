@@ -47,6 +47,14 @@ public class RedBlackTree<E extends Comparable<? super E>> implements Iterable<E
         this.right = right;
     }
 
+    public int size() {
+        if (this == EMPTY) {
+            return 0;
+        } else {
+            return left.size() + right.size() + 1;
+        }
+    }
+
     public RedBlackTree<E> put(E elem) {
         RedBlackTree<E> result = buildTree(elem);
         result.color = BLACK;

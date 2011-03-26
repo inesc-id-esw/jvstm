@@ -25,8 +25,30 @@
  */
 package jvstm;
 
+import sun.misc.Unsafe;
+import java.lang.reflect.Field;
+
 public class VBox<E> {
+    // --- Setup to use Unsafe
+    private static Unsafe unsafe = UtilUnsafe.getUnsafe();
+    private static final long bodyOffset;
+    private static final long currentOwnerOffset;
+    static {                      // <clinit>
+        Field f = null;
+        try { f = VBox.class.getDeclaredField("body"); }
+        catch (java.lang.NoSuchFieldException e) { throw new RuntimeException(e); }
+        bodyOffset = unsafe.objectFieldOffset(f);
+
+        try { f = VBox.class.getDeclaredField("currentOwner"); }
+        catch (java.lang.NoSuchFieldException e) { throw new RuntimeException(e); }
+        currentOwnerOffset = unsafe.objectFieldOffset(f);
+    }
+
     public VBoxBody<E> body;
+
+    // Setting the DEFAULT_COMMITTED_OWNER avoid the test for a possible null in every access to a VBox's currentOwner
+    protected OwnershipRecord currentOwner = OwnershipRecord.DEFAULT_COMMITTED_OWNER;
+    public E tempValue;
 
     public VBox() {
         this((E)null);
@@ -38,7 +60,7 @@ public class VBox<E> {
 
     // used for persistence support
     protected VBox(VBoxBody<E> body) {
-	this.body = body;
+        this.body = body;
     }
 
     public E get() {
@@ -76,15 +98,42 @@ public class VBox<E> {
     }
 
     public VBoxBody<?> commit(E newValue, int txNumber) {
-        VBoxBody<E> newBody = makeNewBody(newValue, txNumber, this.body);
-	this.body = newBody;
-        return newBody;
+        VBoxBody<E> currentHead = this.body;
+
+        VBoxBody<E> existingBody = null;
+        if (currentHead != null) {
+            existingBody = currentHead.getBody(txNumber);
+            assert(existingBody == null || existingBody.version <= txNumber);
+        }
+
+        if (existingBody == null || existingBody.version < txNumber) {
+            VBoxBody<E> newBody = makeNewBody(newValue, txNumber, currentHead);
+            existingBody = CASbody(currentHead, newBody);
+        }
+        // return the existingBody, regardless of whether the CAS succeeded
+        return existingBody;
+    }
+
+    /* Atomically replace the body with the new one iff the current body is the expected.
+     *
+     * Return the body that was actually kept.
+     */
+    private VBoxBody<E> CASbody(VBoxBody<E> expected, VBoxBody<E> newValue) {
+        if (unsafe.compareAndSwapObject(this, bodyOffset, expected, newValue)) {
+            return newValue;
+        } else { // if the CAS failed the new value must already be there!
+            return this.body.getBody(newValue.version);
+        }
+    }
+
+    protected boolean CASsetOwner(OwnershipRecord previousOwner, OwnershipRecord newOwner) {
+        return unsafe.compareAndSwapObject(this, currentOwnerOffset, previousOwner, newOwner);
     }
 
     // in the future, if more than one subclass of body exists, we may
     // need a factory here but, for now, it's simpler to have it like
     // this
     public static <T> VBoxBody<T> makeNewBody(T value, int version, VBoxBody<T> next) {
-	return new VBoxBody<T>(value, version, next);
+        return new VBoxBody<T>(value, version, next);
     }
 }

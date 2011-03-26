@@ -28,10 +28,10 @@ package jvstm.util;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-public class Cons<E> implements Iterable<E> { 
+public final class Cons<E> implements Iterable<E> { 
     protected static final Cons EMPTY = new Cons(null, null);
 
-    public static <T> Cons<T> empty() {
+    public final static <T> Cons<T> empty() {
         return (Cons<T>)EMPTY;
     }
 
@@ -43,11 +43,11 @@ public class Cons<E> implements Iterable<E> {
         this.rest = rest;
     }
 
-    public Cons<E> cons(E elem) {
+    public final Cons<E> cons(E elem) {
         return new Cons<E>(elem, this);
     }
     
-    public E first() {
+    public final E first() {
         if (isEmpty()) {
             throw new EmptyListException();
         } else {
@@ -55,7 +55,7 @@ public class Cons<E> implements Iterable<E> {
         }
     }
 
-    public Cons<E> rest() {
+    public final Cons<E> rest() {
         if (isEmpty()) {
             throw new EmptyListException();
         } else {
@@ -63,7 +63,7 @@ public class Cons<E> implements Iterable<E> {
         }
     }
 
-    public Cons<E> removeFirst(Object elem) {
+    public final Cons<E> removeFirst(Object elem) {
         Cons<E> found = member(elem);
         if (found == null) {
             return this;
@@ -72,7 +72,7 @@ public class Cons<E> implements Iterable<E> {
         }
     }
 
-    public Cons<E> removeAll(Object elem) {
+    public final Cons<E> removeAll(Object elem) {
         Cons<E> lastFound = lastMember(elem);
         if (lastFound == null) {
             return this;
@@ -122,7 +122,7 @@ public class Cons<E> implements Iterable<E> {
         }
     }
 
-    public Cons<E> removeCons(Cons<?> cons) {
+    public final Cons<E> removeCons(Cons<?> cons) {
         Cons<?> iter = this;
         while ((iter != cons) && (iter != EMPTY)) {
             iter = iter.rest;
@@ -135,7 +135,7 @@ public class Cons<E> implements Iterable<E> {
         }
     }
 
-    private Cons<E> removeExistingCons(Cons<?> cons) {
+    private final Cons<E> removeExistingCons(Cons<?> cons) {
         if (cons == this) {
             return rest;
         } else {
@@ -153,7 +153,7 @@ public class Cons<E> implements Iterable<E> {
         }
     }
 
-    public int size() {
+    public final int size() {
         int size = 0;
         Cons<?> iter = this;
         while (iter != EMPTY) {
@@ -163,15 +163,15 @@ public class Cons<E> implements Iterable<E> {
         return size;
     }
 
-    public boolean isEmpty() {
+    public final boolean isEmpty() {
         return (this == EMPTY);
     }
 
-    public boolean contains(Object elem) {
+    public final boolean contains(Object elem) {
         return member(elem) != null;
     }
 
-    public Cons<E> member(Object elem) {
+    public final Cons<E> member(Object elem) {
         Cons<E> iter = this;
         if (elem == null) {
             while (iter != EMPTY) {
@@ -191,7 +191,7 @@ public class Cons<E> implements Iterable<E> {
         return null;
     }
 
-    public Cons<E> lastMember(Object elem) {
+    public final Cons<E> lastMember(Object elem) {
         Cons<E> found = null;
         Cons<E> iter = this;
         if (elem == null) {
@@ -213,11 +213,11 @@ public class Cons<E> implements Iterable<E> {
         return found;
     }
 
-    public Cons<E> reverse() {
+    public final Cons<E> reverse() {
         return reverseInto((Cons<E>)EMPTY);
     }
 
-    public Cons<E> reverseInto(Cons<E> tail) {
+    public final Cons<E> reverseInto(Cons<E> tail) {
         Cons<E> result = tail;
         Cons<E> iter = this;
         while (iter != EMPTY) {
@@ -227,22 +227,22 @@ public class Cons<E> implements Iterable<E> {
         return result;
     }
 
-    public Iterator<E> iterator() {
+    public final Iterator<E> iterator() {
         return new ConsIterator<E>(this);
     }
 
-    static class ConsIterator<T> implements Iterator<T> {
+    final static class ConsIterator<T> implements Iterator<T> {
         private Cons<T> current;
         
         ConsIterator(Cons<T> start) {
             this.current = start;
         }
         
-        public boolean hasNext() { 
+        public final boolean hasNext() { 
             return (current != EMPTY);
         }
         
-        public T next() { 
+        public final T next() { 
             if (current == EMPTY) {
                 throw new NoSuchElementException();
             } else {
@@ -252,7 +252,7 @@ public class Cons<E> implements Iterable<E> {
             }
         }
         
-        public void remove() {
+        public final void remove() {
             throw new UnsupportedOperationException();
         }
     }

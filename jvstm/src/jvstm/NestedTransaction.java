@@ -25,25 +25,89 @@
  */
 package jvstm;
 
+import java.util.Iterator;
+import java.util.Map;
+
 public class NestedTransaction extends ReadWriteTransaction {
 
     public NestedTransaction(ReadWriteTransaction parent) {
         super(parent);
+        // start with parent's read-set
+        this.bodiesRead = parent.bodiesRead;
+        this.next = parent.next;
+        // start with parent write-set of boxes written in place (useful to commit to parent a little faster)
+        this.boxesWrittenInPlace = parent.boxesWrittenInPlace;
     }
 
+    @Override
+    protected Transaction commitAndBeginTx(boolean readOnly) {
+        commitTx(true);
+        return beginWithActiveRecord(readOnly, null);
+    }
+
+    @Override
+    protected void finish() {
+        // do not returnToPool the read-set arrays
+
+        bodiesRead = null;
+        boxesWritten = null;
+        boxesWrittenInPlace = null;
+        perTxValues = null;
+    }
+
+    @Override
+    protected void doCommit() {
+        tryCommit();
+
+        // do not returnToPool the read-set arrays
+
+        // reset read-set, write-set and perTxValues
+        // bodiesRead = parent.bodiesRead; // already ensured in tryCommit()
+        boxesWritten = EMPTY_MAP;
+        // boxesWrittenInPlace = parent.boxesWrittenInPlace; // already ensured in tryCommit()
+        perTxValues = EMPTY_MAP;
+    }
+
+    @Override
     protected void tryCommit() {
         ReadWriteTransaction parent = getRWParent();
-        //parent.bodiesRead = this.bodiesRead.reverseInto(parent.bodiesRead);
-	if (parent.bodiesRead == EMPTY_MAP) {
-	    parent.bodiesRead = this.bodiesRead;
-	} else {
-	    parent.bodiesRead.putAll(this.bodiesRead);
-	}
-        if (parent.boxesWritten == EMPTY_MAP) {
-            parent.boxesWritten = this.boxesWritten;
-        } else {
-            parent.boxesWritten.putAll(this.boxesWritten);
+        // update parent's read-set
+        parent.bodiesRead = this.bodiesRead;
+        parent.next = this.next;
+
+        // update parent's write-set
+
+        // first, add boxesWritten to parent.  Warning: 'this.boxesWritten'
+        // may overwrite values of vboxes in parent.boxesWrittenInPlace, so
+        // care must be taken to check for this case.  Also we could have
+        // written to this.boxesWritten as well as simultaneously to the
+        // VBox.tempValue, so check for that as well.
+
+        for (Map.Entry<VBox, Object> entry : this.boxesWritten.entrySet()) {
+            VBox vbox = entry.getKey();
+            if (vbox.currentOwner == this.orec) { // if we also wrote directly to the box, we just skip this value
+                continue;
+            }
+            Object value = entry.getValue();
+            if (vbox.currentOwner == parent.orec) {
+                vbox.tempValue = value;
+            } else {
+                parent.boxesWritten.put(vbox, value);
+            }
         }
+
+        // update ownership of boxesWrittenInPlace
+        VBox vboxAlreadyInParent = parent.boxesWrittenInPlace.first();
+        Iterator<VBox> it = this.boxesWrittenInPlace.iterator();
+        while (it.hasNext()) {
+            VBox vbox = it.next();
+            if (vbox == vboxAlreadyInParent) {
+                break;
+            }
+            vbox.currentOwner = parent.orec; // vbox.CASsetOwner(this.orec, parent.orec) is not needed because we only have linear nesting
+        }
+        parent.boxesWrittenInPlace = this.boxesWrittenInPlace;
+
         if (parent.perTxValues == EMPTY_MAP) {
             parent.perTxValues = perTxValues;
         } else {

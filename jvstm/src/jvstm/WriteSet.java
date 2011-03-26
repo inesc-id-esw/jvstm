@@ -28,6 +28,8 @@ package jvstm;
 import jvstm.util.Cons;
 
 import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /* This class contains information about the VBoxes modified by a transaction and the corresponding
@@ -39,100 +41,142 @@ import java.util.concurrent.atomic.AtomicInteger;
  * picking a unique bucket and copying the values of that bucket's VBoxes to their "public" place
  * (the body of the VBox).
  */
-public class WriteSet {
-    /* Represents the minimum number os VBoxes to include in the same block.  This value is used to
+public final class WriteSet {
+    private static final ThreadLocal<Random> random = new ThreadLocal<Random>() {
+        @Override protected Random initialValue() {
+            return new Random();
+        }
+    };
+
+    /* Represents the default number os VBoxes to include in the same block.  This value is used to
      * provide enough work to a helper thread and to avoid for example to give 1 box per thread to
      * write, which would be a waste of context switching effort.  The best value certainly depends
      * on the architecture where this code will run.
      */
-    protected static final int MIN_BLOCK_SIZE = 10;
-    /* We don't create more buckets than processors available.  We simply assume that more helper
-     * threads than processors will actually not provide any additional help.
-     */
-    protected static final int N_PROCS = Runtime.getRuntime().availableProcessors();
-
+    protected static final int DEFAULT_BLOCK_SIZE = 10;
 
     /* There are nBlocks of VBoxes ranged from 0 to nBlocks-1.  Any i-th block (except the last one)
      * manages VBoxes from i*blockSize (including) to i*blockSize+blockSize (excluding).  The last
-     * block manages the range from i*blockSize (including) to writeSet.length (excluding). */
+     * block manages the range from i*blockSize (including) to writeSetLength (excluding). */
     protected final int nBlocks;
     /* The number of VBoxes per block */
     protected final int blockSize;
     /* All the VBoxes lined-up in a fixed array for direct access */
-    protected final Map.Entry<VBox, Object> [] writeSet;
+    // protected final Map.Entry<VBox, Object> [] writeSet;
+    protected final VBox [] allWrittenVBoxes;
+    protected final Object [] allWrittenValues;
+    // the previous arrays may be allocated in a larger size than required.
+    // This happens when the same box is first written to the standard
+    // write-set and later re-written in-place.  For this reason we should
+    // never use the arrays 'length' attribute; use instead writeSetLength.
+    protected final int writeSetLength;
+
     /* The VBoxBodies created when writing-back each block of VBoxes */
     protected final Cons<VBoxBody> [] bodiesPerBlock;
-    /* The atomic counter to uniquely distribute one block per request */
-    protected final AtomicInteger nextBlock = new AtomicInteger(0);
-    /* The atomic counter to find out who processed a block in last place */
-    protected final AtomicInteger blocksDone = new AtomicInteger(0);
+    /* A write-back status for each bucket */
+    protected final AtomicBoolean [] blocksDone;
 
-    protected WriteSet(Map<VBox, Object> boxesWritten) {
-	this.writeSet = boxesWritten.entrySet().toArray(new Map.Entry[0]);
-   	this.blockSize = decideBlockSize(writeSet.length);
- 	int nBlocksAux = writeSet.length / blockSize;
-	this.nBlocks = (nBlocksAux == 0 && writeSet.length > 0) ? 1 : nBlocksAux;
-	this.bodiesPerBlock = new Cons[this.nBlocks];
+    protected WriteSet(Cons<VBox> boxesWrittenInPlace, Map<VBox, Object> otherBoxes, OwnershipRecord myOrec) {
+        this(boxesWrittenInPlace, otherBoxes, myOrec, DEFAULT_BLOCK_SIZE);
     }
 
-    private int decideBlockSize(int nBoxes) {
-	// Lowest possible block size is 1, even if the write-set is empty.  This is to avoid a
-	// division by zero.
-	if (nBoxes == 0) {
-	    return 1;
-	}
+    protected WriteSet(Cons<VBox> boxesWrittenInPlace, Map<VBox, Object> otherBoxes, OwnershipRecord myOrec, int blockSize) {
+        int boxesWrittenInPlaceSize = boxesWrittenInPlace.size();
 
-	// if there are less boxes than MIN_BLOCK_SIZE then the blockSize will be equal to nBoxes
-	// (to ensure at least one block)
-	if (nBoxes < MIN_BLOCK_SIZE) {
-	    return nBoxes;
-	}
+        int maxRequiredSize = boxesWrittenInPlaceSize + otherBoxes.size();
+        this.allWrittenVBoxes = new VBox[maxRequiredSize];
+        this.allWrittenValues = new Object[maxRequiredSize];
 
-	int bs = nBoxes/N_PROCS;
-	if (bs < MIN_BLOCK_SIZE) {
-	    bs = MIN_BLOCK_SIZE;
-	}
+        int pos = 0;
+        for (VBox vbox : boxesWrittenInPlace) {
+            this.allWrittenVBoxes[pos] = vbox;
+            this.allWrittenValues[pos++] = vbox.tempValue;
+        }
 
-	return bs;
+        for (Map.Entry<VBox, Object> entry : otherBoxes.entrySet()) {
+            VBox vbox = entry.getKey();
+            if (vbox.currentOwner == myOrec) { // if we also wrote directly to the box, we just skip this value
+                continue;
+            }
+            this.allWrittenVBoxes[pos] = vbox;
+            this.allWrittenValues[pos++] = entry.getValue();
+        }
+        this.writeSetLength = pos;
+
+        this.blockSize = blockSize;
+        int nBlocksAux = writeSetLength / blockSize;
+        this.nBlocks = (nBlocksAux == 0 && writeSetLength > 0) ? 1 : nBlocksAux;
+        this.bodiesPerBlock = new Cons[this.nBlocks];
+        this.blocksDone = new AtomicBoolean[this.nBlocks];
+        for (int i = 0; i < this.nBlocks; i++) {
+            this.blocksDone[i] = new AtomicBoolean(false);
+        }
     }
 
-    protected boolean helpWriteBack(int newTxNumber) {
-	// getAndIncrement atomically ensures a unique block that no one else will be writing-back
-	int block = this.nextBlock.getAndIncrement();
-	while (block < this.nBlocks) {
-	    this.bodiesPerBlock[block] = writeBackBlock(block, newTxNumber);
-	    // Next, incrementing blocksDone enforces a barrier; it is done after setting the
-	    // bodiesPerBlock, thus ensuring that all bodiesPerBlock are seen after the last block
-	    // is written-back
-	    if (blocksDone.incrementAndGet() == this.nBlocks) {
-		return true;
-	    }
-	    block = this.nextBlock.getAndIncrement();
-	}
-	return false;
+    // This constructor is used by InevitableTransactions. It is simpler
+    // because we know that everything was already written in place.  There is
+    // only one bucket and it will already be written-back.  The purpose is
+    // that when any transaction tries to helpWriteBack will simply quickly
+    // return and continue its work.
+    protected WriteSet(Cons<VBox> vboxesWrittenBack) {
+        this.writeSetLength = vboxesWrittenBack.size();
+
+        this.nBlocks = 1;
+        this.blockSize = this.writeSetLength;
+        this.allWrittenVBoxes = new VBox[this.writeSetLength];
+        this.allWrittenValues = new Object[this.writeSetLength];
+        this.bodiesPerBlock = new Cons[this.nBlocks];
+        this.blocksDone = new AtomicBoolean[this.nBlocks];
+
+        int pos = 0;
+        Cons<VBoxBody> bodiesCommitted = Cons.empty();
+        for (VBox vbox : vboxesWrittenBack) {
+            this.allWrittenVBoxes[pos] = vbox;
+            this.allWrittenValues[pos++] = vbox.body.value;
+            bodiesCommitted = bodiesCommitted.cons(vbox.body);
+        }
+        this.bodiesPerBlock[0] = bodiesCommitted;
+        this.blocksDone[0] = new AtomicBoolean(true);
     }
 
-    protected Cons<VBoxBody> writeBackBlock(int block, int newTxNumber) {
-	int min = block*this.blockSize;
-	// max depends on whether this is the last block
-	int max = (block == (this.nBlocks - 1)) ? this.writeSet.length : (min + this.blockSize);
+    protected final void helpWriteBack(int newTxNumber) {
+        if (this.nBlocks == 0) return;  // there was really nothing to be done
 
-	Cons<VBoxBody> newBodies = Cons.empty();
-	for (int i = min; i < max; i++) {
-	    VBox vbox = this.writeSet[i].getKey();
-	    Object newValue = this.writeSet[i].getValue();
-
-	    VBoxBody newBody = vbox.commit((newValue == ReadWriteTransaction.NULL_VALUE) ? null : newValue, newTxNumber);
-	    newBodies = newBodies.cons(newBody);
-	}
-	return newBodies;
+        int finalBlock = random.get().nextInt(this.nBlocks); // start at a random position
+        int currentBlock = finalBlock;
+        do {
+            if (!this.blocksDone[currentBlock].get()) {
+                // smf: is this safe?  multiple helping threads will write to this location, but since java
+                // does not allow values out of the blue, we will always have a reference to a Cons with the
+                // required bodies created, right?
+                this.bodiesPerBlock[currentBlock] = writeBackBlock(currentBlock, newTxNumber);
+                this.blocksDone[currentBlock].set(true);
+            }
+            currentBlock = (currentBlock + 1) % this.nBlocks;
+        } while (currentBlock != finalBlock);
     }
 
-    protected int size() {
-	return this.writeSet.length;
+    protected final Cons<VBoxBody> writeBackBlock(int block, int newTxNumber) {
+        int min = block*this.blockSize;
+        // max depends on whether this is the last block
+        int max = (block == (this.nBlocks - 1)) ? this.writeSetLength : (min + this.blockSize);
+
+        Cons<VBoxBody> newBodies = Cons.empty();
+        for (int i = min; i < max; i++) {
+            VBox vbox = this.allWrittenVBoxes[i];
+            Object newValue = this.allWrittenValues[i];
+
+            VBoxBody newBody = vbox.commit((newValue == ReadWriteTransaction.NULL_VALUE) ? null : newValue, newTxNumber);
+            newBodies = newBodies.cons(newBody);
+        }
+        return newBodies;
+    }
+
+    protected final int size() {
+        return this.writeSetLength;
     }
     
     protected static WriteSet empty() {
-	return new WriteSet(ReadWriteTransaction.EMPTY_MAP);
+        return new WriteSet(Cons.<VBox>empty(), ReadWriteTransaction.EMPTY_MAP, null);
     }
 }

@@ -57,12 +57,12 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
     }
 
     public Cons getNewObjectsRegister() {
-	return newObjects;
+        return newObjects;
     }
 
     @Override
     public Transaction makeNestedTransaction(boolean readOnly) {
-	return new ConsistentNestedTransaction(this);
+        return new ConsistentNestedTransaction(this);
     }
 
     @Override

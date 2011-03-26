@@ -35,14 +35,19 @@ public class TopLevelReadTransaction extends ReadTransaction {
     }
 
     @Override
-    protected ActiveTransactionsRecord getSameRecordForNewTransaction() {
-	this.activeTxRecord.incrementRunning();
-	return this.activeTxRecord;
+    protected Transaction commitAndBeginTx(boolean readOnly) {
+        context().inCommitAndBegin = true;
+        commitTx(true);
+        context().inCommitAndBegin = false;
+        return Transaction.beginWithActiveRecord(readOnly, this.activeTxRecord);
     }
 
     @Override
     protected void finish() {
         super.finish();
-        activeTxRecord.decrementRunning();
+
+        if (! context().inCommitAndBegin) {
+            context().oldestRequiredVersion = null;
+        }
     }
 }

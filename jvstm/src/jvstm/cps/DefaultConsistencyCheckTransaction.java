@@ -42,7 +42,7 @@ public class DefaultConsistencyCheckTransaction extends ReadTransaction implemen
     }
 
     public Transaction makeNestedTransaction() {
-	return this;
+        return this;
     }
 
     public void start() {

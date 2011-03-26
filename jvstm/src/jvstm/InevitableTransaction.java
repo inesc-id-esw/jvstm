@@ -26,8 +26,6 @@
 package jvstm;
 
 import jvstm.util.Cons;
-import jvstm.util.Pair;
-
 
 /* An inevitable transaction is accomplished as follows: 1) first it tries to enqueue a commit
  * record using a compare-and-swap; 2) when it succeeds it ensures that the previous record is
@@ -42,22 +40,28 @@ import jvstm.util.Pair;
  */
 public class InevitableTransaction extends TopLevelTransaction {
 
+    private Cons<VBox> vboxesWrittenBack = Cons.empty();
+    
     public InevitableTransaction(ActiveTransactionsRecord activeRecord) {
         super(activeRecord);
     }
 
     @Override
     public void start() {
-	ActiveTransactionsRecord latestRecord = this.activeTxRecord;
-	// start by enqueueing the request
-	do {
-	    latestRecord = findLatestRecord(latestRecord);
-	    this.commitTxRecord = new InevitableActiveTransactionsRecord(latestRecord.transactionNumber + 1);
-	} while (!latestRecord.trySetNext(this.commitTxRecord));
+        ActiveTransactionsRecord latestRecord = this.activeTxRecord;
+        // start by enqueueing the request
+        do {
+            latestRecord = findLatestRecord(latestRecord);
+            this.commitTxRecord = new InevitableActiveTransactionsRecord(latestRecord.transactionNumber + 1);
+        } while (!latestRecord.trySetNext(this.commitTxRecord));
 
-	ensureCommitStatus();
-	upgradeTx(latestRecord);
+        ensureCommitStatus();
+        upgradeTx(latestRecord);
 
+        // once we get here, we may already increment the transaction number.
+        // This is also required to allow setBoxValue to immediately write to
+        // the vbox.body
+        setNumber(commitTxRecord.transactionNumber);
         super.start();
     }
 
@@ -65,19 +69,19 @@ public class InevitableTransaction extends TopLevelTransaction {
     // our own record.  We don't want to commit it just yet.
     @Override
     protected void ensureCommitStatus() {
-	ActiveTransactionsRecord recordToCommit = Transaction.mostRecentCommittedRecord.getNext();
+        ActiveTransactionsRecord recordToCommit = Transaction.mostRecentCommittedRecord.getNext();
 
         while ((recordToCommit != null)
-	       && (recordToCommit.transactionNumber < this.commitTxRecord.transactionNumber)) {
-	    helpCommit(recordToCommit, true);
-	    recordToCommit = recordToCommit.getNext();
+               && (recordToCommit.transactionNumber < this.commitTxRecord.transactionNumber)) {
+            helpCommit(recordToCommit);
+            recordToCommit = recordToCommit.getNext();
         }
     }
 
     protected ActiveTransactionsRecord findLatestRecord(ActiveTransactionsRecord from) {
-	ActiveTransactionsRecord latest = from;
- 	for (ActiveTransactionsRecord aux; (aux = latest.getNext()) != null; latest = aux);
-	return latest;
+        ActiveTransactionsRecord latest = from;
+        for (ActiveTransactionsRecord aux; (aux = latest.getNext()) != null; latest = aux);
+        return latest;
     }
 
     // Also, InevitableTransactions cannot abort because their commit record as already been created
@@ -88,34 +92,51 @@ public class InevitableTransaction extends TopLevelTransaction {
     }
 
     public Transaction makeNestedTransaction(boolean readOnly) {
-	throw new Error(getClass().getSimpleName() + " doesn't support nesting yet");
+        throw new Error(getClass().getSimpleName() + " doesn't support nesting yet");
     }
 
     @Override
     public <T> T getBoxValue(VBox<T> vbox) {
-        T value = getLocalValue(vbox);
-        if (value == null) {
-            value = vbox.body.value;
-	    // we don't keep a read-set because this transaction will be valid for sure
+        // we don't keep a read-set because this transaction will be valid for sure
+        return vbox.body.value;
+    }
+
+    // Always store in place, given that commits are not ocurring
+    // concurrently, but still keep the write-set to enable other transactions
+    // to validate against this one.
+    @Override
+    public <T> void setBoxValue(VBox<T> vbox, T value) {
+        if ((vbox.body != null) && (vbox.body.version == this.number)) {
+            vbox.body.value = value;
+        } else {
+            VBoxBody<T> newBody = VBox.makeNewBody(value, number, vbox.body);
+            if (vbox.body != null) { // smf: I guess that a null body this means that the VBox was created during this tx
+                this.vboxesWrittenBack = this.vboxesWrittenBack.cons(vbox);
+            }
+            vbox.body = newBody;
         }
-        return (value == NULL_VALUE) ? null : value;
     }
 
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
-	throw new Error(getClass().getSimpleName() + " doesn't support PerTxBoxes yet");
+        throw new Error(getClass().getSimpleName() + " doesn't support PerTxBoxes yet");
     }
     
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
-	throw new Error(getClass().getSimpleName() + " doesn't support PerTxBoxes yet");
+        throw new Error(getClass().getSimpleName() + " doesn't support PerTxBoxes yet");
     }
 
     @Override
+    protected WriteSet makeWriteSet() {
+        return new WriteSet(vboxesWrittenBack);
+    }
+    
+    @Override
     protected void tryCommit() {
-	// we know we're valid and we're already enqueued. just set the writeset
-	((InevitableActiveTransactionsRecord)commitTxRecord).setWriteSet(makeWriteSet());
+        // we know we're valid and we're already enqueued. just set the writeset
+        ((InevitableActiveTransactionsRecord)commitTxRecord).setWriteSet(makeWriteSet());
 
-	helpCommit(this.commitTxRecord, true);
-	upgradeTx(this.commitTxRecord);
+        helpCommit(this.commitTxRecord);
+        upgradeTx(this.commitTxRecord);
     }
    
 }

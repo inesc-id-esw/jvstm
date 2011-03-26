@@ -45,33 +45,40 @@ public class TopLevelTransaction extends ReadWriteTransaction {
     }
 
     @Override
-    protected ActiveTransactionsRecord getSameRecordForNewTransaction() {
-	this.activeTxRecord.incrementRunning();
-	return this.activeTxRecord;
+    protected Transaction commitAndBeginTx(boolean readOnly) {
+        context().inCommitAndBegin = true;
+        try {
+            commitTx(true);
+        } finally {
+            context().inCommitAndBegin = false;
+        }
+        // at this point activeTxRecord and commitTxRecord are the same...
+        return Transaction.beginWithActiveRecord(readOnly, this.activeTxRecord);
     }
 
     @Override
     protected void finish() {
         super.finish();
-        activeTxRecord.decrementRunning();
+        if (! context().inCommitAndBegin) {
+            context().oldestRequiredVersion = null;
+        }
     }
 
     protected boolean isWriteTransaction() {
-	return (! boxesWritten.isEmpty()) || (! perTxValues.isEmpty());
+        return (!boxesWrittenInPlace.isEmpty()) || (! boxesWritten.isEmpty()) || (! perTxValues.isEmpty());
     }
 
     /* Upgrades this transaction's valid read state.  It only makes sense to invoke this method with
      * a newRecord in the committed state.
      */
     protected void upgradeTx(ActiveTransactionsRecord newRecord) {
-	newRecord.incrementRunning();
-	this.activeTxRecord.decrementRunning();
-	this.activeTxRecord = newRecord;
-	setNumber(newRecord.transactionNumber);
+        context().oldestRequiredVersion = newRecord;
+        this.activeTxRecord = newRecord;
+        setNumber(newRecord.transactionNumber);
     }
 
     protected WriteSet makeWriteSet() {
-	return new WriteSet(boxesWritten);
+        return new WriteSet(this.boxesWrittenInPlace, this.boxesWritten, this.orec);
     }
     
     /* validate this transaction and afterwards try to enqueue its commit request with a
@@ -83,25 +90,30 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 //      * the record previous to the commitTxRecord)
      */
     private void validateCommitAndEnqueue(ActiveTransactionsRecord lastValid) {
-	lastValid = validate(lastValid);
-	WriteSet writeSet = makeWriteSet();
-	this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
-	while (!lastValid.trySetNext(this.commitTxRecord)) {
-	    lastValid = validate(lastValid);
-	    this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
-	}
+        lastValid = validate(lastValid);
+        WriteSet writeSet = makeWriteSet();
+        this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
+        while (!lastValid.trySetNext(this.commitTxRecord)) {
+            lastValid = validate(lastValid);
+            this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
+        }
 
-	// after validating, upgrade the transaction's valid read state
-//   	upgradeTx(lastValid);
+        // At this point we no longer need the values we wrote in the VBox's
+        // tempValue slot, so we update the ownership record's version to
+        // allow reuse of the slot.
+        this.orec.version = commitTxRecord.transactionNumber;
+
+        // after validating, upgrade the transaction's valid read state
+//      upgradeTx(lastValid);
     }
 
     protected void tryCommit() {
-	if (isWriteTransaction()) {
-	    validate();
-	    // for now we don't support PerTxBoxes :-(
-	    ensureCommitStatus();
-	    upgradeTx(this.commitTxRecord);
-	}
+        if (isWriteTransaction()) {
+            validate();
+            // for now we don't support PerTxBoxes :-(
+            ensureCommitStatus();
+            upgradeTx(this.commitTxRecord);
+        }
     }
 
     // this may be heavier than simply doing the new validateAndEnqueue when running on a small
@@ -109,114 +121,106 @@ public class TopLevelTransaction extends ReadWriteTransaction {
     // complex solution whenever relevant. Idea for relevant: compare "the average write-set size
     // multiplied by the distance between activeTx # and last enqueued #" with the read-set size.
     protected void validate() {
-	ActiveTransactionsRecord lastSeenCommitted = helpCommitBeforeValidation();
-   	if (isSnapshotValidationWorthIt(lastSeenCommitted)) {
-	    snapshotValidation(lastSeenCommitted.transactionNumber); // this validates up to the last seen committed at least
-	    validateCommitAndEnqueue(lastSeenCommitted);
-   	} else {
-	    validateCommitAndEnqueue(this.activeTxRecord);
-	}
+        ActiveTransactionsRecord lastSeenCommitted = helpCommitAll();
+        // if (isSnapshotValidationWorthIt(lastSeenCommitted)) {
+            snapshotValidation(lastSeenCommitted.transactionNumber); // this validates up to the last seen committed at least
+            validateCommitAndEnqueue(lastSeenCommitted);
+        // } else {
+        //     validateCommitAndEnqueue(this.activeTxRecord);
+        // }
     }
 
     // when the ratio between writes and reads (to validate) is greater than WR_THRESHOLD, then we
     // assume that snapshotValidation is worth executing
     private static float WR_THRESHOLD = 0.5f;
     protected boolean isSnapshotValidationWorthIt(ActiveTransactionsRecord lastRecord) {
-	if (this.bodiesRead.isEmpty()) {
-	    return false;
-	}
+        if (this.bodiesRead.isEmpty()) {
+            return false;
+        }
 
- 	int numberOfReadsToCheck = this.bodiesRead.size();
- 	int numberOfWritesToCheck = 0;
-	for (ActiveTransactionsRecord rec = this.activeTxRecord.getNext(); rec != null; rec = rec.getNext()) {
-	    numberOfWritesToCheck += rec.getWriteSet().size();
-	}
-	return ((float)numberOfWritesToCheck)/numberOfReadsToCheck > WR_THRESHOLD;
+        int numberOfReadsToCheck = this.bodiesRead.first().length - (next + 1);
+        // if there are more arrays the rest are full, for sure
+        for (VBox[] array : bodiesRead.rest()) {
+            numberOfReadsToCheck += array.length;
+        }
+
+        int numberOfWritesToCheck = 0;
+        for (ActiveTransactionsRecord rec = this.activeTxRecord.getNext(); rec != null; rec = rec.getNext()) {
+            numberOfWritesToCheck += rec.getWriteSet().size();
+        }
+        return ((float)numberOfWritesToCheck)/numberOfReadsToCheck > WR_THRESHOLD;
     }
 
-    protected ActiveTransactionsRecord helpCommitBeforeValidation() {
-	ActiveTransactionsRecord lastSeenCommitted = Transaction.mostRecentCommittedRecord;
-	ActiveTransactionsRecord recordToCommit = lastSeenCommitted.getNext();
-	
-        while (recordToCommit != null && helpCommit(recordToCommit, true)) {
-	    lastSeenCommitted = recordToCommit;
-	    recordToCommit = recordToCommit.getNext();
+    protected static ActiveTransactionsRecord helpCommitAll() {
+        ActiveTransactionsRecord lastSeenCommitted = Transaction.mostRecentCommittedRecord;
+        ActiveTransactionsRecord recordToCommit = lastSeenCommitted.getNext();
+        
+        while (recordToCommit != null) {
+            helpCommit(recordToCommit);
+            lastSeenCommitted = recordToCommit;
+            recordToCommit = recordToCommit.getNext();
         }
-	return lastSeenCommitted;
+        return lastSeenCommitted;
     }
 
     protected void snapshotValidation(int lastSeenCommittedTxNumber) {
-	if (lastSeenCommittedTxNumber == getNumber()) {
-	    return;
-	}
-        for (Map.Entry<VBox,VBoxBody> entry : bodiesRead.entrySet()) {
-            if (entry.getKey().body != entry.getValue()) {
-                throw new CommitException();
+        if (lastSeenCommittedTxNumber == getNumber()) {
+            return;
+        }
+
+        int myNumber = getNumber();
+
+        // the first may not be full
+        VBox[] array = bodiesRead.first();
+        for (int i = next + 1; i < array.length; i++) {
+            if (array[i].body.version > myNumber) {
+                throw ReadWriteTransaction.COMMIT_EXCEPTION;
+            }
+        }
+            
+        // the rest are full
+        for (VBox[] ar : bodiesRead.rest()) {
+            for (int i = 0; i < ar.length; i++) {
+                if (ar[i].body.version > myNumber) {
+                    throw ReadWriteTransaction.COMMIT_EXCEPTION;
+                }
             }
         }
     }
 
     protected void ensureCommitStatus() {
-	ActiveTransactionsRecord recordToCommit = Transaction.mostRecentCommittedRecord.getNext();
-	
+        ActiveTransactionsRecord recordToCommit = Transaction.mostRecentCommittedRecord.getNext();
+        
         while ((recordToCommit != null)
-	       && (recordToCommit.transactionNumber <= this.commitTxRecord.transactionNumber)) {
-	    helpCommit(recordToCommit, true);
-	    recordToCommit = recordToCommit.getNext();
+               && (recordToCommit.transactionNumber <= this.commitTxRecord.transactionNumber)) {
+            helpCommit(recordToCommit);
+            recordToCommit = recordToCommit.getNext();
         }
     }
 
-    /** Help to commit has much as possible.  If the <code>wait</code> parameter is
-     * <code>true</code> this method never returns false.
+    /** Help to commit a transaction as much as possible.
      *
      * @param recordToCommit the record to help commit
-     * @param wait whether to wait until committed, even if no more help can be provided
-     *
-     * @return <code>true</code> if it committed for sure; <code>false</code> if it could not help
-     * any more and, thus, commit status was not ensured.  
      */
-    protected boolean helpCommit(ActiveTransactionsRecord recordToCommit, boolean wait) {
-	if (!recordToCommit.isCommitted()) {
-	    // We must check whether recordToCommit.getWriteSet() could, in the meanwhile, become
-	    // null.  This occurs when this recordToCommit was already committed and even cleaned
-	    // while this thread was waiting to be scheduled
-	    WriteSet writeSet = recordToCommit.getWriteSet();
-	    if ((writeSet != null) && writeSet.helpWriteBack(recordToCommit.transactionNumber)) {
-		// the thread that commits the last body will handle the rest of the commit
-		finishCommit(recordToCommit);
-	    } else { // didn't commit the last body and no more help can be provided
-		if (!wait) {
-		    return false;
-		}
-		waitUntilCommitted(recordToCommit);
-	    }
-	}
-	return true;
+    protected static void helpCommit(ActiveTransactionsRecord recordToCommit) {
+        if (!recordToCommit.isCommitted()) {
+            // We must check whether recordToCommit.getWriteSet() could, in the meanwhile, have
+            // become null.  This occurs when this recordToCommit was already committed and even
+            // cleaned while this thread was waiting to be scheduled
+            WriteSet writeSet = recordToCommit.getWriteSet();
+            if (writeSet != null) {
+                writeSet.helpWriteBack(recordToCommit.transactionNumber);
+                // the thread that commits the last body will handle the rest of the commit
+                finishCommit(recordToCommit);
+            }
+        }
     }
 
-    /* Wait for a record to be in the committed state */
-    protected void waitUntilCommitted(ActiveTransactionsRecord recordToCommit) {
-	Random r = new Random();
-  	int time = 1;
-	while (!recordToCommit.isCommitted()) {
-  	    time <<= 1;
-	    // smf: I think that maybe this wait loop keeps the algorithm from being lock-free,
-            // because progress is not guaranteed.  However, this situation will only occur when
-            // enough threads are already busy writing-back this record's write-set. We can ensure
-            // (really?  check!) that in such situation the code that other threads are running will
-            // not fail (unless the whole system breaks, e.g., with an OutOfMemoryException), and
-            // thus this loop will end.  Discuss this.
- 	    try {
-		Thread.sleep(r.nextInt(time));
-	    } catch(InterruptedException ie) {
-		// ignore
-	    }
-// 	    Thread.yield();
-	}
-    }
-
-    protected void finishCommit(ActiveTransactionsRecord recordToCommit) {
-	recordToCommit.setCommitted();
-	Transaction.setMostRecentCommittedRecord(recordToCommit);
+    protected static void finishCommit(ActiveTransactionsRecord recordToCommit) {
+        // we only advance the most recent committed record if we don't see this transaction already committed
+        if (!recordToCommit.isCommitted()) {
+            recordToCommit.setCommitted();
+            Transaction.setMostRecentCommittedRecord(recordToCommit);
+        }
     }
 }
