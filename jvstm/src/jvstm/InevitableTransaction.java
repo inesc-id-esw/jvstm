@@ -88,7 +88,7 @@ public class InevitableTransaction extends TopLevelTransaction {
     }
 
     public Transaction makeNestedTransaction(boolean readOnly) {
-	throw new Error("Inevitable transactions don't support nesting yet");
+	throw new Error(getClass().getSimpleName() + " doesn't support nesting yet");
     }
 
     @Override
@@ -102,11 +102,11 @@ public class InevitableTransaction extends TopLevelTransaction {
     }
 
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
-	throw new Error("Inevitable transactions don't support PerTxBoxes yet");
+	throw new Error(getClass().getSimpleName() + " doesn't support PerTxBoxes yet");
     }
     
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
-	throw new Error("Inevitable transactions don't support PerTxBoxes yet");
+	throw new Error(getClass().getSimpleName() + " doesn't support PerTxBoxes yet");
     }
 
     @Override

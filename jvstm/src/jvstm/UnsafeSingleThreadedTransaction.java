@@ -32,9 +32,9 @@ package jvstm;
  * being concurrently available.  There are potential problems in using this transaction type, thus
  * its use is extremely discouraged, except in well controlled cases. Use at your own risk. */
 public class UnsafeSingleThreadedTransaction extends Transaction {
-
+    
     private ActiveTransactionsRecord activeTxRecord;
-
+    
     public UnsafeSingleThreadedTransaction(ActiveTransactionsRecord activeRecord) {
         super(activeRecord.transactionNumber);
 	this.activeTxRecord = activeRecord;
