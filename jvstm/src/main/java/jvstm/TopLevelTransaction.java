@@ -25,12 +25,6 @@
  */
 package jvstm;
 
-import java.util.Map;
-import java.util.concurrent.locks.ReentrantLock;
-
-import jvstm.util.Cons;
-import java.util.Random;
-
 public class TopLevelTransaction extends ReadWriteTransaction {
 
     protected ActiveTransactionsRecord activeTxRecord;

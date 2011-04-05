@@ -25,11 +25,6 @@
  */
 package jvstm;
 
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-
-import jvstm.util.Cons;
-
 /* An InevitableActiveTransactionsRecord is an ActiveTransactionsRecord especially designed to be
  * used with InevitableTransactions.  This record blocks whenever an attempt is made to obtain the
  * write-set until the write-set is known (set via setWriteSet()). */

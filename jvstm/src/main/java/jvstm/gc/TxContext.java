@@ -31,7 +31,6 @@ import java.lang.reflect.Field;
 import java.lang.ref.WeakReference;
 
 import jvstm.ActiveTransactionsRecord;
-import jvstm.Transaction;
 import jvstm.UtilUnsafe;
 
 public class TxContext {

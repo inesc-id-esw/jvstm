@@ -30,7 +30,6 @@ import jvstm.util.Cons;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /* This class contains information about the VBoxes modified by a transaction and the corresponding
  * new values.  It is used for two purposes: 1) to manage the concurrent write-back of VBox values;

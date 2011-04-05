@@ -26,12 +26,10 @@
 package jvstm;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 
 import jvstm.util.Cons;
-import jvstm.util.Pair;
 
 public abstract class ReadWriteTransaction extends Transaction {
     protected static final CommitException COMMIT_EXCEPTION = new CommitException();

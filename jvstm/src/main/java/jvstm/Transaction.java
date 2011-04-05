@@ -27,9 +27,6 @@ package jvstm;
 
 import java.util.concurrent.Callable;
 
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.ThreadFactory;
-
 import jvstm.gc.GCTask;
 import jvstm.gc.TxContext;
 
