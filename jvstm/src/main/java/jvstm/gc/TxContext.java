@@ -25,23 +25,21 @@
  */
 package jvstm.gc;
 
-import sun.misc.Unsafe;
 import java.lang.reflect.Field;
 
 import java.lang.ref.WeakReference;
 
 import jvstm.ActiveTransactionsRecord;
-import jvstm.UtilUnsafe;
+import static jvstm.UtilUnsafe.UNSAFE;
 
 public class TxContext {
     // --- Setup to use Unsafe
-    protected static Unsafe unsafe = UtilUnsafe.getUnsafe();
     private static final long nextOffset;
     static {                      // <clinit>
         Field f = null;
         try { f = TxContext.class.getDeclaredField("next"); }
         catch (java.lang.NoSuchFieldException e) { throw new RuntimeException(e); }
-        nextOffset = unsafe.objectFieldOffset(f);
+        nextOffset = UNSAFE.objectFieldOffset(f);
     }
 
     /** The oldest version that may be required by transactions running in this tx context is
@@ -75,7 +73,7 @@ public class TxContext {
                 current = current.next;
             }
 
-            if (unsafe.compareAndSwapObject(current, nextOffset, null, ctx)) {
+            if (UNSAFE.compareAndSwapObject(current, nextOffset, null, ctx)) {
                 return ctx;
             }
         }

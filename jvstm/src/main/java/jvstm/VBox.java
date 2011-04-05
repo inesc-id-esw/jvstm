@@ -25,23 +25,23 @@
  */
 package jvstm;
 
-import sun.misc.Unsafe;
 import java.lang.reflect.Field;
+
+import static jvstm.UtilUnsafe.UNSAFE;
 
 public class VBox<E> {
     // --- Setup to use Unsafe
-    private static Unsafe unsafe = UtilUnsafe.getUnsafe();
     private static final long bodyOffset;
     private static final long currentOwnerOffset;
     static {                      // <clinit>
         Field f = null;
         try { f = VBox.class.getDeclaredField("body"); }
         catch (java.lang.NoSuchFieldException e) { throw new RuntimeException(e); }
-        bodyOffset = unsafe.objectFieldOffset(f);
+        bodyOffset = UNSAFE.objectFieldOffset(f);
 
         try { f = VBox.class.getDeclaredField("currentOwner"); }
         catch (java.lang.NoSuchFieldException e) { throw new RuntimeException(e); }
-        currentOwnerOffset = unsafe.objectFieldOffset(f);
+        currentOwnerOffset = UNSAFE.objectFieldOffset(f);
     }
 
     public VBoxBody<E> body;
@@ -119,7 +119,7 @@ public class VBox<E> {
      * Return the body that was actually kept.
      */
     private VBoxBody<E> CASbody(VBoxBody<E> expected, VBoxBody<E> newValue) {
-        if (unsafe.compareAndSwapObject(this, bodyOffset, expected, newValue)) {
+        if (UNSAFE.compareAndSwapObject(this, bodyOffset, expected, newValue)) {
             return newValue;
         } else { // if the CAS failed the new value must already be there!
             return this.body.getBody(newValue.version);
@@ -127,7 +127,7 @@ public class VBox<E> {
     }
 
     protected boolean CASsetOwner(OwnershipRecord previousOwner, OwnershipRecord newOwner) {
-        return unsafe.compareAndSwapObject(this, currentOwnerOffset, previousOwner, newOwner);
+        return UNSAFE.compareAndSwapObject(this, currentOwnerOffset, previousOwner, newOwner);
     }
 
     // in the future, if more than one subclass of body exists, we may

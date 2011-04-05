@@ -26,26 +26,27 @@
 package jvstm;
 
 import java.lang.reflect.Field;
-import sun.misc.Unsafe;
 
 /**
- * Simple class to obtain access to the {@link Unsafe} object.  Based on Cliff Click's
- * org.cliffc.higi_scale_lib.UtilUnsafe class from http://sourceforge.net/projects/high-scale-lib/
+ * Simple class to obtain access to the {@link Unsafe} object.
  */
-public class UtilUnsafe {
+public final class UtilUnsafe {
+    public static final sun.misc.Unsafe UNSAFE;
 
-  private UtilUnsafe() { } // dummy private constructor
-  /** Fetch the Unsafe.  Use With Caution. */
-  public static Unsafe getUnsafe() {
-    // Not on bootclasspath
-    if( UtilUnsafe.class.getClassLoader() == null )
-      return Unsafe.getUnsafe();
-    try {
-      final Field fld = Unsafe.class.getDeclaredField("theUnsafe");
-      fld.setAccessible(true);
-      return (Unsafe) fld.get(UtilUnsafe.class);
-    } catch (Exception e) {
-      throw new RuntimeException("Could not obtain access to sun.misc.Unsafe", e);
+    static {
+        Object theUnsafe = null;
+        Exception exception = null;
+
+        try {
+            Class<?> uc = Class.forName("sun.misc.Unsafe");
+            Field f = uc.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            theUnsafe = f.get(uc);
+        } catch (Exception e) { exception = e; }
+
+        UNSAFE = (sun.misc.Unsafe) theUnsafe;
+        if (UNSAFE == null) throw new Error("Could not obtain access to sun.misc.Unsafe", exception);
     }
-  }
+
+    private UtilUnsafe() { }
 }
