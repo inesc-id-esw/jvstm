@@ -71,7 +71,7 @@ public final class WriteSet {
     protected final int writeSetLength;
 
     /* The VBoxBodies created when writing-back each block of VBoxes */
-    protected final Cons<VBoxBody> [] bodiesPerBlock;
+    protected final Cons<GarbageCollectable> [] bodiesPerBlock;
     /* A write-back status for each bucket */
     protected final AtomicBoolean [] blocksDone;
 
@@ -128,7 +128,7 @@ public final class WriteSet {
         this.blocksDone = new AtomicBoolean[this.nBlocks];
 
         int pos = 0;
-        Cons<VBoxBody> bodiesCommitted = Cons.empty();
+        Cons<GarbageCollectable> bodiesCommitted = Cons.empty();
         for (VBox vbox : vboxesWrittenBack) {
             this.allWrittenVBoxes[pos] = vbox;
             this.allWrittenValues[pos++] = vbox.body.value;
@@ -155,12 +155,12 @@ public final class WriteSet {
         } while (currentBlock != finalBlock);
     }
 
-    protected final Cons<VBoxBody> writeBackBlock(int block, int newTxNumber) {
+    protected final Cons<GarbageCollectable> writeBackBlock(int block, int newTxNumber) {
         int min = block*this.blockSize;
         // max depends on whether this is the last block
         int max = (block == (this.nBlocks - 1)) ? this.writeSetLength : (min + this.blockSize);
 
-        Cons<VBoxBody> newBodies = Cons.empty();
+        Cons<GarbageCollectable> newBodies = Cons.empty();
         for (int i = min; i < max; i++) {
             VBox vbox = this.allWrittenVBoxes[i];
             Object newValue = this.allWrittenValues[i];

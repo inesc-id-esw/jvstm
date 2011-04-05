@@ -27,7 +27,7 @@ package jvstm;
 
 import java.lang.reflect.Field;
 
-public class VBoxBody<E> {
+public class VBoxBody<E> implements GarbageCollectable {
     // this static field is used to change the non-static final field "next"
     // see the comments on the clearPrevious method
     private static final Field NEXT_FIELD;

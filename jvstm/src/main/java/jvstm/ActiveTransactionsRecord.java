@@ -234,8 +234,8 @@ public class ActiveTransactionsRecord {
     }
 
     public void clean() {
-        for (Cons<VBoxBody> bodiesPerBlock : this.getWriteSet().bodiesPerBlock) {
-            for (VBoxBody<?> body : bodiesPerBlock) {
+        for (Cons<GarbageCollectable> bodiesPerBlock : this.getWriteSet().bodiesPerBlock) {
+            for (GarbageCollectable body : bodiesPerBlock) {
                 body.clearPrevious();
             }
         }
