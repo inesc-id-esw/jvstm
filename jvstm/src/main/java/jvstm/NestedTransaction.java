@@ -86,7 +86,7 @@ public class NestedTransaction extends ReadWriteTransaction {
         for (Map.Entry<VBox, Object> entry : this.boxesWritten.entrySet()) {
             VBox vbox = entry.getKey();
             if (vbox.currentOwner == this.orec) { // if we also wrote directly to the box, we just skip this value
-                continue;
+                continue; // it will be handled in the next 'update ownership of boxesWrittenInPlace'
             }
             Object value = entry.getValue();
             if (vbox.currentOwner == parent.orec) {
@@ -96,11 +96,11 @@ public class NestedTransaction extends ReadWriteTransaction {
             }
         }
 
-        // update ownership of boxesWrittenInPlace
-        VBox vboxAlreadyInParent = parent.boxesWrittenInPlace.first();
-        Iterator<VBox> it = this.boxesWrittenInPlace.iterator();
-        while (it.hasNext()) {
-            VBox vbox = it.next();
+        // now, update ownership of boxesWrittenInPlace
+
+        // null, means that the test condition will never match
+        VBox vboxAlreadyInParent = parent.boxesWrittenInPlace.isEmpty() ? null : parent.boxesWrittenInPlace.first();
+        for (VBox vbox : this.boxesWrittenInPlace) {
             if (vbox == vboxAlreadyInParent) {
                 break;
             }
