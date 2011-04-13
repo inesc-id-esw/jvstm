@@ -60,10 +60,13 @@ public abstract class ReadWriteTransaction extends Transaction {
     }
 
     protected Cons<VBox []> bodiesRead = Cons.empty();
+    protected Cons<VArrayEntry<?>> arraysRead = Cons.empty();
     protected int next = -1;
     protected Map<VBox, Object> boxesWritten = EMPTY_MAP;
     protected Cons<VBox> boxesWrittenInPlace = Cons.empty();
     protected Map<PerTxBox,Object> perTxValues = EMPTY_MAP;
+    protected Map<VArrayEntry<?>, VArrayEntry<?>> arrayWrites = EMPTY_MAP;
+    protected Map<VArray<?>, Integer> arrayWritesCount = EMPTY_MAP;
     protected final OwnershipRecord orec = new OwnershipRecord(); // final is not required here, but we know that this slot will never change...
 
 
@@ -99,9 +102,12 @@ public abstract class ReadWriteTransaction extends Transaction {
 
         // to allow garbage collecting the collections
         bodiesRead = null;
+        arraysRead = null;
         boxesWritten = null;
         boxesWrittenInPlace = null;
         perTxValues = null;
+        arrayWrites = null;
+        arrayWritesCount = null;
     }
 
     protected void doCommit() {
@@ -112,9 +118,12 @@ public abstract class ReadWriteTransaction extends Transaction {
         }
 
         bodiesRead = Cons.empty();
+        arraysRead = Cons.empty();
         boxesWritten = EMPTY_MAP;
         boxesWrittenInPlace = Cons.empty();
         perTxValues = EMPTY_MAP;
+        arrayWrites = EMPTY_MAP;
+        arrayWritesCount = EMPTY_MAP;
     }
 
     protected abstract void tryCommit();
@@ -242,14 +251,44 @@ public abstract class ReadWriteTransaction extends Transaction {
         perTxValues.put(box, value);
     }
 
+    protected <T> T getLocalArrayValue(VArrayEntry<T> entry) {
+        T value = null;
+        if (arrayWrites != EMPTY_MAP) {
+            VArrayEntry<T> wsEntry = (VArrayEntry<T>) arrayWrites.get(entry);
+            if (wsEntry != null) {
+                value = (wsEntry.getWriteValue() == null ? (T) NULL_VALUE : wsEntry.getWriteValue());
+            }
+        }
+        if ((value == null) && (parent != null)) {
+            value = getRWParent().getLocalArrayValue(entry);
+        }
+
+        return value;
+    }
+
     @Override
     public <T> T getArrayValue(VArrayEntry<T> entry) {
-        throw new Error("FIXME: Not implemented yet");
+        T value = getLocalArrayValue(entry);
+        if (value == null) {
+            value = entry.getValue(number);
+            arraysRead = arraysRead.cons(entry);
+        }
+        return (value == NULL_VALUE) ? null : value;
     }
 
     @Override
     public <T> void setArrayValue(VArrayEntry<T> entry, T value) {
-        throw new Error("FIXME: Not implemented yet");
+        if (arrayWrites == EMPTY_MAP) {
+            arrayWrites = new HashMap<VArrayEntry<?>, VArrayEntry<?>>();
+            arrayWritesCount = new HashMap<VArray<?>, Integer>();
+        }
+        entry.setWriteValue(value);
+        if (arrayWrites.put(entry, entry) != null) return;
+
+        // Count number of writes to the array
+        Integer writeCount = arrayWritesCount.get(entry.array);
+        if (writeCount == null) writeCount = 0;
+        arrayWritesCount.put(entry.array, writeCount + 1);
     }
 
     /**
@@ -271,32 +310,47 @@ public abstract class ReadWriteTransaction extends Transaction {
         }
         return lastChecked;
     }
-        
+
     protected boolean validFor(ActiveTransactionsRecord recordToCheck) {
-        VBox [] writtenVBoxes = recordToCheck.getWriteSet().allWrittenVBoxes;
+        if (! this.bodiesRead.isEmpty()) {
+            VBox [] writtenVBoxes = recordToCheck.getWriteSet().allWrittenVBoxes;
 
-        for (VBox vbox : writtenVBoxes) {
+            for (VBox vbox : writtenVBoxes) {
 
-            // check if the given vbox is in the readset
+                // check if the given vbox is in the readset
 
-            // the first array may not be full
-            VBox[] array = this.bodiesRead.first();
-            for (int j = next + 1; j < array.length; j++) {
-                if (array[j] == vbox) {
-                    return false;
-                }
-            }
-            
-            // the rest are full
-            for (VBox[] ar : bodiesRead.rest()) {
-                for (int j = 0; j < ar.length; j++) {
-                    if (ar[j] == vbox) {
+                // the first array may not be full
+                VBox[] array = this.bodiesRead.first();
+                for (int j = next + 1; j < array.length; j++) {
+                    if (array[j] == vbox) {
                         return false;
                     }
                 }
-            }
 
+                // the rest are full
+                for (VBox[] ar : bodiesRead.rest()) {
+                    for (int j = 0; j < ar.length; j++) {
+                        if (ar[j] == vbox) {
+                            return false;
+                        }
+                    }
+                }
+
+            }
         }
+
+        for (WriteSet.VArrayCommitState commitState : recordToCheck.getWriteSet().arrayCommitState) {
+            VArray<?> array = commitState.array;
+            for (int index : commitState.logEntryIndexes) {
+                for (VArrayEntry<?> entry : arraysRead) {
+                    if (entry.array == array && entry.index == index) {
+                        return false;
+                    }
+                }
+
+            }
+        }
+
         return true;
     }
 }

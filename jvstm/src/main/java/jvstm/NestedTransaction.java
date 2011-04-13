@@ -34,6 +34,7 @@ public class NestedTransaction extends ReadWriteTransaction {
         super(parent);
         // start with parent's read-set
         this.bodiesRead = parent.bodiesRead;
+        this.arraysRead = parent.arraysRead;
         this.next = parent.next;
         // start with parent write-set of boxes written in place (useful to commit to parent a little faster)
         this.boxesWrittenInPlace = parent.boxesWrittenInPlace;
@@ -112,6 +113,21 @@ public class NestedTransaction extends ReadWriteTransaction {
             parent.perTxValues = perTxValues;
         } else {
             parent.perTxValues.putAll(perTxValues);
+        }
+        parent.arraysRead = this.arraysRead;
+        if (parent.arrayWrites == EMPTY_MAP) {
+            parent.arrayWrites = arrayWrites;
+            parent.arrayWritesCount = arrayWritesCount;
+        } else {
+            // Propagate arrayWrites and correctly update the parent's arrayWritebacks counter
+            for (VArrayEntry<?> entry : arrayWrites.values()) {
+                if (parent.arrayWrites.put(entry, entry) != null) continue;
+
+                // Count number of writes to the array
+                Integer writeCount = parent.arrayWritesCount.get(entry.array);
+                if (writeCount == null) writeCount = 0;
+                parent.arrayWritesCount.put(entry.array, writeCount + 1);
+            }
         }
     }
 }

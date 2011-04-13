@@ -26,7 +26,9 @@
 package jvstm;
 
 import jvstm.util.Cons;
+import jvstm.util.Pair;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -75,11 +77,18 @@ public final class WriteSet {
     /* A write-back status for each bucket */
     protected final AtomicBoolean [] blocksDone;
 
-    protected WriteSet(Cons<VBox> boxesWrittenInPlace, Map<VBox, Object> otherBoxes, OwnershipRecord myOrec) {
-        this(boxesWrittenInPlace, otherBoxes, myOrec, DEFAULT_BLOCK_SIZE);
+    /* Support for VArray */
+    protected final VArrayCommitState [] arrayCommitState;
+
+    protected WriteSet(Cons<VBox> boxesWrittenInPlace, Map<VBox, Object> otherBoxes,
+            Map<VArrayEntry<?>, VArrayEntry<?>> arrayWrites, Map<VArray<?>, Integer> arrayWritesCount,
+            OwnershipRecord myOrec) {
+        this(boxesWrittenInPlace, otherBoxes, arrayWrites, arrayWritesCount, myOrec, DEFAULT_BLOCK_SIZE);
     }
 
-    protected WriteSet(Cons<VBox> boxesWrittenInPlace, Map<VBox, Object> otherBoxes, OwnershipRecord myOrec, int blockSize) {
+    protected WriteSet(Cons<VBox> boxesWrittenInPlace, Map<VBox, Object> otherBoxes,
+            Map<VArrayEntry<?>, VArrayEntry<?>> arrayWrites, Map<VArray<?>, Integer> arrayWritesCount,
+            OwnershipRecord myOrec, int blockSize) {
         int boxesWrittenInPlaceSize = boxesWrittenInPlace.size();
 
         int maxRequiredSize = boxesWrittenInPlaceSize + otherBoxes.size();
@@ -105,11 +114,13 @@ public final class WriteSet {
         this.blockSize = blockSize;
         int nBlocksAux = writeSetLength / blockSize;
         this.nBlocks = (nBlocksAux == 0 && writeSetLength > 0) ? 1 : nBlocksAux;
-        this.bodiesPerBlock = new Cons[this.nBlocks];
+        this.bodiesPerBlock = new Cons[this.nBlocks + arrayWritesCount.size()];
         this.blocksDone = new AtomicBoolean[this.nBlocks];
         for (int i = 0; i < this.nBlocks; i++) {
             this.blocksDone[i] = new AtomicBoolean(false);
         }
+
+        this.arrayCommitState = prepareArrayWrites(arrayWrites, arrayWritesCount);
     }
 
     // This constructor is used by InevitableTransactions. It is simpler
@@ -136,23 +147,59 @@ public final class WriteSet {
         }
         this.bodiesPerBlock[0] = bodiesCommitted;
         this.blocksDone[0] = new AtomicBoolean(true);
+
+        this.arrayCommitState = new VArrayCommitState[0];
     }
 
     protected final void helpWriteBack(int newTxNumber) {
-        if (this.nBlocks == 0) return;  // there was really nothing to be done
+        if (this.nBlocks > 0) {
+            int finalBlock = random.get().nextInt(this.nBlocks); // start at a random position
+            int currentBlock = finalBlock;
+            do {
+                if (!this.blocksDone[currentBlock].get()) {
+                    // smf: is this safe?  multiple helping threads will write to this location, but since java
+                    // does not allow values out of the blue, we will always have a reference to a Cons with the
+                    // required bodies created, right?
+                    this.bodiesPerBlock[currentBlock] = writeBackBlock(currentBlock, newTxNumber);
+                    this.blocksDone[currentBlock].set(true);
+                }
+                currentBlock = (currentBlock + 1) % this.nBlocks;
+            } while (currentBlock != finalBlock);
+        }
 
-        int finalBlock = random.get().nextInt(this.nBlocks); // start at a random position
-        int currentBlock = finalBlock;
-        do {
-            if (!this.blocksDone[currentBlock].get()) {
-                // smf: is this safe?  multiple helping threads will write to this location, but since java
-                // does not allow values out of the blue, we will always have a reference to a Cons with the
-                // required bodies created, right?
-                this.bodiesPerBlock[currentBlock] = writeBackBlock(currentBlock, newTxNumber);
-                this.blocksDone[currentBlock].set(true);
+        // Writeback to arrays
+        // This uses locking, but locks are only used if the current transaction WROTE to an array
+        //
+        // Algorithm:
+        // - All threads tryLock each array: if they succeed, they writeback to the array, otherwise they
+        //   move on to the other arrays.
+        // - Because no thread should leave this method until all arrays are written back, a second pass is
+        //   done, locking each array again, and checking that writeback is complete -- it might not be, if
+        //   tryLock failed because a thread helping an older commit was still holding the lock. This way,
+        //   only after all arrays are written back can the thread continue.
+        if (this.arrayCommitState.length > 0) {
+            for (int i = 0; i < this.arrayCommitState.length; i++) {
+                VArrayCommitState cs = this.arrayCommitState[i];
+                if (cs.array.writebackLock.tryLock()) try {
+                    if (cs.array.version >= newTxNumber) continue;
+                    this.bodiesPerBlock[this.nBlocks + i] = cs.doWriteback(newTxNumber);
+                } finally {
+                    cs.array.writebackLock.unlock();
+                }
             }
-            currentBlock = (currentBlock + 1) % this.nBlocks;
-        } while (currentBlock != finalBlock);
+
+            // This loop is SIMILAR but not THE SAME as the one above: it uses lock instead of tryLock
+            for (int i = 0; i < this.arrayCommitState.length; i++) {
+                VArrayCommitState cs = this.arrayCommitState[i];
+                cs.array.writebackLock.lock();
+                try {
+                    if (cs.array.version >= newTxNumber) continue;
+                    this.bodiesPerBlock[this.nBlocks + i] = cs.doWriteback(newTxNumber);
+                } finally {
+                    cs.array.writebackLock.unlock();
+                }
+            }
+        }
     }
 
     protected final Cons<GarbageCollectable> writeBackBlock(int block, int newTxNumber) {
@@ -176,6 +223,74 @@ public final class WriteSet {
     }
     
     protected static WriteSet empty() {
-        return new WriteSet(Cons.<VBox>empty(), ReadWriteTransaction.EMPTY_MAP, null);
+        return new WriteSet(Cons.<VBox>empty(), ReadWriteTransaction.EMPTY_MAP,
+                ReadWriteTransaction.EMPTY_MAP, ReadWriteTransaction.EMPTY_MAP, null);
+    }
+
+    static final class VArrayCommitState {
+        final VArray<?> array;
+        final VArrayEntry<?>[] writesToCommit;
+        final int[] logEntryIndexes;
+
+        VArrayCommitState(VArray<?> array, VArrayEntry<?>[] writesToCommit, int[] logEntryIndexes) {
+            this.array = array;
+            this.writesToCommit = writesToCommit;
+            this.logEntryIndexes = logEntryIndexes;
+        }
+
+        private Cons<GarbageCollectable> doWriteback(int newTxNumber) {
+            GarbageCollectable newLogNode = array.commit(newTxNumber, writesToCommit, logEntryIndexes);
+            return Cons.<GarbageCollectable>empty().cons(newLogNode);
+        }
+    }
+
+    private VArrayCommitState[] prepareArrayWrites(Map<VArrayEntry<?>, VArrayEntry<?>> arrayWrites,
+            Map<VArray<?>, Integer> arrayWritesCount) {
+        if (arrayWrites.isEmpty()) return new VArrayCommitState[0];
+
+        // During commit, arrayWritebacks keeps the write-set divided into per-array lists
+        Map<VArray<?>, Pair<VArrayEntry<?>[], Integer>> arrayWritebacks =
+            new HashMap<VArray<?>, Pair<VArrayEntry<?>[], Integer>>(arrayWritesCount.size());
+
+        for (Map.Entry<VArray<?>, Integer> entry : arrayWritesCount.entrySet()) {
+            arrayWritebacks.put(entry.getKey(),
+                    new Pair<VArrayEntry<?>[], Integer>(new VArrayEntry[entry.getValue()], 0));
+        }
+
+        VArray<?> lastArray = null;
+        Pair<VArrayEntry<?>[], Integer> lastArrayEntries = null;
+        VArrayCommitState[] commitState = new VArrayCommitState[arrayWritesCount.size()];
+        int nextCommitStatePos = 0;
+
+        // Split array write-set into per-array lists
+        for (VArrayEntry<?> entry : arrayWrites.values()) {
+            VArray<?> array = entry.array;
+
+            if (array != lastArray) {
+                lastArray = array;
+                lastArrayEntries = arrayWritebacks.get(array);
+            }
+
+            // Don't ask. Just try to do lastArrayEntries.second++ and you'll see what I mean
+            int pos = ++lastArrayEntries.second - 1;
+            lastArrayEntries.first[pos] = entry;
+
+            if (lastArrayEntries.first.length == pos+1) { // We have all the writes for the current array
+                VArrayEntry<?>[] writesToCommit = lastArrayEntries.first;
+
+                // Sort entries
+                java.util.Arrays.sort(writesToCommit);
+
+                // Create logEntryIndexes to be used in the log
+                int[] logEntryIndexes = new int[writesToCommit.length];
+                for (int i = 0; i < writesToCommit.length; i++) {
+                    logEntryIndexes[i] = writesToCommit[i].index;
+                }
+
+                commitState[nextCommitStatePos++] = new VArrayCommitState(array, writesToCommit, logEntryIndexes);
+            }
+        }
+
+        return commitState;
     }
 }

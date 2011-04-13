@@ -59,7 +59,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
     }
 
     protected boolean isWriteTransaction() {
-        return (!boxesWrittenInPlace.isEmpty()) || (! boxesWritten.isEmpty()) || (! perTxValues.isEmpty());
+        return (!boxesWrittenInPlace.isEmpty()) || (! boxesWritten.isEmpty()) || (! perTxValues.isEmpty())  || (! arrayWrites.isEmpty());
     }
 
     /* Upgrades this transaction's valid read state.  It only makes sense to invoke this method with
@@ -72,7 +72,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
     }
 
     protected WriteSet makeWriteSet() {
-        return new WriteSet(this.boxesWrittenInPlace, this.boxesWritten, this.orec);
+        return new WriteSet(this.boxesWrittenInPlace, this.boxesWritten, this.arrayWrites, this.arrayWritesCount, this.orec);
     }
     
     /* validate this transaction and afterwards try to enqueue its commit request with a
@@ -164,20 +164,29 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 
         int myNumber = getNumber();
 
-        // the first may not be full
-        VBox[] array = bodiesRead.first();
-        for (int i = next + 1; i < array.length; i++) {
-            if (array[i].body.version > myNumber) {
-                throw ReadWriteTransaction.COMMIT_EXCEPTION;
-            }
-        }
-            
-        // the rest are full
-        for (VBox[] ar : bodiesRead.rest()) {
-            for (int i = 0; i < ar.length; i++) {
-                if (ar[i].body.version > myNumber) {
+        if (!bodiesRead.isEmpty()) {
+            // the first may not be full
+            VBox[] array = bodiesRead.first();
+            for (int i = next + 1; i < array.length; i++) {
+                if (array[i].body.version > myNumber) {
                     throw ReadWriteTransaction.COMMIT_EXCEPTION;
                 }
+            }
+
+            // the rest are full
+            for (VBox[] ar : bodiesRead.rest()) {
+                for (int i = 0; i < ar.length; i++) {
+                    if (ar[i].body.version > myNumber) {
+                        throw ReadWriteTransaction.COMMIT_EXCEPTION;
+                    }
+                }
+            }
+        }
+
+        // VArray
+        for (VArrayEntry<?> entry : arraysRead) {
+            if (!entry.validate()) {
+                throw ReadWriteTransaction.COMMIT_EXCEPTION;
             }
         }
     }
