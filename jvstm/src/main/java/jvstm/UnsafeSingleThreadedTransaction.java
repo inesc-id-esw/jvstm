@@ -108,4 +108,24 @@ public class UnsafeSingleThreadedTransaction extends Transaction {
         context().oldestRequiredVersion = newRecord;
         this.activeTxRecord = newRecord;
     }
+
+    @Override
+    public <T> T getArrayValue(VArrayEntry<T> entry) {
+        // Read directly from array
+        return entry.array.values.get(entry.index);
+    }
+
+    @Override
+    public <T> void setArrayValue(VArrayEntry<T> entry, T value) {
+        VArray<T> array = entry.array;
+
+        // Set array to current version, clear log
+        if (array.version != number) {
+            array.version = number;
+            array.log = null;
+        }
+
+        // Write directly into array
+        array.values.lazySet(entry.index, value);
+    }
 }

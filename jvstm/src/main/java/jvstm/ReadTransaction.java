@@ -65,6 +65,14 @@ public class ReadTransaction extends Transaction {
         throw WRITE_ON_READ_EXCEPTION;
     }
 
+    public <T> T getArrayValue(VArrayEntry<T> entry) {
+        return entry.getValue(number);
+    }
+
+    public <T> void setArrayValue(VArrayEntry<T> entry, T value) {
+        throw WRITE_ON_READ_EXCEPTION;
+    }
+
     protected void doCommit() {
         // do nothing
     }

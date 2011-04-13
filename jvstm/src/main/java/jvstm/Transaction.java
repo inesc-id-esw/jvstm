@@ -348,6 +348,10 @@ public abstract class Transaction {
 
     public abstract <T> void setPerTxValue(PerTxBox<T> box, T value);
 
+    public abstract <T> T getArrayValue(VArrayEntry<T> entry);
+
+    public abstract <T> void setArrayValue(VArrayEntry<T> entry, T value);
+
     protected abstract void doCommit();
 
 

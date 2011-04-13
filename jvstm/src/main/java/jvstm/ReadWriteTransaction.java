@@ -242,6 +242,16 @@ public abstract class ReadWriteTransaction extends Transaction {
         perTxValues.put(box, value);
     }
 
+    @Override
+    public <T> T getArrayValue(VArrayEntry<T> entry) {
+        throw new Error("FIXME: Not implemented yet");
+    }
+
+    @Override
+    public <T> void setArrayValue(VArrayEntry<T> entry, T value) {
+        throw new Error("FIXME: Not implemented yet");
+    }
+
     /**
      * Validates this read-set against all active transaction records more recent that the one
      * <code>lastChecked</code>.

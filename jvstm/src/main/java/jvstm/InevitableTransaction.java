@@ -138,5 +138,16 @@ public class InevitableTransaction extends TopLevelTransaction {
         helpCommit(this.commitTxRecord);
         upgradeTx(this.commitTxRecord);
     }
-   
+
+    @Override
+    public <T> T getArrayValue(VArrayEntry<T> entry) {
+        // Read directly from array
+        return entry.array.values.get(entry.index);
+    }
+
+    @Override
+    public <T> void setArrayValue(VArrayEntry<T> entry, T value) {
+        throw new Error(getClass().getSimpleName() + " doesn't support writing to VArrays yet");
+    }
+
 }
