@@ -33,7 +33,7 @@ public class VBox<E> {
     }
     
     public VBox(E initial) {
-        put(initial);
+        this.body = new VBoxBody<E>(initial,0,null);
     }
 
     // used for persistence support
