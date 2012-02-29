@@ -23,14 +23,10 @@
  * 1000 - 029 Lisboa
  * Portugal
  */
-package jvstm;
+package jvstm.atomic;
 
-import java.lang.annotation.*;
+import java.util.concurrent.Callable;
 
-@Target(ElementType.METHOD)
-public @interface Atomic {
-    boolean readOnly() default false;
-    boolean canFail()  default true;
-    boolean speculativeReadOnly() default true;
-    Class<? extends jvstm.atomic.ContextFactory> contextFactory() default jvstm.atomic.DefaultContextFactory.class;
+public interface AtomicContext {
+    public <V> V doTransactionally(Callable<V> method) throws Exception;
 }
