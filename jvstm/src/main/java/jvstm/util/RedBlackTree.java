@@ -294,9 +294,8 @@ public class RedBlackTree<E extends Comparable<? super E>> implements Iterable<E
         }
 
         public T next() {
-            RedBlackTree<T> current = next;
             T result = super.next();
-            if (current == last) {
+            if (next == last || next.elem.compareTo(last.elem) == 0) {
                 next = null;
             }
             return result;
