@@ -26,6 +26,7 @@
 package jvstm;
 
 import java.util.Iterator;
+import java.util.HashMap;
 import java.util.Map;
 
 public class NestedTransaction extends ReadWriteTransaction {
@@ -93,6 +94,9 @@ public class NestedTransaction extends ReadWriteTransaction {
             if (vbox.currentOwner == parent.orec) {
                 vbox.tempValue = value;
             } else {
+                if (parent.boxesWritten == EMPTY_MAP) {
+                    parent.boxesWritten = new HashMap<VBox, Object>();
+                }
                 parent.boxesWritten.put(vbox, value);
             }
         }
