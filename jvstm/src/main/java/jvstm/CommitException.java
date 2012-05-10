@@ -28,4 +28,5 @@ package jvstm;
 
 public class CommitException extends RuntimeException {
     private static final long serialVersionUID = 1L;
+    protected CommitException() { super(); }
 }

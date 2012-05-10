@@ -28,6 +28,7 @@ package jvstm.atomic;
 import java.util.concurrent.Callable;
 
 import jvstm.CommitException;
+import jvstm.EarlyAbortException;
 import jvstm.Transaction;
 import jvstm.WriteOnReadException;
 
@@ -48,7 +49,8 @@ public enum DefaultAtomicContext implements AtomicContext {
 
     @Override
     public final <V> V doTransactionally(Callable<V> method) throws Exception {
-        if (flattenTx && Transaction.isInTransaction()) {
+        boolean inTransaction = Transaction.isInTransaction();
+        if (flattenTx && inTransaction) {
             return method.call();
         }
 
@@ -61,6 +63,11 @@ public enum DefaultAtomicContext implements AtomicContext {
                 Transaction.commit();
                 txFinished = true;
                 return result;
+            } catch (EarlyAbortException eae) {
+                Transaction.abort();
+                txFinished = true;
+                // check if the tx was a nested tx
+                if (inTransaction) throw eae;
             } catch (CommitException ce) {
                 Transaction.abort();
                 txFinished = true;

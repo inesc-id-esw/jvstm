@@ -25,27 +25,28 @@
  */
 package jvstm;
 
-
 /**
- * An instance of <code>WriteOnReadException</code> is thrown by a
- * thread whenever a write attempt is made to a VBox within a
- * ReadOnlyTransaction.
+ * An instance of <code>EarlyAbortException</code> is thrown within
+ * a ReadWriteTransaction, whenever a read attempt is made to a VBox
+ * which already has a newer committed version available (and as such
+ * the transaction is doomed to abort at this point).
  *
  * An application should never catch instances of this class, as the
  * purpose of throwing an instance of this class is to make a
  * non-local exit from the currently running transaction, and restart
- * it with a new type of transaction that is able to deal with writes.
- * This is done by the JVSTM runtime and should not be masked by the
- * application code in anyway.
+ * it. This is done by the JVSTM runtime and should not be masked by
+ * the application code in any way.
  *
- * The class <code>WriteOnReadException</code> is specifically a
- * subclass of <code>Error</code> rather than <code>Exception</code>,
+ * This class inherits from <code>CommitException</code> so as to not
+ * break compatibility with other JVSTM versions, and legacy
+ * applications using the Transaction API directly. In the future,
+ * it should become instead a subclass of <code>Error</code>,
  * even though it is a "normal occurrence", because many applications
  * catch all occurrences of <code>Exception</code> and then discard
  * the exception.
  *
  */
-public class WriteOnReadException extends Error {
+public class EarlyAbortException extends CommitException {
     private static final long serialVersionUID = 1L;
-    protected WriteOnReadException() { super(); }
+    protected EarlyAbortException() { super(); }
 }

@@ -33,6 +33,7 @@ import jvstm.util.Cons;
 
 public abstract class ReadWriteTransaction extends Transaction {
     protected static final CommitException COMMIT_EXCEPTION = new CommitException();
+    protected static final EarlyAbortException EARLYABORT_EXCEPTION = new EarlyAbortException();
 
     protected static final Object NULL_VALUE = new Object();
 
@@ -148,7 +149,8 @@ public abstract class ReadWriteTransaction extends Transaction {
         VBoxBody<T> body = vbox.body;
 
         if (body.version > number) {
-            throw COMMIT_EXCEPTION;
+            // signal early transaction abort
+            throw EARLYABORT_EXCEPTION;
         }
 
         VBox[] readset = null;
