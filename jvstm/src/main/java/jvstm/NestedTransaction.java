@@ -25,113 +25,215 @@
  */
 package jvstm;
 
-import java.util.Iterator;
 import java.util.HashMap;
 import java.util.Map;
 
+import jvstm.util.Cons;
+
+/**
+ * Linear Nested Transaction, meaning that it its guaranteed that is the only 
+ * active transaction in its nesting tree. The name was preserved for backwards 
+ * compatibility. 
+ * This nested transaction is able to write in-place even if its root top-level 
+ * ancestor also did so in some VBox.
+ * @author nmld
+ *
+ */
 public class NestedTransaction extends ReadWriteTransaction {
 
+    protected Cons<VBox> overwrittenAncestorWriteSet = Cons.<VBox>empty();
+
     public NestedTransaction(ReadWriteTransaction parent) {
-        super(parent);
-        // start with parent's read-set
-        this.bodiesRead = parent.bodiesRead;
-        this.arraysRead = parent.arraysRead;
-        this.next = parent.next;
-        // start with parent write-set of boxes written in place (useful to commit to parent a little faster)
-        this.boxesWrittenInPlace = parent.boxesWrittenInPlace;
+	super(parent);
+	// start with parent's read-set
+	this.bodiesRead = parent.bodiesRead;
+	this.arraysRead = parent.arraysRead;
+	this.next = parent.next;
+	// start with parent write-set of boxes written in place (useful to commit to parent a little faster)
+	this.boxesWrittenInPlace = parent.boxesWrittenInPlace;
+	// use the parent Orec, which will be necessarily the root top-level tx's orec
+	super.ancVersions = ReadWriteTransaction.EMPTY_VERSIONS;
+    }
+
+    @Override
+    public Transaction makeUnsafeMultithreaded() {
+	throw new Error("An Unsafe Parallel Transaction may only be spawned by another Unsafe or a Top-Level transaction");
+    }
+
+    @Override
+    protected void abortTx() {
+	// do not call super, we do not want to make the Orec of the ancestor
+	// aborted (at least not yet, it might happen depending on the nature 
+	// of the abort)
+	for (VBox vbox : overwrittenAncestorWriteSet) {
+	    // revert the in-place entry that had overwritten
+	    vbox.inplace = vbox.inplace.next;
+	}
+
+        this.orec.version = OwnershipRecord.ABORTED;
+        for (OwnershipRecord mergedLinear : linearNestedOrecs) {
+            mergedLinear.version = OwnershipRecord.ABORTED;
+        }
+	for (ParallelNestedTransaction mergedTx : mergedTxs) {
+	    mergedTx.orec.version = OwnershipRecord.ABORTED;
+	}
+	
+	bodiesRead = null;
+	boxesWritten = null;
+	boxesWrittenInPlace = null;
+	perTxValues = null;
+	overwrittenAncestorWriteSet = null;
+	mergedTxs = null;
+	linearNestedOrecs = null;
+	current.set(this.getParent());
+    }
+    
+    protected boolean isAncestor(Transaction tx) {
+	Transaction nextParent = parent;
+	while (nextParent != null) {
+	    if (nextParent == tx) {
+		return true;
+	    }
+	    nextParent = nextParent.parent;
+	}
+	return false;
+    }
+
+    // Differs from the super method because it registers overwritten entries
+    @Override
+    public <T> void setBoxValue(VBox<T> vbox, T value) {
+	InplaceWrite<T> inplaceWrite = vbox.inplace;
+	OwnershipRecord currentOwner = inplaceWrite.orec;
+	if (currentOwner.owner == this) {
+	    inplaceWrite.tempValue = (value == null ? (T)NULL_VALUE : value);
+	    return;
+	}
+
+	// differs here
+	if (isAncestor(currentOwner.owner)) {
+	    vbox.inplace = new InplaceWrite<T>(this.orec, (value == null ? (T) NULL_VALUE : value), inplaceWrite);
+	    overwrittenAncestorWriteSet = overwrittenAncestorWriteSet.cons(vbox);
+	    return;
+	}
+
+	do {
+	    if (currentOwner.version != 0 && currentOwner.version <= this.number) {
+		if (inplaceWrite.CASowner(currentOwner, this.orec)) {
+		    inplaceWrite.tempValue = (value == null ? (T) NULL_VALUE : value);
+		    boxesWrittenInPlace = boxesWrittenInPlace.cons(vbox);
+		    return;
+		} else {
+		    currentOwner = inplaceWrite.orec;
+		    continue;
+		}
+	    } else {
+		if (boxesWritten == EMPTY_MAP) {
+		    boxesWritten = new HashMap<VBox, Object>();
+		}
+		boxesWritten.put(vbox, value == null ? NULL_VALUE : value);
+		return;
+	    }
+	} while (true);
     }
 
     @Override
     protected Transaction commitAndBeginTx(boolean readOnly) {
-        commitTx(true);
-        return beginWithActiveRecord(readOnly, null);
+	commitTx(true);
+	return beginWithActiveRecord(readOnly, null);
     }
 
     @Override
     protected void finish() {
-        // do not returnToPool the read-set arrays
-
-        bodiesRead = null;
-        boxesWritten = null;
-        boxesWrittenInPlace = null;
-        perTxValues = null;
+	bodiesRead = null;
+	boxesWritten = null;
+	perTxValues = null;
+	overwrittenAncestorWriteSet = null;
+	boxesWrittenInPlace = null;
+	mergedTxs = null;
+	linearNestedOrecs = null;
     }
 
     @Override
     protected void doCommit() {
-        tryCommit();
+	tryCommit();
 
-        // do not returnToPool the read-set arrays
-
-        // reset read-set, write-set and perTxValues
-        // bodiesRead = parent.bodiesRead; // already ensured in tryCommit()
-        boxesWritten = EMPTY_MAP;
-        // boxesWrittenInPlace = parent.boxesWrittenInPlace; // already ensured in tryCommit()
-        perTxValues = EMPTY_MAP;
+	bodiesRead = Cons.empty();
+	boxesWritten = EMPTY_MAP;
+	perTxValues = EMPTY_MAP;
+	overwrittenAncestorWriteSet = Cons.empty();
+	boxesWrittenInPlace = Cons.empty();
+	mergedTxs = Cons.empty();
+	linearNestedOrecs = Cons.empty();
     }
 
     @Override
     protected void tryCommit() {
-        ReadWriteTransaction parent = getRWParent();
-        // update parent's read-set
-        parent.bodiesRead = this.bodiesRead;
-        parent.next = this.next;
+	ReadWriteTransaction parent = getRWParent();
+	// update parent's read-set
+	parent.bodiesRead = this.bodiesRead;
+	parent.next = this.next;
 
-        // update parent's write-set
+	// update parent's write-set
 
-        // first, add boxesWritten to parent.  Warning: 'this.boxesWritten'
-        // may overwrite values of vboxes in parent.boxesWrittenInPlace, so
-        // care must be taken to check for this case.  Also we could have
-        // written to this.boxesWritten as well as simultaneously to the
-        // VBox.tempValue, so check for that as well.
+	// first, add boxesWritten to parent.  Warning: 'this.boxesWritten'
+	// may overwrite values of vboxes in parent.boxesWrittenInPlace, so
+	// care must be taken to check for this case.  Also we could have
+	// written to this.boxesWritten as well as simultaneously to the
+	// VBox.tempValue, so check for that as well.
 
-        for (Map.Entry<VBox, Object> entry : this.boxesWritten.entrySet()) {
-            VBox vbox = entry.getKey();
-            if (vbox.currentOwner == this.orec) { // if we also wrote directly to the box, we just skip this value
-                continue; // it will be handled in the next 'update ownership of boxesWrittenInPlace'
-            }
-            Object value = entry.getValue();
-            if (vbox.currentOwner == parent.orec) {
-                vbox.tempValue = value;
-            } else {
-                if (parent.boxesWritten == EMPTY_MAP) {
-                    parent.boxesWritten = new HashMap<VBox, Object>();
-                }
-                parent.boxesWritten.put(vbox, value);
-            }
-        }
+	for (Map.Entry<VBox, Object> entry : this.boxesWritten.entrySet()) {
+	    VBox vbox = entry.getKey();
+	    Object value = entry.getValue();
+	    if (vbox.inplace.orec.owner == this) {
+		// if this nested also wrote in-place, then it was after this private write 
+		continue;
+	    } else {
+		if (parent.boxesWritten == EMPTY_MAP) {
+		    parent.boxesWritten = new HashMap<VBox, Object>();
+		}
+		parent.boxesWritten.put(vbox, value);
+	    }
+	}
 
-        // now, update ownership of boxesWrittenInPlace
+	// pass the orecs of linear nested transactions
+	orec.owner = parent;
+	Cons<OwnershipRecord> linearNestedAlreadyMerged = parent.linearNestedOrecs.cons(this.orec);
+	for (OwnershipRecord linearNestedToMerge : this.linearNestedOrecs) {
+	    linearNestedToMerge.owner = parent;
+	    linearNestedAlreadyMerged = linearNestedAlreadyMerged.cons(linearNestedToMerge);
+	}
+	parent.linearNestedOrecs = linearNestedAlreadyMerged;
+	
+	// pass parallel nested transactions
+	Cons<ParallelNestedTransaction> txsAlreadyMerged = parent.mergedTxs;
+	for (ParallelNestedTransaction mergedTx : mergedTxs) {
+	    mergedTx.orec.owner = parent;
+	    txsAlreadyMerged = txsAlreadyMerged.cons(mergedTx);
+	}
+	parent.mergedTxs = txsAlreadyMerged;
+	
+	// now, pass the boxes to the parent
+	parent.boxesWrittenInPlace = this.boxesWrittenInPlace;
 
-        // null, means that the test condition will never match
-        VBox vboxAlreadyInParent = parent.boxesWrittenInPlace.isEmpty() ? null : parent.boxesWrittenInPlace.first();
-        for (VBox vbox : this.boxesWrittenInPlace) {
-            if (vbox == vboxAlreadyInParent) {
-                break;
-            }
-            vbox.currentOwner = parent.orec; // vbox.CASsetOwner(this.orec, parent.orec) is not needed because we only have linear nesting
-        }
-        parent.boxesWrittenInPlace = this.boxesWrittenInPlace;
+	if (parent.perTxValues == EMPTY_MAP) {
+	    parent.perTxValues = perTxValues;
+	} else {
+	    parent.perTxValues.putAll(perTxValues);
+	}
+	parent.arraysRead = this.arraysRead;
+	if (parent.arrayWrites == EMPTY_MAP) {
+	    parent.arrayWrites = arrayWrites;
+	    parent.arrayWritesCount = arrayWritesCount;
+	} else {
+	    // Propagate arrayWrites and correctly update the parent's arrayWritebacks counter
+	    for (VArrayEntry<?> entry : arrayWrites.values()) {
+		if (parent.arrayWrites.put(entry, entry) != null) continue;
 
-        if (parent.perTxValues == EMPTY_MAP) {
-            parent.perTxValues = perTxValues;
-        } else {
-            parent.perTxValues.putAll(perTxValues);
-        }
-        parent.arraysRead = this.arraysRead;
-        if (parent.arrayWrites == EMPTY_MAP) {
-            parent.arrayWrites = arrayWrites;
-            parent.arrayWritesCount = arrayWritesCount;
-        } else {
-            // Propagate arrayWrites and correctly update the parent's arrayWritebacks counter
-            for (VArrayEntry<?> entry : arrayWrites.values()) {
-                if (parent.arrayWrites.put(entry, entry) != null) continue;
-
-                // Count number of writes to the array
-                Integer writeCount = parent.arrayWritesCount.get(entry.array);
-                if (writeCount == null) writeCount = 0;
-                parent.arrayWritesCount.put(entry.array, writeCount + 1);
-            }
-        }
+		// Count number of writes to the array
+		Integer writeCount = parent.arrayWritesCount.get(entry.array);
+		if (writeCount == null) writeCount = 0;
+		parent.arrayWritesCount.put(entry.array, writeCount + 1);
+	    }
+	}
     }
 }

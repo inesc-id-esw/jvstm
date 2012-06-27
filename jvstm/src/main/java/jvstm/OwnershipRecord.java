@@ -42,11 +42,29 @@ package jvstm;
 public class OwnershipRecord {
     public static final int ABORTED = -1;
     public static final int RUNNING = 0;
-    
-    protected static final OwnershipRecord DEFAULT_COMMITTED_OWNER = new OwnershipRecord() { { version = 1;} };
+
+    protected static final OwnershipRecord DEFAULT_COMMITTED_OWNER = new OwnershipRecord() {
+	{
+	    version = 1;
+	    nestedVersion = 0;
+	    owner = null;
+	}
+    };
 
     // version = 0 is reserved for the state RUNNING
     // version = -1 is reserved for the state ABORTED
-    // version > 0  is the version in which the owning transaction committed
+    // version > 0 is the version in which the owning transaction committed
     public int version = RUNNING;
+    public int nestedVersion;
+    public ReadWriteTransaction owner;
+
+    public OwnershipRecord() {
+	this.owner = null;
+	this.nestedVersion = 0;
+    }
+
+    public OwnershipRecord(ReadWriteTransaction owner) {
+	this.owner = owner;
+	this.nestedVersion = 0;
+    }
 }

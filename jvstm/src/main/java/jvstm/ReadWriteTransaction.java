@@ -36,7 +36,9 @@ public abstract class ReadWriteTransaction extends Transaction {
     protected static final EarlyAbortException EARLYABORT_EXCEPTION = new EarlyAbortException();
 
     protected static final Object NULL_VALUE = new Object();
-
+    
+    protected static final int[] EMPTY_VERSIONS = new int[0];
+    protected static final VBox[] EMPTY_WRITE_SET = new VBox[0];
     protected static final Map EMPTY_MAP = Collections.emptyMap();
 
     protected static final ThreadLocal<Cons<VBox[]>> pool = new ThreadLocal<Cons<VBox[]>>() {
@@ -68,21 +70,35 @@ public abstract class ReadWriteTransaction extends Transaction {
     protected Map<PerTxBox,Object> perTxValues = EMPTY_MAP;
     protected Map<VArrayEntry<?>, VArrayEntry<?>> arrayWrites = EMPTY_MAP;
     protected Map<VArray<?>, Integer> arrayWritesCount = EMPTY_MAP;
-    protected final OwnershipRecord orec = new OwnershipRecord(); // final is not required here, but we know that this slot will never change...
-
-
+    protected OwnershipRecord orec = new OwnershipRecord(this);
+    protected volatile int nestedVersion = 0;
+    public Cons<ParallelNestedTransaction> mergedTxs = Cons.empty();
+    protected Cons<OwnershipRecord> linearNestedOrecs = Cons.empty();
+    protected int[] ancVersions;
+    
     public ReadWriteTransaction(int number) {
         super(number);
+        this.ancVersions = EMPTY_VERSIONS;
     }
 
     public ReadWriteTransaction(ReadWriteTransaction parent) {
         super(parent);
     }
 
+    @Override
     public Transaction makeNestedTransaction(boolean readOnly) {
         // always create a RW nested transaction, because we need its read-set
         return new NestedTransaction(this);
     }
+    
+    @Override
+    public Transaction makeParallelNestedTransaction(boolean readOnly) {
+	if (readOnly) {
+	    return new ParallelNestedReadOnlyTransaction(this);
+	} else {
+	    return new ParallelNestedTransaction(this);
+	}
+    }    
 
     ReadWriteTransaction getRWParent() {
         return (ReadWriteTransaction)getParent();
@@ -91,6 +107,12 @@ public abstract class ReadWriteTransaction extends Transaction {
     @Override
     protected void abortTx() {
         this.orec.version = OwnershipRecord.ABORTED;
+        for (OwnershipRecord linearMergedOrec : linearNestedOrecs) {
+            linearMergedOrec.version = OwnershipRecord.ABORTED;
+	}
+	for (ParallelNestedTransaction mergedTx : mergedTxs) {
+	    mergedTx.orec.version = OwnershipRecord.ABORTED;
+	}
         super.abortTx();
     }
 
@@ -109,8 +131,18 @@ public abstract class ReadWriteTransaction extends Transaction {
         perTxValues = null;
         arrayWrites = null;
         arrayWritesCount = null;
+	cleanUp();
     }
 
+    protected void cleanUp() {
+	if (mergedTxs != Cons.<ParallelNestedTransaction> empty()) {
+	    for (ParallelNestedTransaction mergedTx : mergedTxs) {
+		mergedTx.cleanUp();
+	    }
+	    mergedTxs = null;
+	}
+    }
+    
     protected void doCommit() {
         tryCommit();
         // if commit is successful, then reset transaction to a clean state
@@ -130,19 +162,17 @@ public abstract class ReadWriteTransaction extends Transaction {
     protected abstract void tryCommit();
 
     protected <T> T getLocalValue(VBox<T> vbox) {
-        if (vbox.currentOwner == this.orec) {
-            return vbox.tempValue;
-        } else {
-            T value = null;
-            if (boxesWritten != EMPTY_MAP) {
-                value = (T)boxesWritten.get(vbox);
-            }
-            if ((value == null) && (parent != null)) {
-                value = getRWParent().getLocalValue(vbox);
-            }
-        
-            return value;
-        }
+	InplaceWrite<T> inplace = vbox.inplace;
+	while (inplace != null) {
+	    if (inplace.orec.owner == this) {
+		return inplace.tempValue;
+	    }
+	    inplace = inplace.next;
+	}
+	if (boxesWritten != EMPTY_MAP) {
+	    return (T) boxesWritten.get(vbox);
+	}
+	return null;
     }
 
     private <T> T readFromBody(VBox<T> vbox) {
@@ -171,7 +201,7 @@ public abstract class ReadWriteTransaction extends Transaction {
          * this transaction (as well as any parent) does not have a local value. In this case we read directly from the
          * vbox's body.
          */
-        OwnershipRecord currentOwner = vbox.currentOwner;
+        OwnershipRecord currentOwner = vbox.inplace.orec;
         if (currentOwner.version > 0 && currentOwner.version <= this.number) {
             return readFromBody(vbox);
         } else {
@@ -185,9 +215,10 @@ public abstract class ReadWriteTransaction extends Transaction {
     }
 
     public <T> void setBoxValue(VBox<T> vbox, T value) {
-        OwnershipRecord currentOwner = vbox.currentOwner;
-        if (currentOwner == this.orec) { // we are already the current writer
-            vbox.tempValue = (value == null ? (T)NULL_VALUE : value);
+	InplaceWrite<T> inplaceWrite = vbox.inplace;
+	OwnershipRecord currentOwner = inplaceWrite.orec;
+	if (currentOwner.owner == this) { // we are already the current writer
+	    inplaceWrite.tempValue = (value == null ? (T)NULL_VALUE : value);
             return;
         }
 
@@ -202,16 +233,16 @@ public abstract class ReadWriteTransaction extends Transaction {
              * fallback to the standard write-set
              */
             if (currentOwner.version != 0 && currentOwner.version <= this.number) {
-                if (vbox.CASsetOwner(currentOwner, this.orec)) {
+        	if (inplaceWrite.CASowner(currentOwner, this.orec)) {
                     // note: it is possible that a second invocation of setBoxValue in the same transaction will end up
                     // here after writing to the normal write-set.  This case is accounted for when creating the
                     // WriteSet at commit time
-                    vbox.tempValue = (value == null ? (T)NULL_VALUE : value);
+        	    inplaceWrite.tempValue = (value == null ? (T) NULL_VALUE : value);
                     boxesWrittenInPlace = boxesWrittenInPlace.cons(vbox);
                     return; // break
                 } else {
                     // update the current owner and retry
-                    currentOwner = vbox.currentOwner;
+		    currentOwner = inplaceWrite.orec;
                     continue;
                 }
             } else { // fallback to the standard write-set
@@ -284,7 +315,7 @@ public abstract class ReadWriteTransaction extends Transaction {
             arrayWrites = new HashMap<VArrayEntry<?>, VArrayEntry<?>>();
             arrayWritesCount = new HashMap<VArray<?>, Integer>();
         }
-        entry.setWriteValue(value);
+        entry.setWriteValue(value, this.nestedVersion);
         if (arrayWrites.put(entry, entry) != null) return;
 
         // Count number of writes to the array
@@ -301,58 +332,77 @@ public abstract class ReadWriteTransaction extends Transaction {
      * @throws CommitException if the validation fails
      */
     protected ActiveTransactionsRecord validate(ActiveTransactionsRecord lastChecked) {
-        ActiveTransactionsRecord recordToCheck = lastChecked.getNext();
+	ActiveTransactionsRecord recordToCheck = lastChecked.getNext();
 
-        while (recordToCheck != null) {
-            if (!this.bodiesRead.isEmpty() && !validFor(recordToCheck)) {
-                throw COMMIT_EXCEPTION;
-            }
-            lastChecked = recordToCheck;
-            recordToCheck = recordToCheck.getNext();
-        }
-        return lastChecked;
+	while (recordToCheck != null) {
+	    lastChecked = recordToCheck;
+	    recordToCheck = recordToCheck.getNext();
+	}
+	snapshotValidation(lastChecked.transactionNumber);
+	return lastChecked;
     }
 
-    protected boolean validFor(ActiveTransactionsRecord recordToCheck) {
-        if (! this.bodiesRead.isEmpty()) {
-            VBox [] writtenVBoxes = recordToCheck.getWriteSet().allWrittenVBoxes;
+    protected void snapshotValidation(int lastSeenCommittedTxNumber) {
+	if (lastSeenCommittedTxNumber == getNumber()) {
+	    return;
+	}
 
-            for (VBox vbox : writtenVBoxes) {
+	int myNumber = getNumber();
 
-                // check if the given vbox is in the readset
+	if (!this.bodiesRead.isEmpty()) {
+	    // the first may not be full
+	    VBox[] array = bodiesRead.first();
+	    for (int i = next + 1; i < array.length; i++) {
+		if (array[i].body.version > myNumber) {
+		    throw COMMIT_EXCEPTION;
+		}
+	    }
 
-                // the first array may not be full
-                VBox[] array = this.bodiesRead.first();
-                for (int j = next + 1; j < array.length; j++) {
-                    if (array[j] == vbox) {
-                        return false;
-                    }
-                }
+	    // the rest are full
+	    for (VBox[] ar : bodiesRead.rest()) {
+		for (int i = 0; i < ar.length; i++) {
+		    if (ar[i].body.version > myNumber) {
+			throw COMMIT_EXCEPTION;
+		    }
+		}
+	    }
+	}
 
-                // the rest are full
-                for (VBox[] ar : bodiesRead.rest()) {
-                    for (int j = 0; j < ar.length; j++) {
-                        if (ar[j] == vbox) {
-                            return false;
-                        }
-                    }
-                }
+	for (ParallelNestedTransaction mergedTx : mergedTxs) {
+	    if (!mergedTx.globalReads.isEmpty()) {
+		// the first may not be full
+		VBox[] array = mergedTx.globalReads.first().entries;
+		for (int i = mergedTx.next + 1; i < array.length; i++) {
+		    if (array[i].body.version > myNumber) {
+			throw COMMIT_EXCEPTION;
+		    }
+		}
 
-            }
-        }
+		// the rest are full
+		for (ReadBlock block : mergedTx.globalReads.rest()) {
+		    array = block.entries;
+		    for (int i = 0; i < array.length; i++) {
+			if (array[i].body.version > myNumber) {
+			    throw COMMIT_EXCEPTION;
+			}
+		    }
+		}
+	    }
+	}
 
-        for (WriteSet.VArrayCommitState commitState : recordToCheck.getWriteSet().arrayCommitState) {
-            VArray<?> array = commitState.array;
-            for (int index : commitState.logEntryIndexes) {
-                for (VArrayEntry<?> entry : arraysRead) {
-                    if (entry.array == array && entry.index == index) {
-                        return false;
-                    }
-                }
-
-            }
-        }
-
-        return true;
+	// VArray
+	for (VArrayEntry<?> entry : arraysRead) {
+	    if (!entry.validate()) {
+		throw ReadWriteTransaction.COMMIT_EXCEPTION;
+	    }
+	}
     }
+    
+    @Override
+    public boolean isWriteTransaction() {
+	Cons<ParallelNestedTransaction> emptyCons = Cons.<ParallelNestedTransaction>empty();
+	return (mergedTxs != emptyCons) || (!boxesWritten.isEmpty()) || (!boxesWrittenInPlace.isEmpty()) || (! arrayWrites.isEmpty())
+		|| (perTxValues != null && !perTxValues.isEmpty());
+    }
+    
 }

@@ -74,6 +74,20 @@ public class ReadTransaction extends Transaction {
     }
 
     protected void doCommit() {
-        // do nothing
+    }
+
+    @Override
+    public Transaction makeUnsafeMultithreaded() {
+	throw new Error("Read Transaction cannot be unsafe multithreaded yet!");
+    }
+
+    @Override
+    public Transaction makeParallelNestedTransaction(boolean readOnly) {
+	throw new Error("Read Transaction cannot have parallel nested transactions yet!");
+    }
+
+    @Override
+    public boolean isWriteTransaction() {
+	return false;
     }
 }
