@@ -26,8 +26,8 @@
 package jvstm;
 
 public class DefaultTransactionFactory implements TransactionFactory {
-    public Transaction makeTopLevelTransaction(ActiveTransactionsRecord record) {
-        return new TopLevelTransaction(record);
+    public Transaction makeTopLevelTransaction(ActiveTransactionsRecord record, int transactionId) {
+	return new TopLevelTransaction(record, transactionId);
     }
     public Transaction makeReadOnlyTopLevelTransaction(ActiveTransactionsRecord record) {
         return new TopLevelReadTransaction(record);

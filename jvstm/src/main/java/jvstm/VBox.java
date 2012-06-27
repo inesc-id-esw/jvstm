@@ -27,28 +27,32 @@ package jvstm;
 
 import java.lang.reflect.Field;
 
+
 import static jvstm.UtilUnsafe.UNSAFE;
 
 public class VBox<E> {
     // --- Setup to use Unsafe
     private static final long bodyOffset;
-    private static final long currentOwnerOffset;
-    static {                      // <clinit>
-        Field f = null;
-        try { f = VBox.class.getDeclaredField("body"); }
-        catch (java.lang.NoSuchFieldException e) { throw new RuntimeException(e); }
-        bodyOffset = UNSAFE.objectFieldOffset(f);
+    private static final long inplaceOffset;
+    static { // <clinit>
+	Field f = null;
+	try {
+	    f = VBox.class.getDeclaredField("body");
+	} catch (java.lang.NoSuchFieldException e) {
+	    throw new RuntimeException(e);
+	}
+	bodyOffset = UNSAFE.objectFieldOffset(f);
 
-        try { f = VBox.class.getDeclaredField("currentOwner"); }
-        catch (java.lang.NoSuchFieldException e) { throw new RuntimeException(e); }
-        currentOwnerOffset = UNSAFE.objectFieldOffset(f);
+	try {
+	    f = VBox.class.getDeclaredField("inplace");
+	} catch (java.lang.NoSuchFieldException e) {
+	    throw new RuntimeException(e);
+	}
+	inplaceOffset = UNSAFE.objectFieldOffset(f);
     }
 
     public VBoxBody<E> body;
-
-    // Setting the DEFAULT_COMMITTED_OWNER avoid the test for a possible null in every access to a VBox's currentOwner
-    protected OwnershipRecord currentOwner = OwnershipRecord.DEFAULT_COMMITTED_OWNER;
-    public E tempValue;
+    protected InplaceWrite<E> inplace = new InplaceWrite<E>();
 
     public VBox() {
         this((E)null);
@@ -126,8 +130,8 @@ public class VBox<E> {
         }
     }
 
-    protected boolean CASsetOwner(OwnershipRecord previousOwner, OwnershipRecord newOwner) {
-        return UNSAFE.compareAndSwapObject(this, currentOwnerOffset, previousOwner, newOwner);
+    protected boolean CASinplace(InplaceWrite<E> prevBackup, InplaceWrite<E> newBackup) {
+	return UNSAFE.compareAndSwapObject(this, inplaceOffset, prevBackup, newBackup);
     }
 
     // in the future, if more than one subclass of body exists, we may

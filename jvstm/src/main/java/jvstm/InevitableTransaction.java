@@ -43,7 +43,7 @@ public class InevitableTransaction extends TopLevelTransaction {
     private Cons<VBox> vboxesWrittenBack = Cons.empty();
     
     public InevitableTransaction(ActiveTransactionsRecord activeRecord) {
-        super(activeRecord);
+        super(activeRecord, -1);
     }
 
     @Override

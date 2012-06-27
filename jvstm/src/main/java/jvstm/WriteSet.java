@@ -80,17 +80,21 @@ public final class WriteSet {
     /* Support for VArray */
     protected final VArrayCommitState [] arrayCommitState;
 
-    protected WriteSet(Cons<VBox> boxesWrittenInPlace, Map<VBox, Object> otherBoxes,
-            Map<VArrayEntry<?>, VArrayEntry<?>> arrayWrites, Map<VArray<?>, Integer> arrayWritesCount,
-            OwnershipRecord myOrec) {
-        this(boxesWrittenInPlace, otherBoxes, arrayWrites, arrayWritesCount, myOrec, DEFAULT_BLOCK_SIZE);
+    protected WriteSet(Cons<ParallelNestedTransaction> mergedTxs, Cons<VBox> boxesWrittenInPlace, Map<VBox, Object> otherBoxes,
+	    Map<VArrayEntry<?>, VArrayEntry<?>> arrayWrites, Map<VArray<?>, Integer> arrayWritesCount,
+	    ReadWriteTransaction committer) {
+	this(mergedTxs, boxesWrittenInPlace, otherBoxes, arrayWrites, arrayWritesCount, committer, DEFAULT_BLOCK_SIZE);
     }
 
-    protected WriteSet(Cons<VBox> boxesWrittenInPlace, Map<VBox, Object> otherBoxes,
-            Map<VArrayEntry<?>, VArrayEntry<?>> arrayWrites, Map<VArray<?>, Integer> arrayWritesCount,
-            OwnershipRecord myOrec, int blockSize) {
+    protected WriteSet(Cons<ParallelNestedTransaction> mergedTxs, Cons<VBox> boxesWrittenInPlace, Map<VBox, Object> otherBoxes,
+	    Map<VArrayEntry<?>, VArrayEntry<?>> arrayWrites, Map<VArray<?>, Integer> arrayWritesCount,
+	    ReadWriteTransaction committer, int blockSize) {
         int boxesWrittenInPlaceSize = boxesWrittenInPlace.size();
 
+	for (ParallelNestedTransaction mergedTx : mergedTxs) {
+	    boxesWrittenInPlaceSize += mergedTx.boxesWrittenInPlace.size();
+	}
+        
         int maxRequiredSize = boxesWrittenInPlaceSize + otherBoxes.size();
         this.allWrittenVBoxes = new VBox[maxRequiredSize];
         this.allWrittenValues = new Object[maxRequiredSize];
@@ -98,12 +102,20 @@ public final class WriteSet {
         int pos = 0;
         for (VBox vbox : boxesWrittenInPlace) {
             this.allWrittenVBoxes[pos] = vbox;
-            this.allWrittenValues[pos++] = vbox.tempValue;
+	    this.allWrittenValues[pos++] = vbox.inplace.tempValue;
+	    vbox.inplace.next = null;
         }
+	for (ParallelNestedTransaction mergedTx : mergedTxs) {
+	    for (VBox vbox : mergedTx.boxesWrittenInPlace) {
+		this.allWrittenVBoxes[pos] = vbox;
+		this.allWrittenValues[pos++] = vbox.inplace.tempValue;
+		vbox.inplace.next = null;
+	    }
+	}
 
         for (Map.Entry<VBox, Object> entry : otherBoxes.entrySet()) {
             VBox vbox = entry.getKey();
-            if (vbox.currentOwner == myOrec) { // if we also wrote directly to the box, we just skip this value
+            if (vbox.inplace.orec.owner == committer) { // if we also wrote directly to the box, we just skip this value
                 continue;
             }
             this.allWrittenVBoxes[pos] = vbox;
@@ -223,8 +235,8 @@ public final class WriteSet {
     }
     
     protected static WriteSet empty() {
-        return new WriteSet(Cons.<VBox>empty(), ReadWriteTransaction.EMPTY_MAP,
-                ReadWriteTransaction.EMPTY_MAP, ReadWriteTransaction.EMPTY_MAP, null);
+	return new WriteSet(Cons.<ParallelNestedTransaction>empty(), Cons.<VBox> empty(), ReadWriteTransaction.EMPTY_MAP,
+		ReadWriteTransaction.EMPTY_MAP, ReadWriteTransaction.EMPTY_MAP, null);
     }
 
     static final class VArrayCommitState {

@@ -97,6 +97,9 @@ public class ActiveTransactionsRecord {
     // number, and that, thus, may need to access the values committed by the transaction that
     // created this record
     public final int transactionNumber;
+    
+    // id of the application source level transaction that was executed in this ATR; used for scheduling
+    public final int transactionId;
 
     /* This is the write-set of the transaction that created this record.
      *
@@ -188,6 +191,7 @@ public class ActiveTransactionsRecord {
     // private method to be used only when instantiating the sentinel record
     private ActiveTransactionsRecord() {
         this.transactionNumber = 1;
+        this.transactionId = -1;
         this.writeSet = WriteSet.empty();
         this.recordCommitted = true;
         this.tx = new TopLevelReadTransaction(this);
@@ -201,8 +205,9 @@ public class ActiveTransactionsRecord {
         return new ActiveTransactionsRecord();
     }
 
-    public ActiveTransactionsRecord(int txNumber, WriteSet writeSet) {
+    public ActiveTransactionsRecord(int txNumber, int transactionId, WriteSet writeSet) {
         this.transactionNumber = txNumber;
+        this.transactionId = transactionId;
         this.writeSet = writeSet;
         this.tx = new TopLevelReadTransaction(this);
     }

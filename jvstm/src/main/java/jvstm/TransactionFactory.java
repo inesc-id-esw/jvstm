@@ -26,6 +26,6 @@
 package jvstm;
 
 public interface TransactionFactory {
-    Transaction makeTopLevelTransaction(ActiveTransactionsRecord record);
+    Transaction makeTopLevelTransaction(ActiveTransactionsRecord record, int transactionId);
     Transaction makeReadOnlyTopLevelTransaction(ActiveTransactionsRecord record);
 }

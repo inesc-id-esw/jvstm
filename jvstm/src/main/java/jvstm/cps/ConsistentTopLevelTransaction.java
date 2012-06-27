@@ -45,9 +45,8 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
     protected Set alreadyChecked = null;
 
     public ConsistentTopLevelTransaction(ActiveTransactionsRecord record) {
-        super(record);
+	super(record, -1);
     }
-
     public void registerNewObject(Object obj) {
         newObjects = newObjects.cons(obj);
     }

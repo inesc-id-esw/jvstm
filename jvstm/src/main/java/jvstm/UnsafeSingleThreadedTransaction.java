@@ -76,6 +76,15 @@ public class UnsafeSingleThreadedTransaction extends Transaction {
     public Transaction makeNestedTransaction(boolean readOnly) {
         throw new Error("UnsafeSingleThreaded transactions don't support nesting yet");
     }
+    
+    public Transaction makeParallelNestedTransaction(boolean readOnly) {
+        throw new Error("UnsafeSingleThreaded transactions don't support nesting yet");
+    }
+    
+    @Override
+    public Transaction makeUnsafeMultithreaded() {
+	throw new Error("UnsafeSingleThreaded transactions don't support nesting yet");
+    }
 
     public <T> T getBoxValue(VBox<T> vbox) {
         return vbox.body.value;
@@ -95,7 +104,7 @@ public class UnsafeSingleThreadedTransaction extends Transaction {
 
     protected void doCommit() {
         // the commit is already done, so create a new ActiveTransactionsRecord
-        ActiveTransactionsRecord newRecord = new ActiveTransactionsRecord(getNumber(), WriteSet.empty());
+        ActiveTransactionsRecord newRecord = new ActiveTransactionsRecord(getNumber(), -1, WriteSet.empty());
         newRecord.setCommitted();
         setMostRecentCommittedRecord(newRecord);
 
@@ -127,5 +136,10 @@ public class UnsafeSingleThreadedTransaction extends Transaction {
 
         // Write directly into array
         array.values.lazySet(entry.index, value);
+    }
+
+    @Override
+    public boolean isWriteTransaction() {
+	return true;
     }
 }

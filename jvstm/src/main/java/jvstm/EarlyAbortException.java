@@ -49,4 +49,5 @@ package jvstm;
 public class EarlyAbortException extends CommitException {
     private static final long serialVersionUID = 1L;
     protected EarlyAbortException() { super(); }
+    protected EarlyAbortException(int txNumber) { super(txNumber); }
 }

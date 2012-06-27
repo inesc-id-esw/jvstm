@@ -28,5 +28,30 @@ package jvstm;
 
 public class CommitException extends RuntimeException {
     private static final long serialVersionUID = 1L;
-    protected CommitException() { super(); }
+    private final Transaction tx;
+    private final int txNumber;
+
+    protected CommitException() {
+	super();
+	this.tx = null;
+	this.txNumber = -1;
+    }
+
+    protected CommitException(int txNumber) {
+	this.tx = null;
+	this.txNumber = txNumber;
+    }
+
+    protected CommitException(Transaction tx) {
+	this.tx = tx;
+	this.txNumber = -1;
+    }
+
+    public Transaction getTransactionCausedConflict() {
+	return this.tx;
+    }
+
+    public int getTxNumber() {
+	return txNumber;
+    }
 }

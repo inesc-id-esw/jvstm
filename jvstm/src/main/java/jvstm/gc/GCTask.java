@@ -36,7 +36,8 @@ import jvstm.ActiveTransactionsRecord;
 import jvstm.Transaction;
 
 public class GCTask implements Runnable {
-    private ActiveTransactionsRecord lastCleanedRecord;
+    // Used by the scheduler
+    public ActiveTransactionsRecord lastCleanedRecord;
     private ThreadPoolExecutor cleanersPool = makeCleanersPool();
 
     private static ThreadPoolExecutor makeCleanersPool() {

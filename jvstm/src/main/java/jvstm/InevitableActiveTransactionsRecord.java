@@ -32,7 +32,7 @@ public class InevitableActiveTransactionsRecord extends ActiveTransactionsRecord
     private final Object WRITE_SET_MONITOR = new Object();
 
     public InevitableActiveTransactionsRecord(int txNumber) {
-        super(txNumber, null);
+        super(txNumber, -1, null);
     }
 
     // anyone doing this will have to be delayed until this transaction sets the write-set
