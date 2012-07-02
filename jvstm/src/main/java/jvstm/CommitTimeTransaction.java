@@ -3,6 +3,16 @@ package jvstm;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * This transaction is only used during the lock-free commit helping procedure.
+ * Namely, it encapsulates the execution of the PerTxBoxes of the committing
+ * transaction at commit time. This allows new implementations of getBoxValue
+ * and setBoxValue to be hooked, so that they correctly handle a situation in
+ * which there are potential multiple helpers going through the same PerTxBoxes.
+ * 
+ * @author nmld
+ * 
+ */
 public class CommitTimeTransaction extends Transaction {
 
     protected static final StopPerTxBoxesCommitException STOP_PER_TX_BOX_COMMIT_EXCEPTION = new StopPerTxBoxesCommitException();

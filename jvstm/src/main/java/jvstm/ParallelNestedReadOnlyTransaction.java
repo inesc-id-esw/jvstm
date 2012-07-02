@@ -1,14 +1,15 @@
 package jvstm;
 
 /**
- * Parallel Nested Transaction that may only abort when reading a VBoxBody.
- * This means that if it only reads RAWs, then it necessarily commits.
+ * Parallel Nested Transaction that may only abort when reading a VBoxBody. This
+ * means that if it only reads RAWs, then it necessarily commits.
  * 
- * It is not as efficient as a Top Level RO Tx because it still has to maintain 
- * the read-set of globally consolidated entries that were read, for the 
- * nested RW ancestor to validate on its commit.
+ * It is not as efficient as a Top Level RO Tx because it still has to maintain
+ * the read-set of globally consolidated entries that were read, for the nested
+ * RW ancestor to validate on its commit.
+ * 
  * @author nmld
- *
+ * 
  */
 
 public class ParallelNestedReadOnlyTransaction extends ParallelNestedTransaction {
@@ -16,24 +17,40 @@ public class ParallelNestedReadOnlyTransaction extends ParallelNestedTransaction
     public ParallelNestedReadOnlyTransaction(ReadWriteTransaction parent) {
 	super(parent);
     }
-    
+
     @Override
     public Transaction makeParallelNestedTransaction(boolean readOnly) {
-        if (!readOnly) {
-            throw new WriteOnReadException();
-        }
-        return new ParallelNestedReadOnlyTransaction(this);
+	if (!readOnly) {
+	    throw new WriteOnReadException();
+	}
+	return new ParallelNestedReadOnlyTransaction(this);
     }
-    
+
     @Override
     protected void tryCommit() {
 	ReadWriteTransaction parent = getRWParent();
 	synchronized (parent) {
+	    // Support for PerTxBoxes
+	    if (readAncestorPerTxValue) {
+		// If some concurrent commit took place into the parent in the
+		// meantime, the reads over perTxValues from ancestors may have
+		// been made stale. For this reason, we have to pessimistically
+		// abort this transaction and execute it sequentially.
+		if (retrieveAncestorVersion(parent) != parent.nestedVersion) {
+		    throw EXECUTE_SEQUENTIALLY_EXCEPTION;
+		}
+
+		// Pessimistically make all ancestors do this verification
+		if (parent instanceof ParallelNestedTransaction) {
+		    ((ParallelNestedTransaction) parent).readAncestorPerTxValue = true;
+		}
+	    }
+
 	    parent.mergedTxs = parent.mergedTxs.cons(this);
 	    parent.arraysRead = this.arraysRead.reverseInto(parent.arraysRead);
 	}
     }
-    
+
     @Override
     public <T> T getBoxValue(VBox<T> vbox) {
 	InplaceWrite<T> inplaceWrite = vbox.inplace;
@@ -70,51 +87,46 @@ public class ParallelNestedReadOnlyTransaction extends ParallelNestedTransaction
 	return value;
 
     }
-    
+
     @Override
     protected <T> T getLocalArrayValue(VArrayEntry<T> entry) {
-        ReadWriteTransaction iter = getRWParent();
-        while (iter != null) {
-            if (iter.arrayWrites != EMPTY_MAP) {
-        	VArrayEntry<T> wsEntry = (VArrayEntry<T>) iter.arrayWrites.get(entry);
-        	if (wsEntry == null) {
-        	    iter = iter.getRWParent();
-        	    continue;
-        	}
-        	
-        	if (wsEntry.nestedVersion <= retrieveAncestorVersion(iter)) {
-        	    return (wsEntry.getWriteValue() == null ? (T) NULL_VALUE : wsEntry.getWriteValue());
-        	}
-            }
-            iter = iter.getRWParent();
-        }
+	ReadWriteTransaction iter = getRWParent();
+	while (iter != null) {
+	    if (iter.arrayWrites != EMPTY_MAP) {
+		VArrayEntry<T> wsEntry = (VArrayEntry<T>) iter.arrayWrites.get(entry);
+		if (wsEntry == null) {
+		    iter = iter.getRWParent();
+		    continue;
+		}
 
-        return null;
+		if (wsEntry.nestedVersion <= retrieveAncestorVersion(iter)) {
+		    return (wsEntry.getWriteValue() == null ? (T) NULL_VALUE : wsEntry.getWriteValue());
+		}
+	    }
+	    iter = iter.getRWParent();
+	}
+
+	return null;
     }
-    
+
     @Override
     public <T> void setArrayValue(jvstm.VArrayEntry<T> entry, T value) {
 	throw new WriteOnReadException();
     }
-    
+
     @Override
     public <T> void setBoxValue(jvstm.VBox<T> vbox, T value) {
 	throw new WriteOnReadException();
     }
-    
-    @Override
-    protected <T> T getPerTxValue(PerTxBox<T> box) {
-        throw new RuntimeException("Not implemented for NestedReadOnlyTransactions");
-    }
-    
+
     @Override
     public <T> void setPerTxValue(jvstm.PerTxBox<T> box, T value) {
 	throw new WriteOnReadException();
     }
-    
+
     @Override
     public boolean isWriteTransaction() {
-        return false;
+	return false;
     }
 
 }
