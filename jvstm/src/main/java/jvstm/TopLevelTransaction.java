@@ -99,6 +99,17 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 	    this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
 	}
 
+	// At this point we no longer need the values we wrote in the VBox's
+	// tempValue slot, so we update the ownership record's version to
+	// allow reuse of the slot.
+	this.orec.version = commitTxRecord.transactionNumber;
+	for (OwnershipRecord mergedOrec : linearNestedOrecs) {
+	    mergedOrec.version = commitTxRecord.transactionNumber;
+	}
+	for (ParallelNestedTransaction tx : mergedTxs) {
+	    tx.orec.version = commitTxRecord.transactionNumber;
+	}
+
 	// after validating, upgrade the transaction's valid read state
 	// upgradeTx(lastValid);
     }
