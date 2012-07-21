@@ -32,14 +32,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 import jvstm.util.Cons;
 
 /**
- * Parallel Nested Transaction used to represent a part of a transaction that is running (potentially) 
- * in parallel with other subparts of the same transaction. The programmer is responsible for identifying 
- * the parts of a transaction that he wants to run concurrently. Consequently, those parts may not run 
- * in program order. The only guarantee is that their execution will be equivalent to some sequential 
- * order (plus the properties of opacity). If that guarantee is already provided by the disjoint accesses 
- * of each subpart, consider using UnsafeParallelTransaction.
+ * Parallel Nested Transaction used to represent a part of a transaction that is
+ * running (potentially) in parallel with other subparts of the same
+ * transaction. The programmer is responsible for identifying the parts of a
+ * transaction that he wants to run concurrently. Consequently, those parts may
+ * not run in program order. The only guarantee is that their execution will be
+ * equivalent to some sequential order (plus the properties of opacity). If that
+ * guarantee is already provided by the disjoint accesses of each subpart,
+ * consider using UnsafeParallelTransaction.
+ * 
  * @author nmld
- *
+ * 
  */
 public class ParallelNestedTransaction extends ReadWriteTransaction {
 
@@ -65,7 +68,7 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 
 	int[] parentVers = parent.ancVersions;
 	super.ancVersions = new int[parentVers.length + 1];
-	super.ancVersions[0] = parent.nestedVersion;
+	super.ancVersions[0] = parent.nestedCommitQueue.commitNumber;
 	for (int i = 0; i < parentVers.length; i++) {
 	    this.ancVersions[i + 1] = parentVers[i];
 	}
@@ -89,7 +92,8 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 
     @Override
     public Transaction makeNestedTransaction(boolean readOnly) {
-	throw new Error("A Parallel Nested Transaction cannot spawn a Linear Nested Transaction yet. Consider using a single Parallel Nested Transaction instead.");
+	throw new Error(
+		"A Parallel Nested Transaction cannot spawn a Linear Nested Transaction yet. Consider using a single Parallel Nested Transaction instead.");
     }
 
     @Override
@@ -251,13 +255,6 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 
     }
 
-    protected static final ThreadLocal<Integer> backoffTime = new ThreadLocal<Integer>() {
-	@Override
-	protected Integer initialValue() {
-	    return 1;
-	}
-    };
-
     @Override
     public <T> void setBoxValue(jvstm.VBox<T> vbox, T value) {
 	InplaceWrite<T> inplaceWrite = vbox.inplace;
@@ -281,8 +278,7 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 		// more recent than my number
 		break;
 	    } else {
-		int versionOnAnc = retrieveAncestorVersion(currentOwner.owner);
-		if (versionOnAnc >= 0) {
+		if (retrieveAncestorVersion(currentOwner.owner) >= 0) {
 		    if (vbox.CASinplace(inplaceWrite, new InplaceWrite<T>(this.orec, (value == null ? (T) NULL_VALUE : value),
 			    inplaceWrite))) {
 			return;
@@ -292,16 +288,6 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 		    continue;
 		} else {
 		    Transaction abortUpTo = retrieveLowestCommonAncestor(currentOwner.owner);
-		    if (abortUpTo != null) {
-			manualAbort();
-			int sleepTime = backoffTime.get();
-			try {
-			    Thread.sleep(sleepTime);
-			} catch (InterruptedException e) {
-			}
-			backoffTime.set(sleepTime*2);
-			throw new CommitException(abortUpTo);
-		    }
 		    // owner is not from this nesting tree
 		    break;
 		}
@@ -313,7 +299,8 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
     }
 
     /*
-     * Here we ensure that the array read is consistent with concurrent nested commits
+     * Here we ensure that the array read is consistent with concurrent nested
+     * commits
      */
     @Override
     protected <T> T getLocalArrayValue(VArrayEntry<T> entry) {
@@ -374,63 +361,50 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 
     }
 
+    protected NestedCommitRecord helpCommitAll(NestedCommitRecord start) {
+	NestedCommitRecord lastSeen = start;
+	NestedCommitRecord current = lastSeen.next.get();
+	while (current != null) {
+	    if (!current.recordCommitted) {
+		current.helpCommit();
+	    }
+	    lastSeen = current;
+	    current = current.next.get();
+	}
+	return lastSeen;
+    }
+
     @Override
     protected void tryCommit() {
 	ReadWriteTransaction parent = getRWParent();
-	synchronized (parent) {
 
+	NestedCommitRecord lastSeen;
+	NestedCommitRecord newCommit;
+
+	do {
+	    lastSeen = helpCommitAll(parent.nestedCommitQueue);
 	    snapshotValidation();
+	    newCommit = new NestedCommitRecord(this, this.mergedTxs, parent.mergedTxs, lastSeen.commitNumber);
+	} while (!lastSeen.next.compareAndSet(null, newCommit));
 
-	    // Validate array reads and propagate them to the parent. Only a subset is propagated.
-	    // At this point this transaction can no longer fail, thus the propagation is correct.
-	    parent.arraysRead = validateNestedArrayReads();
-
-	    int commitVersion = parent.nestedVersion + 1;
-	    orec.nestedVersion = commitVersion;
-	    orec.owner = parent;
-	    Cons<ParallelNestedTransaction> txsAlreadyMerged = parent.mergedTxs.cons(this);
-	    for (ParallelNestedTransaction mergedTx : mergedTxs) {
-		mergedTx.orec.nestedVersion = commitVersion;
-		mergedTx.orec.owner = parent;
-		txsAlreadyMerged = txsAlreadyMerged.cons(mergedTx);
-	    }
-	    parent.mergedTxs = txsAlreadyMerged;
-
-	    if (parent.perTxValues == EMPTY_MAP) {
-		parent.perTxValues = perTxValues;
-	    } else {
-		parent.perTxValues.putAll(perTxValues);
-	    }
-
-	    if (parent.arrayWrites == EMPTY_MAP) {
-		parent.arrayWrites = arrayWrites;
-		parent.arrayWritesCount = arrayWritesCount;
-		for (VArrayEntry<?> entry : arrayWrites.values()) {
-		    entry.nestedVersion = commitVersion;
-		}
-	    } else {
-		// Propagate arrayWrites and correctly update the parent's arrayWritebacks counter
-		for (VArrayEntry<?> entry : arrayWrites.values()) {
-		    // Update the array write entry nested version
-		    entry.nestedVersion = commitVersion;
-
-		    if (parent.arrayWrites.put(entry, entry) != null) continue;
-
-		    // Count number of writes to the array
-		    Integer writeCount = parent.arrayWritesCount.get(entry.array);
-		    if (writeCount == null) writeCount = 0;
-		    parent.arrayWritesCount.put(entry.array, writeCount + 1);
-		}
-	    }
-
-	    // volatile write
-	    parent.nestedVersion++;
+	lastSeen = parent.nestedCommitQueue;
+	while ((lastSeen != null) && (lastSeen.commitNumber <= newCommit.commitNumber)) {
+	    lastSeen.helpCommit();
+	    lastSeen = lastSeen.next.get();
 	}
-	backoffTime.set(1);
+
+	// Validate array reads and propagate them to the parent. Only a
+	// subset is propagated.
+	// At this point this transaction can no longer fail, thus the
+	// propagation is correct.
+
+	// Not supported at the moment
+	// parent.arraysRead = validateNestedArrayReads();
+
     }
 
     protected void snapshotValidation() {
-	if (retrieveAncestorVersion(parent) == ((ReadWriteTransaction) parent).nestedVersion) {
+	if (retrieveAncestorVersion(parent) == ((ReadWriteTransaction) parent).nestedCommitQueue.commitNumber) {
 	    return;
 	}
 
@@ -457,10 +431,10 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
     }
 
     /*
-     * Validate a single read that was a read-after-write over some ancestor write.
-     * Iterate over the inplace writes of that VBox: 
-     * 		if an entry is found belonging to an ancestor, it must be the one 
-     * 		that it was read, in which case the search stops.
+     * Validate a single read that was a read-after-write over some ancestor
+     * write. Iterate over the inplace writes of that VBox: if an entry is found
+     * belonging to an ancestor, it must be the one that it was read, in which
+     * case the search stops.
      */
     protected void validateNestedRead(Map.Entry<VBox, InplaceWrite> read) {
 	InplaceWrite inplaceRead = read.getValue();
@@ -479,9 +453,8 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
     }
 
     /*
-     * Validate a single read that obtained a VBoxBody
-     * Iterate over the inplace writes of that VBox: 
-     * 		no entry may be found that belonged to an ancestor
+     * Validate a single read that obtained a VBoxBody Iterate over the inplace
+     * writes of that VBox: no entry may be found that belonged to an ancestor
      */
     protected void validateGlobalReads(Cons<ReadBlock> reads, int startIdx) {
 	VBox[] array = reads.first().entries;
@@ -521,14 +494,16 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 	int maxVersionOnParent = retrieveAncestorVersion(parent);
 	for (VArrayEntry<?> entry : arraysRead) {
 
-	    // If the read was performed on an ancestor of the parent, then propagate it
+	    // If the read was performed on an ancestor of the parent, then
+	    // propagate it
 	    // for further validation
 	    if (entry.owner != parent) {
 		parentArrayReads = parentArrayReads.cons(entry);
 	    }
 
 	    if (parentArrayWrites != EMPTY_MAP) {
-		// Verify if the parent contains a more recent write for the read that we performed 
+		// Verify if the parent contains a more recent write for the
+		// read that we performed
 		// somewhere in our ancestors
 		VArrayEntry<?> parentWrite = parentArrayWrites.get(entry);
 		if (parentWrite == null) {

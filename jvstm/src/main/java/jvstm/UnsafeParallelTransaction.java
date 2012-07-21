@@ -5,11 +5,13 @@ import java.util.HashMap;
 import jvstm.util.Cons;
 
 /**
- * This type of transaction is meant for usage when one parallelizes a transaction 
- * into subparts that are disjoint. This means that an UnsafeParallelTransaction 
- * never aborts because of a conflict with is siblings.
+ * This type of transaction is meant for usage when one parallelizes a
+ * transaction into subparts that are disjoint. This means that an
+ * UnsafeParallelTransaction never aborts because of a conflict with is
+ * siblings.
+ * 
  * @author nmld
- *
+ * 
  */
 public class UnsafeParallelTransaction extends ParallelNestedTransaction {
 
@@ -18,30 +20,31 @@ public class UnsafeParallelTransaction extends ParallelNestedTransaction {
     public UnsafeParallelTransaction(ReadWriteTransaction parent) {
 	super(parent, true);
 	this.parentOrec = parent.orec;
+	this.orec.owner = parent;
     }
 
     @Override
     public Transaction makeNestedTransaction(boolean readOnly) {
-        throw new Error("Unsafe Parallel Transactions can only spawn nested transactions that are themselves unsafe");
+	throw new Error("Unsafe Parallel Transactions can only spawn nested transactions that are themselves unsafe");
     }
-    
+
     @Override
     public Transaction makeParallelNestedTransaction(boolean readOnly) {
 	throw new Error("Unsafe Parallel Transactions can only spawn nested transactions that are themselves unsafe");
-    }    
-    
+    }
+
     @Override
     protected void abortTx() {
 	boxesWritten = null;
 	perTxValues = null;
-	
+
 	int i = 0;
 	for (ReadBlock block : globalReads) {
 	    block.free = true;
 	    i++;
 	}
 	blocksFree.get().addAndGet(i);
-	
+
 	globalReads = null;
 	boxesWrittenInPlace = null;
 	Transaction.current.set(null);
@@ -126,7 +129,7 @@ public class UnsafeParallelTransaction extends ParallelNestedTransaction {
 		    currentOwner = inplaceWrite.orec;
 		    continue;
 		}
-	    } else { 
+	    } else {
 		synchronized (parent) {
 		    if (boxesWritten == EMPTY_MAP) {
 			boxesWritten = new HashMap<VBox, Object>();
@@ -141,14 +144,14 @@ public class UnsafeParallelTransaction extends ParallelNestedTransaction {
     @Override
     protected void tryCommit() {
 	ReadWriteTransaction parent = getRWParent();
-	synchronized (parent) {
-	    int commitVersion = parent.nestedVersion;
-	    orec.nestedVersion = commitVersion;
-	    orec.owner = parent;
-	    Cons<ParallelNestedTransaction> txsAlreadyMerged = parent.mergedTxs.cons(this);
+	Cons<ParallelNestedTransaction> currentOrecs;
+	Cons<ParallelNestedTransaction> modifiedOrecs;
 
-	    parent.mergedTxs = txsAlreadyMerged;
-	}
+	do {
+	    currentOrecs = parent.mergedTxs;
+	    modifiedOrecs = currentOrecs.cons(this);
+	} while (!parent.CASmergedTxs(currentOrecs, modifiedOrecs));
+
 	Transaction.current.set(null);
     }
 

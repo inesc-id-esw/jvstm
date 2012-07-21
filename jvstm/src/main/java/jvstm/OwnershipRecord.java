@@ -25,6 +25,9 @@
  */
 package jvstm;
 
+import static jvstm.UtilUnsafe.UNSAFE;
+
+import java.lang.reflect.Field;
 
 /*
  * Each ReadWriteTransaction uses an instance of this class to represent that
@@ -42,7 +45,7 @@ package jvstm;
 public class OwnershipRecord {
     public static final int ABORTED = -1;
     public static final int RUNNING = 0;
-    
+
     protected static final OwnershipRecord DEFAULT_COMMITTED_OWNER = new OwnershipRecord() {
 	{
 	    version = 1;
@@ -66,5 +69,33 @@ public class OwnershipRecord {
     public OwnershipRecord(ReadWriteTransaction owner) {
 	this.owner = owner;
 	this.nestedVersion = 0;
+    }
+
+    protected boolean CASnestedVersion(int expectedNestedVersion, int newNestedVersion) {
+	return UNSAFE.compareAndSwapObject(this, nestedVersionOffset, expectedNestedVersion, newNestedVersion);
+    }
+
+    protected boolean CASowner(ReadWriteTransaction expectedOwner, ReadWriteTransaction newOwner) {
+	return UNSAFE.compareAndSwapObject(this, ownerOffset, expectedOwner, newOwner);
+    }
+
+    // --- Setup to use Unsafe
+    private static final long nestedVersionOffset;
+    private static final long ownerOffset;
+    static { // <clinit>
+	Field f = null;
+	try {
+	    f = OwnershipRecord.class.getDeclaredField("nestedVersion");
+	} catch (java.lang.NoSuchFieldException e) {
+	    throw new RuntimeException(e);
+	}
+	nestedVersionOffset = UNSAFE.objectFieldOffset(f);
+
+	try {
+	    f = VBox.class.getDeclaredField("owner");
+	} catch (java.lang.NoSuchFieldException e) {
+	    throw new RuntimeException(e);
+	}
+	ownerOffset = UNSAFE.objectFieldOffset(f);
     }
 }
