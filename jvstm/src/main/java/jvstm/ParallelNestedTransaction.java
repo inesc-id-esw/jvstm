@@ -383,13 +383,16 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 
 	do {
 	    lastSeen = helpCommitAll(parent.nestedCommitQueue);
-	    snapshotValidation();
-	    newCommit = new NestedCommitRecord(this, this.mergedTxs, parent.mergedTxs, lastSeen.commitNumber);
+	    snapshotValidation(lastSeen.commitNumber);
+	    newCommit = new NestedCommitRecord(this, this.mergedTxs, parent.mergedTxs, lastSeen.commitNumber + 1);
 	} while (!lastSeen.next.compareAndSet(null, newCommit));
 
 	lastSeen = parent.nestedCommitQueue;
 	while ((lastSeen != null) && (lastSeen.commitNumber <= newCommit.commitNumber)) {
-	    lastSeen.helpCommit();
+	    if (!lastSeen.recordCommitted) {
+		lastSeen.helpCommit();
+		parent.nestedCommitQueue = lastSeen;
+	    }
 	    lastSeen = lastSeen.next.get();
 	}
 
@@ -403,8 +406,9 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 
     }
 
-    protected void snapshotValidation() {
-	if (retrieveAncestorVersion(parent) == ((ReadWriteTransaction) parent).nestedCommitQueue.commitNumber) {
+    @Override
+    protected void snapshotValidation(int lastSeenNumber) {
+	if (retrieveAncestorVersion(parent) == lastSeenNumber) {
 	    return;
 	}
 

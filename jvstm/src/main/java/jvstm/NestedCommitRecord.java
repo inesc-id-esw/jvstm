@@ -38,6 +38,7 @@ public class NestedCommitRecord {
 
 	Cons<ParallelNestedTransaction> currentParentOrecs = parent.mergedTxs;
 	if (currentParentOrecs == parentOrecs) {
+	    currentParentOrecs = currentParentOrecs.cons(committer);
 	    for (ParallelNestedTransaction childrenCommit : children) {
 		commitOrec(parent, childrenCommit.orec);
 		currentParentOrecs = currentParentOrecs.cons(childrenCommit);

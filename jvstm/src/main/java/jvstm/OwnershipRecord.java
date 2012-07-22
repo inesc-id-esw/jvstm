@@ -92,7 +92,7 @@ public class OwnershipRecord {
 	nestedVersionOffset = UNSAFE.objectFieldOffset(f);
 
 	try {
-	    f = VBox.class.getDeclaredField("owner");
+	    f = OwnershipRecord.class.getDeclaredField("owner");
 	} catch (java.lang.NoSuchFieldException e) {
 	    throw new RuntimeException(e);
 	}
