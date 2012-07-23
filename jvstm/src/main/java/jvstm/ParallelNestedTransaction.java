@@ -139,29 +139,15 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
     }
 
     private void manualAbort() {
-	for (ParallelNestedTransaction mergedIntoParent : getRWParent().mergedTxs) {
-	    for (VBox vboxMergedIntoParent : mergedIntoParent.boxesWrittenInPlace) {
-		InplaceWrite inplaceWrite = vboxMergedIntoParent.inplace;
-		if (inplaceWrite.orec.owner == this && inplaceWrite.next != null) {
-		    InplaceWrite newWriteAtHead = inplaceWrite.next;
-		    while (newWriteAtHead.next != null && newWriteAtHead.next.orec.owner == this) {
-			newWriteAtHead = newWriteAtHead.next;
-		    }
-		    vboxMergedIntoParent.inplace = newWriteAtHead;
-		}
+	for (VBox vboxWritten : this.boxesWrittenInPlace) {
+	    revertOverwrite(vboxWritten);
+	}
+	for (ParallelNestedTransaction child : this.mergedTxs) {
+	    for (VBox vboxWritten : child.boxesWrittenInPlace) {
+		revertOverwrite(vboxWritten);
 	    }
 	}
-	for (VBox vboxMergedIntoParent : getRWParent().boxesWrittenInPlace) {
-	    InplaceWrite inplaceWrite = vboxMergedIntoParent.inplace;
-	    if (inplaceWrite.orec.owner == this && inplaceWrite.next != null) {
-		InplaceWrite newWriteAtHead = inplaceWrite.next;
-		while (newWriteAtHead.next != null && newWriteAtHead.next.orec.owner == this) {
-		    newWriteAtHead = newWriteAtHead.next;
-		}
-		vboxMergedIntoParent.inplace = newWriteAtHead;
-	    }
-	}
-
+	
 	this.orec.version = OwnershipRecord.ABORTED;
 	for (ReadWriteTransaction child : mergedTxs) {
 	    child.orec.version = OwnershipRecord.ABORTED;
@@ -178,6 +164,21 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 	this.globalReads = null;
 	this.nestedReads = null;
 	super.mergedTxs = null;
+    }
+
+    protected void revertOverwrite(VBox vboxWritten) {
+	InplaceWrite write = vboxWritten.inplace;
+	InplaceWrite overwritten = write;
+	while (overwritten.next != null) {
+	    overwritten = overwritten.next;
+	    if (overwritten.orec.owner != this && overwritten.orec.version == OwnershipRecord.RUNNING) {
+		write.tempValue = overwritten.tempValue;
+		overwritten.orec.owner = overwritten.orec.owner;	//enforce visibility
+		write.orec = overwritten.orec;
+		write.next = overwritten.next;
+		return;
+	    }
+	}
     }
 
     protected <T> T readGlobal(VBox<T> vbox) {

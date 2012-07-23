@@ -59,7 +59,7 @@ public class OwnershipRecord {
     // version > 0 is the version in which the owning transaction committed
     public int version = RUNNING;
     public int nestedVersion;
-    public ReadWriteTransaction owner;
+    public volatile ReadWriteTransaction owner;
 
     public OwnershipRecord() {
 	this.owner = null;
