@@ -34,13 +34,14 @@ public class NestedCommitRecord {
     public void helpCommit() {
 	ReadWriteTransaction parent = committer.getRWParent();
 
-	commitOrec(parent, committer.orec);
-
 	Cons<ParallelNestedTransaction> currentParentOrecs = parent.mergedTxs;
 	if (currentParentOrecs == parentOrecs) {
+	    committer.orec.nestedVersion = commitNumber;
+	    committer.orec.owner = parent;
 	    currentParentOrecs = currentParentOrecs.cons(committer);
 	    for (ParallelNestedTransaction childrenCommit : children) {
-		commitOrec(parent, childrenCommit.orec);
+		childrenCommit.orec.nestedVersion = commitNumber;
+		committer.orec.owner = parent;
 		currentParentOrecs = currentParentOrecs.cons(childrenCommit);
 	    }
 	    parent.CASmergedTxs(parentOrecs, currentParentOrecs);
@@ -80,14 +81,4 @@ public class NestedCommitRecord {
 
     }
 
-    private void commitOrec(ReadWriteTransaction parent, OwnershipRecord committerOrec) {
-	int currentNestedVersion = committerOrec.nestedVersion;
-	ReadWriteTransaction currentOwner = committerOrec.owner;
-	if (currentNestedVersion < commitNumber) {
-	    committerOrec.CASnestedVersion(currentNestedVersion, commitNumber);
-	}
-	if (currentOwner == committer) {
-	    committerOrec.CASowner(committer, parent);
-	}
-    }
 }
