@@ -139,15 +139,15 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
     }
 
     private void manualAbort() {
-	for (VBox vboxWritten : this.boxesWrittenInPlace) {
-	    revertOverwrite(vboxWritten);
-	}
-	for (ParallelNestedTransaction child : this.mergedTxs) {
-	    for (VBox vboxWritten : child.boxesWrittenInPlace) {
-		revertOverwrite(vboxWritten);
+	for (ParallelNestedTransaction mergedIntoParent : getRWParent().mergedTxs) {
+	    for (VBox vboxMergedIntoParent : mergedIntoParent.boxesWrittenInPlace) {
+		revertOverwrite(vboxMergedIntoParent);
 	    }
 	}
-	
+	for (VBox vboxMergedIntoParent : getRWParent().boxesWrittenInPlace) {
+	    revertOverwrite(vboxMergedIntoParent);
+	}
+
 	this.orec.version = OwnershipRecord.ABORTED;
 	for (ReadWriteTransaction child : mergedTxs) {
 	    child.orec.version = OwnershipRecord.ABORTED;
@@ -173,9 +173,10 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 	    overwritten = overwritten.next;
 	    if (overwritten.orec.owner != this && overwritten.orec.version == OwnershipRecord.RUNNING) {
 		write.tempValue = overwritten.tempValue;
-		overwritten.orec.owner = overwritten.orec.owner;	//enforce visibility
-		write.orec = overwritten.orec;
 		write.next = overwritten.next;
+		overwritten.orec.owner = overwritten.orec.owner; // enforce
+								 // visibility
+		write.orec = overwritten.orec;
 		return;
 	    }
 	}
