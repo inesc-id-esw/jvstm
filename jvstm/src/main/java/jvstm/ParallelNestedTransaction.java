@@ -389,7 +389,8 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 	do {
 	    lastSeen = helpCommitAll(parent.nestedCommitQueue);
 	    snapshotValidation(lastSeen.commitNumber);
-	    newCommit = new NestedCommitRecord(this, this.mergedTxs, parent.mergedTxs, lastSeen.commitNumber + 1);
+	    Cons<VArrayEntry<?>> varrayReadsToPropagate = validateNestedArrayReads();
+	    newCommit = new NestedCommitRecord(this, this.mergedTxs, parent.mergedTxs, varrayReadsToPropagate, arrayWrites, arrayWritesCount, lastSeen.commitNumber + 1);
 	} while (!lastSeen.next.compareAndSet(null, newCommit));
 
 	lastSeen = parent.nestedCommitQueue;
@@ -400,14 +401,6 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 	    }
 	    lastSeen = lastSeen.next.get();
 	}
-
-	// Validate array reads and propagate them to the parent. Only a
-	// subset is propagated.
-	// At this point this transaction can no longer fail, thus the
-	// propagation is correct.
-
-	// Not supported at the moment
-	// parent.arraysRead = validateNestedArrayReads();
 
     }
 
@@ -504,16 +497,14 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 	for (VArrayEntry<?> entry : arraysRead) {
 
 	    // If the read was performed on an ancestor of the parent, then
-	    // propagate it
-	    // for further validation
+	    // propagate it for further validation
 	    if (entry.owner != parent) {
 		parentArrayReads = parentArrayReads.cons(entry);
 	    }
 
 	    if (parentArrayWrites != EMPTY_MAP) {
 		// Verify if the parent contains a more recent write for the
-		// read that we performed
-		// somewhere in our ancestors
+		// read that we performed somewhere in our ancestors
 		VArrayEntry<?> parentWrite = parentArrayWrites.get(entry);
 		if (parentWrite == null) {
 		    continue;
