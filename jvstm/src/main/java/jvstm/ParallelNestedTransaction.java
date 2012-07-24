@@ -168,6 +168,9 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 
     protected void revertOverwrite(VBox vboxWritten) {
 	InplaceWrite write = vboxWritten.inplace;
+	if (write.orec.owner != this) {
+	    return;
+	}
 	InplaceWrite overwritten = write;
 	while (overwritten.next != null) {
 	    overwritten = overwritten.next;
