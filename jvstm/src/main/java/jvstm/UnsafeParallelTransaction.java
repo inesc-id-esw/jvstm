@@ -142,6 +142,26 @@ public class UnsafeParallelTransaction extends ParallelNestedTransaction {
     }
 
     @Override
+    public <T> void setArrayValue(VArrayEntry<T> entry, T value) {
+	ReadWriteTransaction parent = getRWParent();
+	synchronized (parent) {
+	    if (parent.arrayWrites == EMPTY_MAP) {
+		parent.arrayWrites = new HashMap<VArrayEntry<?>, VArrayEntry<?>>();
+		parent.arrayWritesCount = new HashMap<VArray<?>, Integer>();
+	    }
+	    entry.setWriteValue(value, parent.nestedCommitQueue.commitNumber);
+	    if (parent.arrayWrites.put(entry, entry) != null)
+		return;
+
+	    // Count number of writes to the array
+	    Integer writeCount = parent.arrayWritesCount.get(entry.array);
+	    if (writeCount == null)
+		writeCount = 0;
+	    parent.arrayWritesCount.put(entry.array, writeCount + 1);
+	}
+    }
+    
+    @Override
     protected void tryCommit() {
 	ReadWriteTransaction parent = getRWParent();
 	Cons<ParallelNestedTransaction> currentOrecs;
