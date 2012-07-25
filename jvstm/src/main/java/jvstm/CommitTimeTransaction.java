@@ -124,6 +124,27 @@ public class CommitTimeTransaction extends Transaction {
 	writeSetProduced.put(vbox, value == null ? ReadWriteTransaction.NULL_VALUE : value);
     }
 
+    @Override
+    public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
+	T value = null;
+	if (perTxValues != ReadWriteTransaction.EMPTY_MAP) {
+	    value = (T) perTxValues.get(box);
+	}
+	if (value == null) {
+	    value = initial;
+	}
+
+	return value;
+    }
+
+    @Override
+    public <T> void setPerTxValue(PerTxBox<T> box, T value) {
+	if (perTxValues == ReadWriteTransaction.EMPTY_MAP) {
+	    perTxValues = new HashMap<PerTxBox, Object>();
+	}
+	perTxValues.put(box, value);
+    }
+
     private static final String NOT_YET_SUPPORTED_MESSAGE = "The CommitTimeTransaction does not YET implement this operation";
 
     @Override
@@ -137,16 +158,6 @@ public class CommitTimeTransaction extends Transaction {
     }
 
     private static final String UNSUPPORTED_MESSAGE = "The CommitTimeTransaction does not implement this operation";
-
-    @Override
-    public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
-	throw new UnsupportedOperationException(UNSUPPORTED_MESSAGE);
-    }
-
-    @Override
-    public <T> void setPerTxValue(PerTxBox<T> box, T value) {
-	throw new UnsupportedOperationException(UNSUPPORTED_MESSAGE);
-    }
 
     @Override
     protected Transaction commitAndBeginTx(boolean readOnly) {
