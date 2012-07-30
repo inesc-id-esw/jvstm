@@ -220,7 +220,7 @@ public final class WriteSet {
 
     protected final void helpWriteBack(int newTxNumber) {
 	if (this.perTxBoxesWrites != ReadWriteTransaction.EMPTY_MAP && this.boxesWrittenDueToPerTxBoxes == null) {
-	    CommitTimeTransaction commitTx = new CommitTimeTransaction(this.committer);
+	    CommitTimeTransaction commitTx = new CommitTimeTransaction(this.committer, this.writeSetToCommit);
 
 	    try {
 		for (Map.Entry<PerTxBox, Object> entry : this.perTxBoxesWrites.entrySet()) {

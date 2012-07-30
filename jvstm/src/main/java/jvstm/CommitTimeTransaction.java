@@ -49,9 +49,9 @@ public class CommitTimeTransaction extends Transaction {
     private Map<VBox, Object> writeSetProduced = ReadWriteTransaction.EMPTY_MAP;
     private Transaction transactionHelping;
 
-    public CommitTimeTransaction(ReadWriteTransaction committer) {
+    public CommitTimeTransaction(ReadWriteTransaction committer, Map<VBox, Object> writeSet) {
 	super(committer.getNumber());
-	this.writeSet = committer.boxesWritten;
+	this.writeSet = writeSet;
 	this.perTxValues = committer.perTxValues;
 
 	this.transactionHelping = Transaction.current();
