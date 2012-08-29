@@ -231,7 +231,7 @@ public final class WriteSet {
 
     protected final void helpWriteBack(int newTxNumber) {
 	if (this.perTxBoxesWrites != ReadWriteTransaction.EMPTY_MAP && this.boxesWrittenDueToPerTxBoxes == null) {
-	    CommitTimeTransaction commitTx = new CommitTimeTransaction(newTxNumber, this.committer.perTxValues, this.writeSetToCommit);
+	    CommitTimeTransaction commitTx = new CommitTimeTransaction(newTxNumber - 1, this.committer.perTxValues, this.writeSetToCommit);
 
 	    try {
 		for (Map.Entry<PerTxBox, Object> entry : this.perTxBoxesWrites.entrySet()) {
@@ -243,7 +243,7 @@ public final class WriteSet {
 		// the same baseline writeSet from the committing tx, and
 		// read VBoxBodies with the same version.
 		this.boxesWrittenDueToPerTxBoxes = commitTx.finishExecution();
-
+		
 	    } catch (StopPerTxBoxesCommitException e) {
 		// A read over a VBox detected that some other helper already
 		// did all this.

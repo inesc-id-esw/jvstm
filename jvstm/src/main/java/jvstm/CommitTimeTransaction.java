@@ -49,8 +49,8 @@ public class CommitTimeTransaction extends Transaction {
     private Map<VBox, Object> writeSetProduced = ReadWriteTransaction.EMPTY_MAP;
     private Transaction transactionHelping;
 
-    public CommitTimeTransaction(int commitNumber, Map<PerTxBox, Object> perTxValues, Map<VBox, Object> writeSet) {
-	super(commitNumber);
+    public CommitTimeTransaction(int maxVersion, Map<PerTxBox, Object> perTxValues, Map<VBox, Object> writeSet) {
+	super(maxVersion);
 	this.writeSet = writeSet;
 	this.perTxValues = perTxValues;
 
@@ -137,12 +137,14 @@ public class CommitTimeTransaction extends Transaction {
 	return value;
     }
 
+    // FIXME Look into this
     @Override
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
-	if (perTxValues == ReadWriteTransaction.EMPTY_MAP) {
-	    perTxValues = new HashMap<PerTxBox, Object>();
-	}
-	perTxValues.put(box, value);
+    	throw new UnsupportedOperationException(NOT_YET_SUPPORTED_MESSAGE);
+//	if (perTxValues == ReadWriteTransaction.EMPTY_MAP) {
+//	    perTxValues = new HashMap<PerTxBox, Object>();
+//	}
+//	perTxValues.put(box, value);
     }
 
     private static final String NOT_YET_SUPPORTED_MESSAGE = "The CommitTimeTransaction does not YET implement this operation";
