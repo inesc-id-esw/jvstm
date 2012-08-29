@@ -28,6 +28,7 @@ package jvstm;
 import gnu.trove.impl.hash.TObjectHash;
 import gnu.trove.map.hash.THashMap;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -52,7 +53,10 @@ public final class WriteSet {
 	    return new Random();
 	}
     };
-
+    
+    protected static final VBox[] EMPTY_VBOX_ARRAY = new VBox[0];
+    protected static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
+    
     /*
      * Represents the default number os VBoxes to include in the same block.
      * This value is used to provide enough work to a helper thread and to avoid
@@ -115,31 +119,38 @@ public final class WriteSet {
 	int maxRequiredSize = boxesWrittenInPlaceSize + otherBoxes.size();
 
 	if (this.perTxBoxesWrites != ReadWriteTransaction.EMPTY_MAP) {
-	    this.writeSetToCommit = new THashMap<VBox, Object>(maxRequiredSize);
-
-	    for (VBox vbox : boxesWrittenInPlace) {
-		this.writeSetToCommit.put(vbox, vbox.inplace.tempValue);
-		vbox.inplace.next = null;
-	    }
-	    for (ParallelNestedTransaction mergedTx : mergedTxs) {
-		for (VBox vbox : mergedTx.boxesWrittenInPlace) {
-		    this.writeSetToCommit.put(vbox, vbox.inplace.tempValue);
-		    vbox.inplace.next = null;
+		if (maxRequiredSize == 0) {
+			this.writeSetToCommit = ReadWriteTransaction.EMPTY_MAP;
+			this.allWrittenVBoxes = EMPTY_VBOX_ARRAY;
+			this.allWrittenValues = EMPTY_OBJECT_ARRAY;
+			this.writeSetLength = 0;
+		} else {
+			this.writeSetToCommit = new THashMap<VBox, Object>(maxRequiredSize);
+			
+			for (VBox vbox : boxesWrittenInPlace) {
+				this.writeSetToCommit.put(vbox, vbox.inplace.tempValue);
+				vbox.inplace.next = null;
+			}
+			for (ParallelNestedTransaction mergedTx : mergedTxs) {
+				for (VBox vbox : mergedTx.boxesWrittenInPlace) {
+					this.writeSetToCommit.put(vbox, vbox.inplace.tempValue);
+					vbox.inplace.next = null;
+				}
+			}
+			
+			for (Map.Entry<VBox, Object> entry : otherBoxes.entrySet()) {
+				VBox vbox = entry.getKey();
+				if (vbox.inplace.orec.owner == committer) {
+					// if we also wrote directly to the box, we just skip this
+					// value
+					continue;
+				}
+				this.writeSetToCommit.put(vbox, entry.getValue());
+			}
+			this.allWrittenVBoxes = ((THashMap<VBox, Object>) this.writeSetToCommit)._set;
+			this.allWrittenValues = ((THashMap<VBox, Object>) this.writeSetToCommit)._values;
+			this.writeSetLength = this.allWrittenVBoxes.length;
 		}
-	    }
-
-	    for (Map.Entry<VBox, Object> entry : otherBoxes.entrySet()) {
-		VBox vbox = entry.getKey();
-		if (vbox.inplace.orec.owner == committer) {
-		    // if we also wrote directly to the box, we just skip this
-		    // value
-		    continue;
-		}
-		this.writeSetToCommit.put(vbox, entry.getValue());
-	    }
-	    this.allWrittenVBoxes = ((THashMap<VBox, Object>) this.writeSetToCommit)._set;
-	    this.allWrittenValues = ((THashMap<VBox, Object>) this.writeSetToCommit)._values;
-	    this.writeSetLength = this.allWrittenVBoxes.length;
 	} else {
 	    this.writeSetToCommit = null;
 	    this.allWrittenVBoxes = new VBox[maxRequiredSize];
@@ -220,7 +231,7 @@ public final class WriteSet {
 
     protected final void helpWriteBack(int newTxNumber) {
 	if (this.perTxBoxesWrites != ReadWriteTransaction.EMPTY_MAP && this.boxesWrittenDueToPerTxBoxes == null) {
-	    CommitTimeTransaction commitTx = new CommitTimeTransaction(this.committer, this.writeSetToCommit);
+	    CommitTimeTransaction commitTx = new CommitTimeTransaction(newTxNumber, this.committer.perTxValues, this.writeSetToCommit);
 
 	    try {
 		for (Map.Entry<PerTxBox, Object> entry : this.perTxBoxesWrites.entrySet()) {

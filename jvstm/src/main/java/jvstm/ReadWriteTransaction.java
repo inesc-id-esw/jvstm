@@ -273,7 +273,6 @@ public abstract class ReadWriteTransaction extends Transaction {
         if (value == null) {
             value = initial;
         }
-
         return value;
     }
 
