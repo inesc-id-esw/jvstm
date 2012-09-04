@@ -324,24 +324,6 @@ public abstract class ReadWriteTransaction extends Transaction {
         arrayWritesCount.put(entry.array, writeCount + 1);
     }
 
-    /**
-     * Validates this read-set against all active transaction records more recent that the one
-     * <code>lastChecked</code>.
-     *
-     * @return The last successfully validated ActiveTransactionsRecord
-     * @throws CommitException if the validation fails
-     */
-    protected ActiveTransactionsRecord validate(ActiveTransactionsRecord lastChecked) {
-	ActiveTransactionsRecord recordToCheck = lastChecked.getNext();
-
-	while (recordToCheck != null) {
-	    lastChecked = recordToCheck;
-	    recordToCheck = recordToCheck.getNext();
-	}
-	snapshotValidation(lastChecked.transactionNumber);
-	return lastChecked;
-    }
-
     protected void snapshotValidation(int lastSeenCommittedTxNumber) {
 	if (lastSeenCommittedTxNumber == getNumber()) {
 	    return;

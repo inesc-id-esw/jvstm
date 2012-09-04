@@ -107,6 +107,25 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 	// after validating, upgrade the transaction's valid read state
 	//      upgradeTx(lastValid);
     }
+    
+    /**
+     * Validates this read-set against all active transaction records more recent that the one
+     * <code>lastChecked</code>.
+     *
+     * @return The last successfully validated ActiveTransactionsRecord
+     * @throws CommitException if the validation fails
+     */
+    protected ActiveTransactionsRecord validate(ActiveTransactionsRecord lastChecked) {
+	ActiveTransactionsRecord recordToCheck = lastChecked.getNext();
+
+	while (recordToCheck != null) {
+	    lastChecked = recordToCheck;
+	    recordToCheck = recordToCheck.getNext();
+	}
+	helpCommitAll();
+	snapshotValidation(lastChecked.transactionNumber);
+	return lastChecked;
+    }
 
     protected void tryCommit() {
 	if (isWriteTransaction()) {
