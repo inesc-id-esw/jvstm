@@ -115,15 +115,19 @@ public class TopLevelTransaction extends ReadWriteTransaction {
      * @return The last successfully validated ActiveTransactionsRecord
      * @throws CommitException if the validation fails
      */
-    protected ActiveTransactionsRecord validate(ActiveTransactionsRecord lastChecked) {
+    protected ActiveTransactionsRecord validate(ActiveTransactionsRecord startCheck) {
+    ActiveTransactionsRecord lastChecked = startCheck;
 	ActiveTransactionsRecord recordToCheck = lastChecked.getNext();
 
 	while (recordToCheck != null) {
 	    lastChecked = recordToCheck;
 	    recordToCheck = recordToCheck.getNext();
 	}
-	helpCommitAll();
-	snapshotValidation(lastChecked.transactionNumber);
+	
+	if (lastChecked != startCheck) {
+		helpCommitAll();
+		snapshotValidation(lastChecked.transactionNumber);
+	}
 	return lastChecked;
     }
 
