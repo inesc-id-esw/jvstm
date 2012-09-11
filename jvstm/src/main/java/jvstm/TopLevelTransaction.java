@@ -88,6 +88,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 	for (Map.Entry<PerTxBox, Object> entry : this.perTxValues.entrySet()) {
 	    entry.getKey().commit(entry.getValue());
 	}
+	commitTx.finishExecution();
 	return commitTx;
     }
     
@@ -107,12 +108,13 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 	CommitTimeTransaction commitTx = speculatePerTxBoxes(lastValid.transactionNumber);
 	WriteSet writeSet = makeWriteSet(commitTx);
 	
-	// TODO if the enqueue fails, revalidate (as its done now), then validate specReadSet and if 
-	// it fails, re-execute specPerTxBoxes and re-do writeset
-	
 	this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
 	while (!lastValid.trySetNext(this.commitTxRecord)) {
 	    lastValid = validate(lastValid);
+	    if(!commitTx.speculativeReadSetStillValid()) {
+		commitTx = speculatePerTxBoxes(lastValid.transactionNumber);
+		writeSet = makeWriteSet(commitTx);
+	    }
 	    this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
 	}
 

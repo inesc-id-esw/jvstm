@@ -56,6 +56,15 @@ public class CommitTimeTransaction extends Transaction {
 	Transaction.current.set(this.committer);
 	this.committer = null;
     }
+    
+    public boolean speculativeReadSetStillValid() {
+	for (VBox vbox : specReadSet) {
+	    if (vbox.body.version > this.number) {
+		return false;
+	    }
+	}
+	return true;
+    }
 
     protected <T> T readFromBody(VBox<T> vbox) {
 	specReadSet = specReadSet.cons(vbox);
