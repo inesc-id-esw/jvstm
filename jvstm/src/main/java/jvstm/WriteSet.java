@@ -25,10 +25,6 @@
  */
 package jvstm;
 
-import gnu.trove.impl.hash.TObjectHash;
-import gnu.trove.map.hash.THashMap;
-
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -92,108 +88,63 @@ public final class WriteSet {
     /* Support for VArray */
     protected final VArrayCommitState[] arrayCommitState;
 
-    /* Support for PerTxBoxes */
-    protected final Map<PerTxBox, Object> perTxBoxesWrites;
-    protected Map<VBox, Object> boxesWrittenDueToPerTxBoxes;
-    protected final ReadWriteTransaction committer;
-    protected final Map<VBox, Object> writeSetToCommit;
-
-    protected WriteSet(Cons<ParallelNestedTransaction> mergedTxs, Cons<VBox> boxesWrittenInPlace, Map<VBox, Object> otherBoxes,
-	    Map<VArrayEntry<?>, VArrayEntry<?>> arrayWrites, Map<VArray<?>, Integer> arrayWritesCount,
-	    ReadWriteTransaction committer, Map<PerTxBox, Object> perTxBoxesWrites) {
-	this(mergedTxs, boxesWrittenInPlace, otherBoxes, arrayWrites, arrayWritesCount, committer, perTxBoxesWrites,
-		DEFAULT_BLOCK_SIZE);
+    protected WriteSet(ReadWriteTransaction committer, Map<VBox, Object> perTxBoxesWrites) {
+	this(committer, perTxBoxesWrites, DEFAULT_BLOCK_SIZE);
     }
 
-    protected WriteSet(Cons<ParallelNestedTransaction> mergedTxs, Cons<VBox> boxesWrittenInPlace, Map<VBox, Object> otherBoxes,
-	    Map<VArrayEntry<?>, VArrayEntry<?>> arrayWrites, Map<VArray<?>, Integer> arrayWritesCount,
-	    ReadWriteTransaction committer, Map<PerTxBox, Object> perTxBoxesWrites, int blockSize) {
+    protected WriteSet(ReadWriteTransaction committer, Map<VBox, Object> perTxBoxesWrites, int blockSize) {
 
-	this.perTxBoxesWrites = perTxBoxesWrites;
-	this.committer = committer;
-
-	int boxesWrittenInPlaceSize = boxesWrittenInPlace.size();
-	for (ParallelNestedTransaction mergedTx : mergedTxs) {
+	int boxesWrittenInPlaceSize = committer.boxesWrittenInPlace.size();
+	for (ParallelNestedTransaction mergedTx : committer.mergedTxs) {
 	    boxesWrittenInPlaceSize += mergedTx.boxesWrittenInPlace.size();
 	}
-	int maxRequiredSize = boxesWrittenInPlaceSize + otherBoxes.size();
+	int maxRequiredSize = boxesWrittenInPlaceSize + committer.boxesWritten.size();
 
-	if (this.perTxBoxesWrites != ReadWriteTransaction.EMPTY_MAP) {
-		if (maxRequiredSize == 0) {
-			this.writeSetToCommit = ReadWriteTransaction.EMPTY_MAP;
-			this.allWrittenVBoxes = EMPTY_VBOX_ARRAY;
-			this.allWrittenValues = EMPTY_OBJECT_ARRAY;
-			this.writeSetLength = 0;
-		} else {
-			this.writeSetToCommit = new THashMap<VBox, Object>(maxRequiredSize);
-			
-			for (VBox vbox : boxesWrittenInPlace) {
-				this.writeSetToCommit.put(vbox, vbox.inplace.tempValue);
-				vbox.inplace.next = null;
-			}
-			for (ParallelNestedTransaction mergedTx : mergedTxs) {
-				for (VBox vbox : mergedTx.boxesWrittenInPlace) {
-					this.writeSetToCommit.put(vbox, vbox.inplace.tempValue);
-					vbox.inplace.next = null;
-				}
-			}
-			
-			for (Map.Entry<VBox, Object> entry : otherBoxes.entrySet()) {
-				VBox vbox = entry.getKey();
-				if (vbox.inplace.orec.owner == committer) {
-					// if we also wrote directly to the box, we just skip this
-					// value
-					continue;
-				}
-				this.writeSetToCommit.put(vbox, entry.getValue());
-			}
-			this.allWrittenVBoxes = ((THashMap<VBox, Object>) this.writeSetToCommit)._set;
-			this.allWrittenValues = ((THashMap<VBox, Object>) this.writeSetToCommit)._values;
-			this.writeSetLength = this.allWrittenVBoxes.length;
-		}
-	} else {
-	    this.writeSetToCommit = null;
-	    this.allWrittenVBoxes = new VBox[maxRequiredSize];
-	    this.allWrittenValues = new Object[maxRequiredSize];
-	    int pos = 0;
+	this.allWrittenVBoxes = new VBox[maxRequiredSize];
+	this.allWrittenValues = new Object[maxRequiredSize];
+	int pos = 0;
 
-	    for (VBox vbox : boxesWrittenInPlace) {
+	// TODO dependencies checks here
+	
+	// Deal with VBoxes written due to PerTxBoxes
+	
+	// Deal with VBoxes written in place 
+	for (VBox vbox : committer.boxesWrittenInPlace) {
+	    this.allWrittenVBoxes[pos] = vbox;
+	    this.allWrittenValues[pos++] = vbox.inplace.tempValue;
+	    vbox.inplace.next = null;
+	}
+	for (ParallelNestedTransaction mergedTx : committer.mergedTxs) {
+	    for (VBox vbox : mergedTx.boxesWrittenInPlace) {
 		this.allWrittenVBoxes[pos] = vbox;
 		this.allWrittenValues[pos++] = vbox.inplace.tempValue;
 		vbox.inplace.next = null;
 	    }
-	    for (ParallelNestedTransaction mergedTx : mergedTxs) {
-		for (VBox vbox : mergedTx.boxesWrittenInPlace) {
-		    this.allWrittenVBoxes[pos] = vbox;
-		    this.allWrittenValues[pos++] = vbox.inplace.tempValue;
-		    vbox.inplace.next = null;
-		}
-	    }
-
-	    for (Map.Entry<VBox, Object> entry : otherBoxes.entrySet()) {
-		VBox vbox = entry.getKey();
-		if (vbox.inplace.orec.owner == committer) {
-		    // if we also wrote directly to the box, we just skip this
-		    // value
-		    continue;
-		}
-		this.allWrittenVBoxes[pos] = vbox;
-		this.allWrittenValues[pos++] = entry.getValue();
-	    }
-	    this.writeSetLength = pos;
 	}
+
+	// Deal with VBoxes written in the fallback write-set
+	for (Map.Entry<VBox, Object> entry : committer.boxesWritten.entrySet()) {
+	    VBox vbox = entry.getKey();
+	    if (vbox.inplace.orec.owner == committer) {
+		// if we also wrote directly to the box, we just skip this
+		// value
+		continue;
+	    }
+	    this.allWrittenVBoxes[pos] = vbox;
+	    this.allWrittenValues[pos++] = entry.getValue();
+	}
+	this.writeSetLength = pos;
 
 	this.blockSize = blockSize;
 	int nBlocksAux = writeSetLength / blockSize;
 	this.nBlocks = (nBlocksAux == 0 && writeSetLength > 0) ? 1 : nBlocksAux;
-	this.bodiesPerBlock = new Cons[this.nBlocks + arrayWritesCount.size()
-		+ (perTxBoxesWrites == ReadWriteTransaction.EMPTY_MAP ? 0 : 1)];
-	this.blocksDone = new AtomicBoolean[this.nBlocks + (perTxBoxesWrites == ReadWriteTransaction.EMPTY_MAP ? 0 : 1)];
-	for (int i = 0; i < this.nBlocks + (perTxBoxesWrites == ReadWriteTransaction.EMPTY_MAP ? 0 : 1); i++) {
+	this.bodiesPerBlock = new Cons[this.nBlocks + committer.arrayWritesCount.size()];
+	this.blocksDone = new AtomicBoolean[this.nBlocks];
+	for (int i = 0; i < this.nBlocks; i++) {
 	    this.blocksDone[i] = new AtomicBoolean(false);
 	}
 
-	this.arrayCommitState = prepareArrayWrites(arrayWrites, arrayWritesCount);
+	this.arrayCommitState = prepareArrayWrites(committer.arrayWrites, committer.arrayWritesCount);
 
     }
 

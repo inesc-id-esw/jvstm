@@ -42,8 +42,8 @@ import jvstm.util.Cons;
  */
 public class CommitTimeTransaction extends Transaction {
 
-    private Cons<VBox> specReadSet = Cons.<VBox>empty();
-    private Map<VBox, Object> specWriteSet = ReadWriteTransaction.EMPTY_MAP;
+    protected Cons<VBox> specReadSet = Cons.<VBox>empty();
+    protected Map<VBox, Object> specWriteSet = ReadWriteTransaction.EMPTY_MAP;
     private TopLevelTransaction committer;
 
     public CommitTimeTransaction(int maxVersion, TopLevelTransaction committer) {
@@ -52,17 +52,9 @@ public class CommitTimeTransaction extends Transaction {
 	Transaction.current.set(this);
     }
 
-    public Map<VBox, Object> finishExecution() {
-	Map<VBox, Object> result = this.specWriteSet;
-
-	this.specReadSet = null;
-	this.specWriteSet = null;
-
+    public void finishExecution() {
 	Transaction.current.set(this.committer);
-
 	this.committer = null;
-
-	return result;
     }
 
     protected <T> T readFromBody(VBox<T> vbox) {

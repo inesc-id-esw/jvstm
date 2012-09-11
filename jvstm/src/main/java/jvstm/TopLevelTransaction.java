@@ -25,6 +25,8 @@
  */
 package jvstm;
 
+import java.util.Map;
+
 public class TopLevelTransaction extends ReadWriteTransaction {
 
     protected ActiveTransactionsRecord activeTxRecord;
@@ -74,11 +76,21 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 	setNumber(newRecord.transactionNumber);
     }
 
-    protected WriteSet makeWriteSet() {
-	return new WriteSet(mergedTxs, this.boxesWrittenInPlace, this.boxesWritten, this.arrayWrites, this.arrayWritesCount,
-		this, this.perTxValues);
+    protected WriteSet makeWriteSet(CommitTimeTransaction commitTx) {
+	return new WriteSet(this, commitTx.specWriteSet);
     }
 
+    private CommitTimeTransaction speculatePerTxBoxes(int maxVersion) {
+	if (this.perTxValues == EMPTY_MAP) {
+	    return null;
+	}
+	CommitTimeTransaction commitTx = new CommitTimeTransaction(maxVersion, this);
+	for (Map.Entry<PerTxBox, Object> entry : this.perTxValues.entrySet()) {
+	    entry.getKey().commit(entry.getValue());
+	}
+	return commitTx;
+    }
+    
     /*
      * validate this transaction and afterwards try to enqueue its commit
      * request with a compare-and-swap. If the CAS doesn't succeed, then it's
@@ -92,10 +104,12 @@ public class TopLevelTransaction extends ReadWriteTransaction {
      */
     private void validateCommitAndEnqueue(ActiveTransactionsRecord lastValid) {
 	lastValid = validate(lastValid);
+	CommitTimeTransaction commitTx = speculatePerTxBoxes(lastValid.transactionNumber);
+	WriteSet writeSet = makeWriteSet(commitTx);
 	
-	CommitTimeTransaction commitTx = new CommitTimeTransaction(lastValid.transactionNumber, this);
+	// TODO if the enqueue fails, revalidate (as its done now), then validate specReadSet and if 
+	// it fails, re-execute specPerTxBoxes and re-do writeset
 	
-	WriteSet writeSet = makeWriteSet();
 	this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
 	while (!lastValid.trySetNext(this.commitTxRecord)) {
 	    lastValid = validate(lastValid);
