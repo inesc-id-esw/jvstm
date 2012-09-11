@@ -28,6 +28,8 @@ package jvstm;
 import java.util.HashMap;
 import java.util.Map;
 
+import jvstm.util.Cons;
+
 /**
  * This transaction is only used during the lock-free commit helping procedure.
  * Namely, it encapsulates the execution of the PerTxBoxes of the committing
@@ -40,95 +42,81 @@ import java.util.Map;
  */
 public class CommitTimeTransaction extends Transaction {
 
-    protected static final StopPerTxBoxesCommitException STOP_PER_TX_BOX_COMMIT_EXCEPTION = new StopPerTxBoxesCommitException();
+    private Cons<VBox> specReadSet = Cons.<VBox>empty();
+    private Map<VBox, Object> specWriteSet = ReadWriteTransaction.EMPTY_MAP;
+    private TopLevelTransaction committer;
 
-    // Note: these are not meant to be modified!
-    private Map<VBox, Object> writeSet;
-    private Map<PerTxBox, Object> perTxValues;
-
-    private Map<VBox, Object> writeSetProduced = ReadWriteTransaction.EMPTY_MAP;
-    private Transaction transactionHelping;
-
-    public CommitTimeTransaction(int maxVersion, Map<PerTxBox, Object> perTxValues, Map<VBox, Object> writeSet) {
+    public CommitTimeTransaction(int maxVersion, TopLevelTransaction committer) {
 	super(maxVersion);
-	this.writeSet = writeSet;
-	this.perTxValues = perTxValues;
 
-	this.transactionHelping = Transaction.current();
 	Transaction.current.set(this);
     }
 
     public Map<VBox, Object> finishExecution() {
-	Map<VBox, Object> result = this.writeSetProduced;
+	Map<VBox, Object> result = this.specWriteSet;
 
-	this.writeSet = null;
-	this.perTxValues = null;
-	this.writeSetProduced = null;
+	this.specReadSet = null;
+	this.specWriteSet = null;
 
-	Transaction.current.set(this.transactionHelping);
+	Transaction.current.set(this.committer);
 
-	this.transactionHelping = null;
+	this.committer = null;
 
 	return result;
     }
 
-    public void finishEarly() {
-	this.writeSet = null;
-	this.perTxValues = null;
-	this.writeSetProduced = null;
-
-	Transaction.current.set(this.transactionHelping);
-
-	this.transactionHelping = null;
+    protected <T> T readFromBody(VBox<T> vbox) {
+	specReadSet = specReadSet.cons(vbox);
+	return vbox.body.getBody(this.number).value;
     }
-
+    
     protected <T> T getLocalValue(VBox<T> vbox) {
-	T result = null;
-	if (writeSetProduced != ReadWriteTransaction.EMPTY_MAP) {
-	    result = (T) writeSetProduced.get(vbox);
+	InplaceWrite<T> inplace = vbox.inplace;
+	if (inplace.orec.owner == this.committer) {
+	    return inplace.tempValue;
 	}
-	if (result == null && writeSet != ReadWriteTransaction.EMPTY_MAP) {
-	    result = (T) writeSet.get(vbox);
+	if (committer.boxesWritten != ReadWriteTransaction.EMPTY_MAP) {
+	    return (T) committer.boxesWritten.get(vbox);
 	}
-	return result;
+	return null;
     }
 
     @Override
     public <T> T getBoxValue(VBox<T> vbox) {
-	T value = getLocalValue(vbox);
+	T value = null;
+	if (specWriteSet != ReadWriteTransaction.EMPTY_MAP) {
+	    value = (T) specWriteSet.get(vbox);
+	}
 	if (value != null) {
 	    return (value == ReadWriteTransaction.NULL_VALUE) ? null : value;
 	}
-
-	try {
-	    return vbox.body.getBody(this.number).value;
-	} catch (NullPointerException npe) {
-	    // The thread helping in this commit may be arbitrarily delayed and
-	    // executing this code long after the commit has been finished.
-	    // Therefore, the "this.number" version and all bellow it may have
-	    // been GCed by the JVSTM GC. Consequently, the getBody.value will
-	    // throw a NPE. In that case, we know that some helper finished this
-	    // and therefore may preemptively stop.
-
-	    // A sanity check is performed in the WriteSet class where this
-	    // exception is caught.
-	    throw STOP_PER_TX_BOX_COMMIT_EXCEPTION;
-	}
+	
+        OwnershipRecord currentOwner = vbox.inplace.orec;
+        if (currentOwner.version > 0 && currentOwner.version <= this.number) {
+            return readFromBody(vbox);
+        } 
+        
+        value = getLocalValue(vbox);
+        if (value == null) {
+            return readFromBody(vbox);
+        }
+	
+        return (value == ReadWriteTransaction.NULL_VALUE) ? null : value;
     }
 
     @Override
     public <T> void setBoxValue(VBox<T> vbox, T value) {
-	if (writeSetProduced == ReadWriteTransaction.EMPTY_MAP) {
-	    writeSetProduced = new HashMap<VBox, Object>();
+	if (specWriteSet == ReadWriteTransaction.EMPTY_MAP) {
+	    specWriteSet = new HashMap<VBox, Object>();
 	}
-	writeSetProduced.put(vbox, value == null ? ReadWriteTransaction.NULL_VALUE : value);
+	specWriteSet.put(vbox, value == null ? ReadWriteTransaction.NULL_VALUE : value);
     }
 
     @Override
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
 	T value = null;
-	if (perTxValues != ReadWriteTransaction.EMPTY_MAP) {
-	    value = (T) perTxValues.get(box);
+	if (committer.perTxValues != ReadWriteTransaction.EMPTY_MAP) {
+	    value = (T) committer.perTxValues.get(box);
 	}
 	if (value == null) {
 	    value = initial;

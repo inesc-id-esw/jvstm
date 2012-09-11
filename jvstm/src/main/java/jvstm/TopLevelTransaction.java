@@ -92,6 +92,9 @@ public class TopLevelTransaction extends ReadWriteTransaction {
      */
     private void validateCommitAndEnqueue(ActiveTransactionsRecord lastValid) {
 	lastValid = validate(lastValid);
+	
+	CommitTimeTransaction commitTx = new CommitTimeTransaction(lastValid.transactionNumber, this);
+	
 	WriteSet writeSet = makeWriteSet();
 	this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
 	while (!lastValid.trySetNext(this.commitTxRecord)) {
