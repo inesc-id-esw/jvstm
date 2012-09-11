@@ -42,13 +42,19 @@ import jvstm.util.Cons;
  */
 public class CommitTimeTransaction extends Transaction {
 
+    public static final CommitTimeTransaction EMPTY_COMMIT_TX = new CommitTimeTransaction();
+    
     protected Cons<VBox> specReadSet = Cons.<VBox>empty();
     protected Map<VBox, Object> specWriteSet = ReadWriteTransaction.EMPTY_MAP;
     private TopLevelTransaction committer;
 
+    public CommitTimeTransaction() {
+	super(0);
+    }
+    
     public CommitTimeTransaction(int maxVersion, TopLevelTransaction committer) {
 	super(maxVersion);
-
+	this.committer = committer;
 	Transaction.current.set(this);
     }
 

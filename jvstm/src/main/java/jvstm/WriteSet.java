@@ -98,7 +98,7 @@ public final class WriteSet {
 	for (ParallelNestedTransaction mergedTx : mergedTxs) {
 	    boxesWrittenInPlaceSize += mergedTx.boxesWrittenInPlace.size();
 	}
-	int maxRequiredSize = boxesWrittenInPlaceSize + boxesWritten.size();
+	int maxRequiredSize = boxesWrittenInPlaceSize + boxesWritten.size() + perTxBoxesWrites.size();
 
 	this.allWrittenVBoxes = new VBox[maxRequiredSize];
 	this.allWrittenValues = new Object[maxRequiredSize];
@@ -114,7 +114,7 @@ public final class WriteSet {
 	
 	// Deal with VBoxes written in place 
 	for (VBox vbox : boxesWrittenInPlace) {
-	    if (perTxBoxesWrites.containsKey(vbox)) {
+	    if (perTxBoxesWrites != ReadWriteTransaction.EMPTY_MAP && perTxBoxesWrites.containsKey(vbox)) {
 		continue;
 	    }
 	    this.allWrittenVBoxes[pos] = vbox;
@@ -123,7 +123,7 @@ public final class WriteSet {
 	}
 	for (ParallelNestedTransaction mergedTx : mergedTxs) {
 	    for (VBox vbox : mergedTx.boxesWrittenInPlace) {
-		if (perTxBoxesWrites.containsKey(vbox)) {
+		if (perTxBoxesWrites != ReadWriteTransaction.EMPTY_MAP && perTxBoxesWrites.containsKey(vbox)) {
 		    continue;
 		}
 		this.allWrittenVBoxes[pos] = vbox;
@@ -135,7 +135,7 @@ public final class WriteSet {
 	// Deal with VBoxes written in the fallback write-set
 	for (Map.Entry<VBox, Object> entry : boxesWritten.entrySet()) {
 	    VBox vbox = entry.getKey();
-	    if (vbox.inplace.orec.owner == committer || perTxBoxesWrites.containsKey(vbox)) {
+	    if (vbox.inplace.orec.owner == committer || (perTxBoxesWrites != ReadWriteTransaction.EMPTY_MAP && perTxBoxesWrites.containsKey(vbox))) {
 		// if we also wrote directly to the box, we just skip this value
 		continue;
 	    }

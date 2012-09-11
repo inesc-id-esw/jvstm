@@ -82,7 +82,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 
     private CommitTimeTransaction speculatePerTxBoxes(int maxVersion) {
 	if (this.perTxValues == EMPTY_MAP) {
-	    return null;
+	    return CommitTimeTransaction.EMPTY_COMMIT_TX;
 	}
 	CommitTimeTransaction commitTx = new CommitTimeTransaction(maxVersion, this);
 	for (Map.Entry<PerTxBox, Object> entry : this.perTxValues.entrySet()) {
