@@ -40,19 +40,20 @@ import jvstm.util.Cons;
  * @author nmld
  * 
  */
-public class CommitTimeTransaction extends Transaction {
+public class ProcessPerTxBoxesTransaction extends Transaction {
 
-    public static final CommitTimeTransaction EMPTY_COMMIT_TX = new CommitTimeTransaction();
+    public static final ProcessPerTxBoxesTransaction EMPTY_COMMIT_TX = new ProcessPerTxBoxesTransaction();
     
+    protected Map<PerTxBox, Object> specPerTxBoxes = ReadWriteTransaction.EMPTY_MAP;
     protected Cons<VBox> specReadSet = Cons.<VBox>empty();
     protected Map<VBox, Object> specWriteSet = ReadWriteTransaction.EMPTY_MAP;
     private TopLevelTransaction committer;
 
-    public CommitTimeTransaction() {
+    public ProcessPerTxBoxesTransaction() {
 	super(0);
     }
     
-    public CommitTimeTransaction(int maxVersion, TopLevelTransaction committer) {
+    public ProcessPerTxBoxesTransaction(int maxVersion, TopLevelTransaction committer) {
 	super(maxVersion);
 	this.committer = committer;
 	Transaction.current.set(this);
@@ -122,7 +123,10 @@ public class CommitTimeTransaction extends Transaction {
     @Override
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
 	T value = null;
-	if (committer.perTxValues != ReadWriteTransaction.EMPTY_MAP) {
+	if (specPerTxBoxes != ReadWriteTransaction.EMPTY_MAP) {
+	    value = (T) specPerTxBoxes.get(box);
+	}
+	if (value == null && committer.perTxValues != ReadWriteTransaction.EMPTY_MAP) {
 	    value = (T) committer.perTxValues.get(box);
 	}
 	if (value == null) {
@@ -132,18 +136,17 @@ public class CommitTimeTransaction extends Transaction {
 	return value;
     }
 
-    // FIXME Look into this
     @Override
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
-    	throw new UnsupportedOperationException(NOT_YET_SUPPORTED_MESSAGE);
-//	if (perTxValues == ReadWriteTransaction.EMPTY_MAP) {
-//	    perTxValues = new HashMap<PerTxBox, Object>();
-//	}
-//	perTxValues.put(box, value);
+	if (specPerTxBoxes == ReadWriteTransaction.EMPTY_MAP) {
+	    specPerTxBoxes = new HashMap<PerTxBox, Object>();
+	}
+	specPerTxBoxes.put(box, value);
     }
 
     private static final String NOT_YET_SUPPORTED_MESSAGE = "The CommitTimeTransaction does not YET implement this operation";
 
+    // TODO to work out later with Ivo
     @Override
     public <T> T getArrayValue(VArrayEntry<T> entry) {
 	throw new UnsupportedOperationException(NOT_YET_SUPPORTED_MESSAGE);

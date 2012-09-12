@@ -126,14 +126,14 @@ public class InevitableTransaction extends TopLevelTransaction {
     }
 
     @Override
-    protected WriteSet makeWriteSet(CommitTimeTransaction commitTx) {
+    protected WriteSet makeWriteSet() {
         return new WriteSet(vboxesWrittenBack);
     }
     
     @Override
     protected void tryCommit() {
         // we know we're valid and we're already enqueued. just set the writeset
-        ((InevitableActiveTransactionsRecord)commitTxRecord).setWriteSet(makeWriteSet(null));
+        ((InevitableActiveTransactionsRecord)commitTxRecord).setWriteSet(makeWriteSet());
 
         helpCommit(this.commitTxRecord);
         upgradeTx(this.commitTxRecord);

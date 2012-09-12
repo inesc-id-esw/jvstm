@@ -76,15 +76,15 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 	setNumber(newRecord.transactionNumber);
     }
 
-    protected WriteSet makeWriteSet(CommitTimeTransaction commitTx) {
-	return new WriteSet(this, commitTx.specWriteSet);
+    protected WriteSet makeWriteSet() {
+	return new WriteSet(this);
     }
 
-    private CommitTimeTransaction speculatePerTxBoxes(int maxVersion) {
+    private ProcessPerTxBoxesTransaction speculatePerTxBoxes(int maxVersion) {
 	if (this.perTxValues == EMPTY_MAP) {
-	    return CommitTimeTransaction.EMPTY_COMMIT_TX;
+	    return ProcessPerTxBoxesTransaction.EMPTY_COMMIT_TX;
 	}
-	CommitTimeTransaction commitTx = new CommitTimeTransaction(maxVersion, this);
+	ProcessPerTxBoxesTransaction commitTx = new ProcessPerTxBoxesTransaction(maxVersion, this);
 	for (Map.Entry<PerTxBox, Object> entry : this.perTxValues.entrySet()) {
 	    entry.getKey().commit(entry.getValue());
 	}
@@ -105,15 +105,16 @@ public class TopLevelTransaction extends ReadWriteTransaction {
      */
     private void validateCommitAndEnqueue(ActiveTransactionsRecord lastValid) {
 	lastValid = validate(lastValid);
-	CommitTimeTransaction commitTx = speculatePerTxBoxes(lastValid.transactionNumber);
-	WriteSet writeSet = makeWriteSet(commitTx);
+	ProcessPerTxBoxesTransaction commitTx = speculatePerTxBoxes(lastValid.transactionNumber);
+	WriteSet writeSet = makeWriteSet();
+	writeSet.addPerTxBoxesWrites(commitTx.specWriteSet);
 	
 	this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
 	while (!lastValid.trySetNext(this.commitTxRecord)) {
 	    lastValid = validate(lastValid);
 	    if(!commitTx.speculativeReadSetStillValid()) {
 		commitTx = speculatePerTxBoxes(lastValid.transactionNumber);
-		writeSet = makeWriteSet(commitTx);
+		writeSet.addPerTxBoxesWrites(commitTx.specWriteSet);
 	    }
 	    this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
 	}
