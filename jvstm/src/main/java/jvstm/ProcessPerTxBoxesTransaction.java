@@ -45,7 +45,6 @@ public class ProcessPerTxBoxesTransaction extends Transaction {
     public static final ProcessPerTxBoxesTransaction EMPTY_COMMIT_TX = new ProcessPerTxBoxesTransaction();
     
     protected Map<PerTxBox, Object> specPerTxBoxes = ReadWriteTransaction.EMPTY_MAP;
-    protected Cons<VBox> specReadSet = Cons.<VBox>empty();
     protected Map<VBox, Object> specWriteSet = ReadWriteTransaction.EMPTY_MAP;
     private TopLevelTransaction committer;
 
@@ -62,20 +61,6 @@ public class ProcessPerTxBoxesTransaction extends Transaction {
     public void finishExecution() {
 	Transaction.current.set(this.committer);
 	this.committer = null;
-    }
-    
-    public boolean speculativeReadSetStillValid() {
-	for (VBox vbox : specReadSet) {
-	    if (vbox.body.version > this.number) {
-		return false;
-	    }
-	}
-	return true;
-    }
-
-    protected <T> T readFromBody(VBox<T> vbox) {
-	specReadSet = specReadSet.cons(vbox);
-	return vbox.body.getBody(this.number).value;
     }
     
     protected <T> T getLocalValue(VBox<T> vbox) {
@@ -101,12 +86,12 @@ public class ProcessPerTxBoxesTransaction extends Transaction {
 	
         OwnershipRecord currentOwner = vbox.inplace.orec;
         if (currentOwner.version > 0 && currentOwner.version <= this.number) {
-            return readFromBody(vbox);
+            return vbox.body.getBody(this.number).value;
         } 
         
         value = getLocalValue(vbox);
         if (value == null) {
-            return readFromBody(vbox);
+            return vbox.body.getBody(this.number).value;
         }
 	
         return (value == ReadWriteTransaction.NULL_VALUE) ? null : value;

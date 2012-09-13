@@ -113,12 +113,11 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 	    // Failed enqueue, at least some other transaction succeeded in the meantime
 	    lastCheck = helpCommitAll();
 	    snapshotValidation(lastCheck.transactionNumber);
-	    // Check if perTxBoxes must be re-executed
-	    // TODO: check if it's worth to keep the spec read-set and do this verification, or just repeat the boxes anyway
-	    if(!commitTx.speculativeReadSetStillValid()) {
-		commitTx = speculatePerTxBoxes(lastCheck.transactionNumber);
-		writeSet.addPerTxBoxesWrites(commitTx.specWriteSet);
-	    }
+	    // Re-execute the perTxBoxes speculatively. They are supposed to be a point of contention, thus
+	    // any validation to check if previous speculative reads are still up-to-date should most of the time
+	    // lead to the conclusion that they are not. This way we avoid registering those reads and skip the validation.
+	    commitTx = speculatePerTxBoxes(lastCheck.transactionNumber);
+	    writeSet.addPerTxBoxesWrites(commitTx.specWriteSet);
 	    this.commitTxRecord = new ActiveTransactionsRecord(lastCheck.transactionNumber + 1, writeSet);
 	}
 
