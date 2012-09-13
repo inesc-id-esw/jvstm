@@ -103,20 +103,23 @@ public class TopLevelTransaction extends ReadWriteTransaction {
      * valid read state (which is // * the record previous to the
      * commitTxRecord)
      */
-    private void validateCommitAndEnqueue(ActiveTransactionsRecord lastValid) {
-	lastValid = validate(lastValid);
-	ProcessPerTxBoxesTransaction commitTx = speculatePerTxBoxes(lastValid.transactionNumber);
+    private void validateCommitAndEnqueue(ActiveTransactionsRecord lastCheck) {
+	ProcessPerTxBoxesTransaction commitTx = speculatePerTxBoxes(lastCheck.transactionNumber);
 	WriteSet writeSet = makeWriteSet();
 	writeSet.addPerTxBoxesWrites(commitTx.specWriteSet);
 	
-	this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
-	while (!lastValid.trySetNext(this.commitTxRecord)) {
-	    lastValid = validate(lastValid);
+	this.commitTxRecord = new ActiveTransactionsRecord(lastCheck.transactionNumber + 1, writeSet);
+	while (!lastCheck.trySetNext(this.commitTxRecord)) {
+	    // Failed enqueue, at least some other transaction succeeded in the meantime
+	    lastCheck = helpCommitAll();
+	    snapshotValidation(lastCheck.transactionNumber);
+	    // Check if perTxBoxes must be re-executed
+	    // TODO: check if it's worth to keep the spec read-set and do this verification, or just repeat the boxes anyway
 	    if(!commitTx.speculativeReadSetStillValid()) {
-		commitTx = speculatePerTxBoxes(lastValid.transactionNumber);
+		commitTx = speculatePerTxBoxes(lastCheck.transactionNumber);
 		writeSet.addPerTxBoxesWrites(commitTx.specWriteSet);
 	    }
-	    this.commitTxRecord = new ActiveTransactionsRecord(lastValid.transactionNumber + 1, writeSet);
+	    this.commitTxRecord = new ActiveTransactionsRecord(lastCheck.transactionNumber + 1, writeSet);
 	}
 
 	// At this point we no longer need the values we wrote in the VBox's
@@ -134,34 +137,10 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 	// upgradeTx(lastValid);
     }
 
-    /**
-     * Validates this read-set against all active transaction records more recent that the one
-     * <code>lastChecked</code>.
-     *
-     * @return The last successfully validated ActiveTransactionsRecord
-     * @throws CommitException if the validation fails
-     */
-    protected ActiveTransactionsRecord validate(ActiveTransactionsRecord startCheck) {
-    ActiveTransactionsRecord lastChecked = startCheck;
-	ActiveTransactionsRecord recordToCheck = lastChecked.getNext();
-
-	while (recordToCheck != null) {
-	    lastChecked = recordToCheck;
-	    recordToCheck = recordToCheck.getNext();
-	}
-	
-	if (lastChecked != startCheck) {
-		helpCommitAll();
-		snapshotValidation(lastChecked.transactionNumber);
-	}
-	return lastChecked;
-    }
-    
     @Override
     protected void tryCommit() {
 	if (isWriteTransaction()) {
 	    validate();
-	    // for now we don't support PerTxBoxes :-(
 	    ensureCommitStatus();
 	    upgradeTx(this.commitTxRecord);
 	}
@@ -178,12 +157,8 @@ public class TopLevelTransaction extends ReadWriteTransaction {
     protected void validate() {
 	ActiveTransactionsRecord lastSeenCommitted = helpCommitAll();
 	// if (isSnapshotValidationWorthIt(lastSeenCommitted)) {
-	snapshotValidation(lastSeenCommitted.transactionNumber); // this
-								 // validates up
-								 // to the last
-								 // seen
-								 // committed at
-								 // least
+	// this validates up to the last seen committed at least
+	snapshotValidation(lastSeenCommitted.transactionNumber); 
 	validateCommitAndEnqueue(lastSeenCommitted);
 	// } else {
 	// validateCommitAndEnqueue(this.activeTxRecord);

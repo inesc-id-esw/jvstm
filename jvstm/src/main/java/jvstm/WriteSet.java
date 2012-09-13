@@ -178,8 +178,10 @@ public final class WriteSet {
     }
 
     protected final void helpWriteBack(int newTxNumber) {
-	processBoxes(this.normalWriteSet, newTxNumber);
+	// It is important that this order or processing is preserved: perTxBoxes' commits' writes to VBoxes
+	// take precedence over the normal write set of the committing transaction
 	processBoxes(this.perTxBoxesWriteSet, newTxNumber);
+	processBoxes(this.normalWriteSet, newTxNumber);
 
 	// Writeback to arrays
 	// This uses locking, but locks are only used if the current transaction
@@ -258,7 +260,7 @@ public final class WriteSet {
 
 	Cons<GarbageCollectable> newBodies = Cons.empty();
 	VBox[] vboxes = boxesToCommit.allWrittenVBoxes;
-	Object[] values = boxesToCommit.allWrittenVBoxes;
+	Object[] values = boxesToCommit.allWrittenValues;
 	for (int i = min; i < max; i++) {
 	    VBox vbox = vboxes[i];
 	    Object newValue = values[i];
