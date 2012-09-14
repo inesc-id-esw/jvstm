@@ -296,7 +296,7 @@ public abstract class Transaction {
 		    results.add(futures.get(i).get());
 		} catch (ExecutionException ee) {
 		    Throwable t = ee.getCause();
-		    if (t instanceof WriteOnRootWriteSetException) {
+		    if (t instanceof ExecuteParallelNestedTxSequentiallyException) {
 			if (repeatList == null) {
 			    repeatList = new ArrayList<TransactionalTask<E>>();
 			}
