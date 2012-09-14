@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import jvstm.util.Cons;
 
 /**
- * Parallel Nested Transaction used to represent a part of a transaction that is
+ * Parallel Nested Transaction is used to represent a part of a transaction that is
  * running (potentially) in parallel with other subparts of the same
  * transaction. The programmer is responsible for identifying the parts of a
  * transaction that he wants to run concurrently. Consequently, those parts may
@@ -70,7 +70,7 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 
 	int[] parentVers = parent.ancVersions;
 	super.ancVersions = new int[parentVers.length + 1];
-	super.ancVersions[0] = parent.nestedVersion;
+	super.ancVersions[0] = parent.nestedCommitQueue.commitNumber;
 	for (int i = 0; i < parentVers.length; i++) {
 	    this.ancVersions[i + 1] = parentVers[i];
 	}
@@ -143,25 +143,11 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
     private void manualAbort() {
 	for (ParallelNestedTransaction mergedIntoParent : getRWParent().mergedTxs) {
 	    for (VBox vboxMergedIntoParent : mergedIntoParent.boxesWrittenInPlace) {
-		InplaceWrite inplaceWrite = vboxMergedIntoParent.inplace;
-		if (inplaceWrite.orec.owner == this && inplaceWrite.next != null) {
-		    InplaceWrite newWriteAtHead = inplaceWrite.next;
-		    while (newWriteAtHead.next != null && newWriteAtHead.next.orec.owner == this) {
-			newWriteAtHead = newWriteAtHead.next;
-		    }
-		    vboxMergedIntoParent.inplace = newWriteAtHead;
-		}
+		revertOverwrite(vboxMergedIntoParent);
 	    }
 	}
 	for (VBox vboxMergedIntoParent : getRWParent().boxesWrittenInPlace) {
-	    InplaceWrite inplaceWrite = vboxMergedIntoParent.inplace;
-	    if (inplaceWrite.orec.owner == this && inplaceWrite.next != null) {
-		InplaceWrite newWriteAtHead = inplaceWrite.next;
-		while (newWriteAtHead.next != null && newWriteAtHead.next.orec.owner == this) {
-		    newWriteAtHead = newWriteAtHead.next;
-		}
-		vboxMergedIntoParent.inplace = newWriteAtHead;
-	    }
+	    revertOverwrite(vboxMergedIntoParent);
 	}
 
 	this.orec.version = OwnershipRecord.ABORTED;
@@ -180,6 +166,25 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 	this.globalReads = null;
 	this.nestedReads = null;
 	super.mergedTxs = null;
+    }
+
+    protected void revertOverwrite(VBox vboxWritten) {
+	InplaceWrite write = vboxWritten.inplace;
+	if (write.orec.owner != this) {
+	    return;
+	}
+	InplaceWrite overwritten = write;
+	while (overwritten.next != null) {
+	    overwritten = overwritten.next;
+	    if (overwritten.orec.owner != this && overwritten.orec.version == OwnershipRecord.RUNNING) {
+		write.tempValue = overwritten.tempValue;
+		write.next = overwritten.next;
+		overwritten.orec.owner = overwritten.orec.owner; // enforce
+								 // visibility
+		write.orec = overwritten.orec;
+		return;
+	    }
+	}
     }
 
     protected <T> T readGlobal(VBox<T> vbox) {
@@ -257,13 +262,6 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 
     }
 
-    protected static final ThreadLocal<Integer> backoffTime = new ThreadLocal<Integer>() {
-	@Override
-	protected Integer initialValue() {
-	    return 1;
-	}
-    };
-
     @Override
     public <T> void setBoxValue(jvstm.VBox<T> vbox, T value) {
 	InplaceWrite<T> inplaceWrite = vbox.inplace;
@@ -287,8 +285,7 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 		// more recent than my number
 		break;
 	    } else {
-		int versionOnAnc = retrieveAncestorVersion(currentOwner.owner);
-		if (versionOnAnc >= 0) {
+		if (retrieveAncestorVersion(currentOwner.owner) >= 0) {
 		    if (vbox.CASinplace(inplaceWrite, new InplaceWrite<T>(this.orec, (value == null ? (T) NULL_VALUE : value),
 			    inplaceWrite))) {
 			return;
@@ -296,21 +293,8 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 		    inplaceWrite = vbox.inplace;
 		    currentOwner = inplaceWrite.orec;
 		    continue;
-		} else {
-		    Transaction abortUpTo = retrieveLowestCommonAncestor(currentOwner.owner);
-		    if (abortUpTo != null) {
-			manualAbort();
-			int sleepTime = backoffTime.get();
-			try {
-			    Thread.sleep(sleepTime);
-			} catch (InterruptedException e) {
-			}
-			backoffTime.set(sleepTime * 2);
-			throw new CommitException(abortUpTo);
-		    }
-		    // owner is not from this nesting tree
-		    break;
-		}
+		} 
+		break;
 	    }
 	}
 
@@ -319,71 +303,9 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
     }
 
     /*
-     * This behavior is different in the case of parallel nested transactions. A
-     * PerTxBox avoids reading VBoxes until commit time, to avoid concurrent
-     * writes invalidating the read and causing the abort of the transaction.
-     * However, in the case of parallel nested transactions, this issue may
-     * happen at all levels of nesting. Therefore, it is not clear when a
-     * PerTxBox should be committed: in a nested commit, or in the top-level?
-     * There are issues with both choices.
-     * 
-     * Therefore, the solution is the following: Allow reading PerTxValues from
-     * an ancestor if no sibling committed in the meantime. Moreover, accesses
-     * to the ancestors' perTxValues maps must be synchronized as the underlying
-     * map is not thread-safe. Additionally, at commit time, no sibling may have
-     * committed if this transaction read some PerTxValue from an ancestor.
-     * 
-     * In the cases in which we pessimistically guess that the transaction may
-     * have read an inconsistent PerTxValue from an ancestor (committed by some
-     * sibling), the parallel nested transaction aborts and is repeated by the
-     * root top level transaction ancestor sequentially (as in the fallback
-     * mechanism of parallel nesting).
-     */
-    protected boolean readAncestorPerTxValue = false;
-
-    @Override
-    protected <T> T getPerTxValue(PerTxBox<T> box) {
-	T value = null;
-	if (perTxValues != EMPTY_MAP) {
-	    value = (T) perTxValues.get(box);
-	    if (value != null) {
-		return value;
-	    }
-	}
-
-	ReadWriteTransaction iter = getRWParent();
-	while (iter != null) {
-	    synchronized (iter) {
-		if (iter.perTxValues == EMPTY_MAP) {
-		    iter = iter.getRWParent();
-		    continue;
-		}
-
-		value = (T) iter.perTxValues.get(box);
-	    }
-
-	    if (value != null) {
-		int versionOnAnc = retrieveAncestorVersion(iter);
-		if (iter.nestedVersion != versionOnAnc) {
-		    // A nested commit into this ancestor has taken place since
-		    // this transaction started. Thus we must pessimistically
-		    // assume that this read may not be consistent.
-		    manualAbort();
-		    throw EXECUTE_SEQUENTIALLY_EXCEPTION;
-		}
-		this.readAncestorPerTxValue = true;
-		return value;
-	    }
-
-	    iter = iter.getRWParent();
-	}
-
-	return value;
-    }
-
-    /*
-     * Here we ensure that the array read is consistent with concurrent nested
-     * commits
+     * VArrays:
+     * Here we ensure that the local array read over ancestors is consistent with concurrent nested commits
+     * This procedure is blocking, accordingly to the support provided to VArrays.
      */
     @Override
     protected <T> T getLocalArrayValue(VArrayEntry<T> entry) {
@@ -396,19 +318,21 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 
 	ReadWriteTransaction iter = getRWParent();
 	while (iter != null) {
-	    if (iter.arrayWrites != EMPTY_MAP) {
-		VArrayEntry<T> wsEntry = (VArrayEntry<T>) iter.arrayWrites.get(entry);
-		if (wsEntry == null) {
-		    iter = iter.getRWParent();
-		    continue;
-		}
+	    synchronized (iter) {
+		if (iter.arrayWrites != EMPTY_MAP) {
+		    VArrayEntry<T> wsEntry = (VArrayEntry<T>) iter.arrayWrites.get(entry);
+		    if (wsEntry == null) {
+			iter = iter.getRWParent();
+			continue;
+		    }
 
-		if (wsEntry.nestedVersion <= retrieveAncestorVersion(iter)) {
-		    this.arraysRead = this.arraysRead.cons(entry);
-		    entry.setReadOwner(iter);
-		    return (wsEntry.getWriteValue() == null ? (T) NULL_VALUE : wsEntry.getWriteValue());
-		} else {
-		    throw new CommitException(iter);
+		    if (wsEntry.nestedVersion <= retrieveAncestorVersion(iter)) {
+			this.arraysRead = this.arraysRead.cons(entry);
+			entry.setReadOwner(iter);
+			return (wsEntry.getWriteValue() == null ? (T) NULL_VALUE : wsEntry.getWriteValue());
+		    } else {
+			throw new CommitException(iter);
+		    }
 		}
 	    }
 	    iter = iter.getRWParent();
@@ -417,6 +341,24 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 	return null;
     }
 
+    /*
+     * Both parallel nested transactions and perTxBoxes may be seen as alternatives to work 
+     * around inherently-conflicting workloads. An important question may be posed if we put 
+     * them together: when should a perTxBox be committed, if write by a parallel nested 
+     * transaction? Is it solving a conflict at top-level, or nested level of parallelism?
+     * 
+     * Should the need for perTxBoxes arise in parNesting, that question shall have to be addressed.
+     */
+    @Override
+    public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
+        throw new RuntimeException("Parallel Nested Transactions do not support PerTxBoxes");
+    }
+    
+    @Override
+    public <T> void setPerTxValue(PerTxBox<T> box, T value) {
+	throw new RuntimeException("Parallel Nested Transactions do not support PerTxBoxes");
+    }
+    
     @Override
     protected void finish() {
 	boxesWritten = null;
@@ -444,85 +386,46 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 
     }
 
+    protected NestedCommitRecord helpCommitAll(NestedCommitRecord start) {
+	NestedCommitRecord lastSeen = start;
+	NestedCommitRecord current = lastSeen.next.get();
+	while (current != null) {
+	    if (!current.recordCommitted) {
+		current.helpCommit();
+	    }
+	    lastSeen = current;
+	    current = current.next.get();
+	}
+	return lastSeen;
+    }
+
     @Override
     protected void tryCommit() {
 	ReadWriteTransaction parent = getRWParent();
-	synchronized (parent) {
+	NestedCommitRecord lastSeen;
+	NestedCommitRecord newCommit;
 
-	    snapshotValidation();
+	do {
+	    lastSeen = helpCommitAll(parent.nestedCommitQueue);
+	    snapshotValidation(lastSeen.commitNumber);
+	    Cons<VArrayEntry<?>> varrayReadsToPropagate = validateNestedArrayReads();
+	    newCommit = new NestedCommitRecord(this, this.mergedTxs, parent.mergedTxs, varrayReadsToPropagate, arrayWrites, arrayWritesCount, lastSeen.commitNumber + 1);
+	} while (!lastSeen.next.compareAndSet(null, newCommit));
 
-	    // Validate array reads and propagate them to the parent. Only a
-	    // subset is propagated.
-	    // At this point this transaction can no longer fail, thus the
-	    // propagation is correct.
-	    parent.arraysRead = validateNestedArrayReads();
-
-	    // Support for PerTxBoxes
-	    if (readAncestorPerTxValue) {
-		// If some concurrent commit took place into the parent in the
-		// meantime, the reads over perTxValues from ancestors may have
-		// been made stale. For this reason, we have to pessimistically
-		// abort this transaction and execute it sequentially.
-		if (retrieveAncestorVersion(parent) != parent.nestedVersion) {
-		    manualAbort();
-		    throw EXECUTE_SEQUENTIALLY_EXCEPTION;
-		}
-
-		// Pessimistically make all ancestors do this verification
-		if (parent instanceof ParallelNestedTransaction) {
-		    ((ParallelNestedTransaction) parent).readAncestorPerTxValue = true;
-		}
+	lastSeen = parent.nestedCommitQueue;
+	while ((lastSeen != null) && (lastSeen.commitNumber <= newCommit.commitNumber)) {
+	    if (!lastSeen.recordCommitted) {
+		lastSeen.helpCommit();
+		parent.nestedCommitQueue = lastSeen;
 	    }
-
-	    int commitVersion = parent.nestedVersion + 1;
-	    orec.nestedVersion = commitVersion;
-	    orec.owner = parent;
-	    Cons<ParallelNestedTransaction> txsAlreadyMerged = parent.mergedTxs.cons(this);
-	    for (ParallelNestedTransaction mergedTx : mergedTxs) {
-		mergedTx.orec.nestedVersion = commitVersion;
-		mergedTx.orec.owner = parent;
-		txsAlreadyMerged = txsAlreadyMerged.cons(mergedTx);
-	    }
-	    parent.mergedTxs = txsAlreadyMerged;
-
-	    if (parent.perTxValues == EMPTY_MAP) {
-		parent.perTxValues = perTxValues;
-	    } else {
-		parent.perTxValues.putAll(perTxValues);
-	    }
-
-	    if (parent.arrayWrites == EMPTY_MAP) {
-		parent.arrayWrites = arrayWrites;
-		parent.arrayWritesCount = arrayWritesCount;
-		for (VArrayEntry<?> entry : arrayWrites.values()) {
-		    entry.nestedVersion = commitVersion;
-		}
-	    } else {
-		// Propagate arrayWrites and correctly update the parent's
-		// arrayWritebacks counter
-		for (VArrayEntry<?> entry : arrayWrites.values()) {
-		    // Update the array write entry nested version
-		    entry.nestedVersion = commitVersion;
-
-		    if (parent.arrayWrites.put(entry, entry) != null)
-			continue;
-
-		    // Count number of writes to the array
-		    Integer writeCount = parent.arrayWritesCount.get(entry.array);
-		    if (writeCount == null)
-			writeCount = 0;
-		    parent.arrayWritesCount.put(entry.array, writeCount + 1);
-		}
-	    }
-
-	    // volatile write
-	    parent.nestedVersion++;
+	    lastSeen = lastSeen.next.get();
 	}
-	backoffTime.set(1);
+
     }
 
-    protected void snapshotValidation() {
-	if (retrieveAncestorVersion(parent) == ((ReadWriteTransaction) parent).nestedVersion) {
+    @Override
+    protected void snapshotValidation(int lastSeenNumber) {
+	if (retrieveAncestorVersion(parent) == lastSeenNumber) {
 	    return;
 	}
 
@@ -613,22 +516,22 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 	for (VArrayEntry<?> entry : arraysRead) {
 
 	    // If the read was performed on an ancestor of the parent, then
-	    // propagate it
-	    // for further validation
+	    // propagate it for further validation
 	    if (entry.owner != parent) {
 		parentArrayReads = parentArrayReads.cons(entry);
 	    }
 
-	    if (parentArrayWrites != EMPTY_MAP) {
-		// Verify if the parent contains a more recent write for the
-		// read that we performed
-		// somewhere in our ancestors
-		VArrayEntry<?> parentWrite = parentArrayWrites.get(entry);
-		if (parentWrite == null) {
-		    continue;
-		}
-		if (parentWrite.nestedVersion > maxVersionOnParent) {
-		    throw new CommitException(parent);
+	    synchronized (parent) {
+		if (parentArrayWrites != EMPTY_MAP) {
+		    // Verify if the parent contains a more recent write for the
+		    // read that we performed somewhere in our ancestors
+		    VArrayEntry<?> parentWrite = parentArrayWrites.get(entry);
+		    if (parentWrite == null) {
+			continue;
+		    }
+		    if (parentWrite.nestedVersion > maxVersionOnParent) {
+			throw new CommitException(parent);
+		    }
 		}
 	    }
 	}

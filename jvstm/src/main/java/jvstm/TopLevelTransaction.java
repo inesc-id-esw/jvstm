@@ -153,8 +153,8 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 	}
 	
 	if (lastChecked != startCheck) {
-		helpCommitAll();
-		snapshotValidation(lastChecked.transactionNumber);
+	    helpCommitAll();
+	    snapshotValidation(lastChecked.transactionNumber);
 	}
 	return lastChecked;
     }

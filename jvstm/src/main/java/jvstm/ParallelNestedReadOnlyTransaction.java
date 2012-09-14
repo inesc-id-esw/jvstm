@@ -25,6 +25,8 @@
  */
 package jvstm;
 
+import jvstm.util.Cons;
+
 /**
  * Parallel Nested Transaction that may only abort when reading a VBoxBody. This
  * means that if it only reads RAWs, then it necessarily commits.
@@ -54,25 +56,21 @@ public class ParallelNestedReadOnlyTransaction extends ParallelNestedTransaction
     @Override
     protected void tryCommit() {
 	ReadWriteTransaction parent = getRWParent();
-	synchronized (parent) {
-	    // Support for PerTxBoxes
-	    if (readAncestorPerTxValue) {
-		// If some concurrent commit took place into the parent in the
-		// meantime, the reads over perTxValues from ancestors may have
-		// been made stale. For this reason, we have to pessimistically
-		// abort this transaction and execute it sequentially.
-		if (retrieveAncestorVersion(parent) != parent.nestedVersion) {
-		    throw EXECUTE_SEQUENTIALLY_EXCEPTION;
-		}
+	Cons<ParallelNestedTransaction> currentOrecs;
+	Cons<ParallelNestedTransaction> modifiedOrecs;
 
-		// Pessimistically make all ancestors do this verification
-		if (parent instanceof ParallelNestedTransaction) {
-		    ((ParallelNestedTransaction) parent).readAncestorPerTxValue = true;
-		}
+	do {
+	    currentOrecs = parent.mergedTxs;
+	    modifiedOrecs = currentOrecs.cons(this);
+	    for (ParallelNestedTransaction child : mergedTxs) {
+		modifiedOrecs = modifiedOrecs.cons(child);
 	    }
+	} while (!parent.CASmergedTxs(currentOrecs, modifiedOrecs));
 
-	    parent.mergedTxs = parent.mergedTxs.cons(this);
-	    parent.arraysRead = this.arraysRead.reverseInto(parent.arraysRead);
+	if (!this.arraysRead.isEmpty()) {
+	    synchronized (parent) {
+		parent.arraysRead = this.arraysRead.reverseInto(parent.arraysRead);
+	    }
 	}
     }
 
@@ -144,6 +142,11 @@ public class ParallelNestedReadOnlyTransaction extends ParallelNestedTransaction
 	throw new WriteOnReadException();
     }
 
+    @Override
+    protected <T> T getPerTxValue(PerTxBox<T> box) {
+	throw new RuntimeException("Not implemented for NestedReadOnlyTransactions");
+    }
+    
     @Override
     public <T> void setPerTxValue(jvstm.PerTxBox<T> box, T value) {
 	throw new WriteOnReadException();

@@ -45,6 +45,7 @@ public class UnsafeParallelTransaction extends ParallelNestedTransaction {
     public UnsafeParallelTransaction(ReadWriteTransaction parent) {
 	super(parent, true);
 	this.parentOrec = parent.orec;
+	this.orec.owner = parent;
     }
 
     @Override
@@ -164,73 +165,64 @@ public class UnsafeParallelTransaction extends ParallelNestedTransaction {
 	    }
 	} while (true);
     }
-
+    
     @Override
-    protected <T> T getPerTxValue(PerTxBox<T> box) {
-	T value = null;
-	if (perTxValues != EMPTY_MAP) {
-	    value = (T) perTxValues.get(box);
-	    if (value != null) {
-		return value;
-	    }
-	}
-
+    public <T> void setArrayValue(VArrayEntry<T> entry, T value) {
 	ReadWriteTransaction parent = getRWParent();
 	synchronized (parent) {
-	    if (parent.perTxValues != EMPTY_MAP) {
-		value = (T) parent.perTxValues.get(box);
+	    if (parent.arrayWrites == EMPTY_MAP) {
+		parent.arrayWrites = new HashMap<VArrayEntry<?>, VArrayEntry<?>>();
+		parent.arrayWritesCount = new HashMap<VArray<?>, Integer>();
 	    }
+	    entry.setWriteValue(value, parent.nestedCommitQueue.commitNumber);
+	    if (parent.arrayWrites.put(entry, entry) != null)
+		return;
 
+	    // Count number of writes to the array
+	    Integer writeCount = parent.arrayWritesCount.get(entry.array);
+	    if (writeCount == null)
+		writeCount = 0;
+	    parent.arrayWritesCount.put(entry.array, writeCount + 1);
 	}
-
-	return value;
     }
-
+    
     @Override
     protected <T> T getLocalArrayValue(VArrayEntry<T> entry) {
-	if (this.arrayWrites != EMPTY_MAP) {
-	    VArrayEntry<T> wsEntry = (VArrayEntry<T>) this.arrayWrites.get(entry);
-	    if (wsEntry != null) {
+	ReadWriteTransaction parent = getRWParent();
+	synchronized (parent) {
+	    if (parent.arrayWrites != EMPTY_MAP) {
+		VArrayEntry<T> wsEntry = (VArrayEntry<T>) parent.arrayWrites.get(entry);
 		return (wsEntry.getWriteValue() == null ? (T) NULL_VALUE : wsEntry.getWriteValue());
 	    }
 	}
 
-	ReadWriteTransaction parent = getRWParent();
-	if (parent.arrayWrites != EMPTY_MAP) {
-	    VArrayEntry<T> wsEntry = (VArrayEntry<T>) parent.arrayWrites.get(entry);
-	    return (wsEntry.getWriteValue() == null ? (T) NULL_VALUE : wsEntry.getWriteValue());
-	}
-
 	return null;
     }
-
+    
     @Override
     protected void tryCommit() {
 	ReadWriteTransaction parent = getRWParent();
+	Cons<ParallelNestedTransaction> currentOrecs;
+	Cons<ParallelNestedTransaction> modifiedOrecs;
+
+	do {
+	    currentOrecs = parent.mergedTxs;
+	    modifiedOrecs = currentOrecs.cons(this);
+	} while (!parent.CASmergedTxs(currentOrecs, modifiedOrecs));
+
 	synchronized (parent) {
-	    int commitVersion = parent.nestedVersion;
-	    orec.nestedVersion = commitVersion;
-	    orec.owner = parent;
-	    Cons<ParallelNestedTransaction> txsAlreadyMerged = parent.mergedTxs.cons(this);
-
-	    if (parent.perTxValues == EMPTY_MAP) {
-		parent.perTxValues = perTxValues;
-	    } else {
-		parent.perTxValues.putAll(perTxValues);
-	    }
-
 	    if (parent.arrayWrites == EMPTY_MAP) {
 		parent.arrayWrites = arrayWrites;
 		parent.arrayWritesCount = arrayWritesCount;
 		for (VArrayEntry<?> entry : arrayWrites.values()) {
-		    entry.nestedVersion = commitVersion;
+		    entry.nestedVersion = parent.nestedCommitQueue.commitNumber;
 		}
 	    } else {
 		// Propagate arrayWrites and correctly update the parent's
 		// arrayWritebacks counter
 		for (VArrayEntry<?> entry : arrayWrites.values()) {
 		    // Update the array write entry nested version
-		    entry.nestedVersion = commitVersion;
+		    entry.nestedVersion = parent.nestedCommitQueue.commitNumber;
 
 		    if (parent.arrayWrites.put(entry, entry) != null)
 			continue;
@@ -242,9 +234,8 @@ public class UnsafeParallelTransaction extends ParallelNestedTransaction {
 		    parent.arrayWritesCount.put(entry.array, writeCount + 1);
 		}
 	    }
-
-	    parent.mergedTxs = txsAlreadyMerged;
 	}
+	    
 	Transaction.current.set(null);
     }
 
