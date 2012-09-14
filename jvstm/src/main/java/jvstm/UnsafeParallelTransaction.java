@@ -165,7 +165,7 @@ public class UnsafeParallelTransaction extends ParallelNestedTransaction {
 	    }
 	} while (true);
     }
-    
+
     @Override
     public <T> void setArrayValue(VArrayEntry<T> entry, T value) {
 	ReadWriteTransaction parent = getRWParent();
@@ -185,20 +185,24 @@ public class UnsafeParallelTransaction extends ParallelNestedTransaction {
 	    parent.arrayWritesCount.put(entry.array, writeCount + 1);
 	}
     }
-    
+
     @Override
     protected <T> T getLocalArrayValue(VArrayEntry<T> entry) {
-	ReadWriteTransaction parent = getRWParent();
-	synchronized (parent) {
-	    if (parent.arrayWrites != EMPTY_MAP) {
-		VArrayEntry<T> wsEntry = (VArrayEntry<T>) parent.arrayWrites.get(entry);
-		return (wsEntry.getWriteValue() == null ? (T) NULL_VALUE : wsEntry.getWriteValue());
+	ReadWriteTransaction iter = getRWParent();
+	while (iter != null) {
+	    synchronized (iter) {
+		if (iter.arrayWrites != EMPTY_MAP) {
+		    VArrayEntry<T> wsEntry = (VArrayEntry<T>) iter.arrayWrites.get(entry);
+		    if (wsEntry != null) {
+			return (wsEntry.getWriteValue() == null ? (T) NULL_VALUE : wsEntry.getWriteValue());
+		    }
+		}
 	    }
+	    iter = iter.getRWParent();
 	}
-
 	return null;
     }
-    
+
     @Override
     protected void tryCommit() {
 	ReadWriteTransaction parent = getRWParent();
@@ -210,32 +214,13 @@ public class UnsafeParallelTransaction extends ParallelNestedTransaction {
 	    modifiedOrecs = currentOrecs.cons(this);
 	} while (!parent.CASmergedTxs(currentOrecs, modifiedOrecs));
 
-	synchronized (parent) {
-	    if (parent.arrayWrites == EMPTY_MAP) {
-		parent.arrayWrites = arrayWrites;
-		parent.arrayWritesCount = arrayWritesCount;
-		for (VArrayEntry<?> entry : arrayWrites.values()) {
-		    entry.nestedVersion = parent.nestedCommitQueue.commitNumber;
-		}
-	    } else {
-		// Propagate arrayWrites and correctly update the parent's
-		// arrayWritebacks counter
-		for (VArrayEntry<?> entry : arrayWrites.values()) {
-		    // Update the array write entry nested version
-		    entry.nestedVersion = parent.nestedCommitQueue.commitNumber;
-
-		    if (parent.arrayWrites.put(entry, entry) != null)
-			continue;
-
-		    // Count number of writes to the array
-		    Integer writeCount = parent.arrayWritesCount.get(entry.array);
-		    if (writeCount == null)
-			writeCount = 0;
-		    parent.arrayWritesCount.put(entry.array, writeCount + 1);
-		}
+	if (!this.arraysRead.isEmpty()) {
+	    synchronized (parent) {
+		// the possible array writes are already placed in the parent
+		parent.arraysRead = this.arraysRead.reverseInto(parent.arraysRead);
 	    }
 	}
-	    
+
 	Transaction.current.set(null);
     }
 
