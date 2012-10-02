@@ -31,9 +31,10 @@ import java.lang.reflect.Field;
  * Simple class to obtain access to the {@link Unsafe} object.
  */
 public final class UtilUnsafe {
-    public static final sun.misc.Unsafe UNSAFE;
+    public static final sun.misc.Unsafe UNSAFE = getUnsafe();
 
-    static {
+    @SuppressWarnings("unchecked")
+    private static <UNSAFE> UNSAFE getUnsafe() {
         Object theUnsafe = null;
         Exception exception = null;
 
@@ -44,8 +45,8 @@ public final class UtilUnsafe {
             theUnsafe = f.get(uc);
         } catch (Exception e) { exception = e; }
 
-        UNSAFE = (sun.misc.Unsafe) theUnsafe;
-        if (UNSAFE == null) throw new Error("Could not obtain access to sun.misc.Unsafe", exception);
+        if (theUnsafe == null) throw new Error("Could not obtain access to sun.misc.Unsafe", exception);
+        return (UNSAFE) theUnsafe;
     }
 
     private UtilUnsafe() { }
