@@ -6,6 +6,9 @@
   <property name="build.dir" location="${dist.dir}/classes"/>
   <property name="src.dist.dir" location="src-dist"/>
   <property name="lib.dir" location="lib"/>
+  <property name="src.test.dir" location="src/test"/>  
+  <property name="build.test.dir"  location="target/test-classes"/>
+  <property name="build.test.reports" location="target/test-reports"/>
   <property name="dist.version" value="1.0-SNAPSHOT"/>
   <property name="jar.file" value="${dist.dir}/jvstm-${dist.version}.jar"/>
 
@@ -55,4 +58,41 @@
     <mkdir dir="${dist.dir}"/>
     <jar destfile="${jar.file}" basedir="${build.dir}"/>
   </target>
+
+  
+   <!--++++++++++ Targets Test ++++++++++-->
+      
+  <target name="compile-test" depends="compile" description="Compiles the test source" >
+  <mkdir dir="${build.test.dir}"/>
+    <javac  debug="true"
+            debugLevel="source"
+            srcdir="${src.test.dir}"
+            destdir="${build.test.dir}"
+            includeantruntime="true">
+      <classpath>
+        <pathelement location="${build.dir}"/>
+        <path refid="project.class.path" />
+      </classpath>
+    </javac>
+  </target>
+  
+  <target name="test" depends="compile-test" description="Runs the tests">
+    <mkdir dir="${build.test.reports}"/>
+    <junit printsummary="yes" haltonfailure="true" showoutput="true" >
+      <classpath>
+        <pathelement location="${build.dir}"/>
+        <pathelement location="${build.test.dir}"/>
+        <path refid="project.class.path" />
+      </classpath>
+      <formatter type="plain"/>
+      <batchtest fork="yes" todir="${build.test.reports}" >
+        <fileset dir="${src.test.dir}">
+            <include name="**/*Test*.java"/>
+        </fileset>
+        <formatter type="xml"/>
+        <formatter type="plain" usefile="false" />
+      </batchtest>
+    </junit>
+  </target>
+
 </project>
