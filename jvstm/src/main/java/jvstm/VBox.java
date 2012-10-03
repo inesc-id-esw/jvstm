@@ -108,7 +108,11 @@ public class VBox<E> {
         VBoxBody<E> existingBody = null;
         if (currentHead != null) {
             existingBody = currentHead.getBody(txNumber);
-            assert(existingBody == null || existingBody.version <= txNumber);
+            
+            // Commented by FMC@17-09-2012 => it causes a crash in JVM for 
+            // transactional classes that inherit fom the VBox and loaded 
+            // during the bootstrap.
+            // assert(existingBody == null || existingBody.version <= txNumber);
         }
 
         if (existingBody == null || existingBody.version < txNumber) {
