@@ -427,7 +427,7 @@ public abstract class Transaction {
 	this.number = number;
     }
 
-    protected void abortTx() {
+    public void abortTx() {
 	finishTx();
     }
 
@@ -449,7 +449,7 @@ public abstract class Transaction {
 	// intentionally empty
     }
 
-    protected SuspendedTransaction suspendTx() {
+    public SuspendedTransaction suspendTx() {
 	// remove the transaction from the thread
 	current.set(null);
 

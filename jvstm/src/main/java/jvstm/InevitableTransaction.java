@@ -86,7 +86,7 @@ public class InevitableTransaction extends TopLevelTransaction {
 
     // Also, InevitableTransactions cannot abort because their commit record as already been created
     @Override
-    protected void abortTx() {
+    public void abortTx() {
         commitTx(true);
         //throw new Error("An Inevitable transaction cannot abort.  I've committed it instead.");
     }

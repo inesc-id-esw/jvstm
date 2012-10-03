@@ -59,7 +59,7 @@ public class UnsafeParallelTransaction extends ParallelNestedTransaction {
     }
 
     @Override
-    protected void abortTx() {
+    public void abortTx() {
 	boxesWritten = null;
 	perTxValues = null;
 

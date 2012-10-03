@@ -110,7 +110,7 @@ public abstract class ReadWriteTransaction extends Transaction {
     }
 
     @Override
-    protected void abortTx() {
+    public void abortTx() {
 	this.orec.version = OwnershipRecord.ABORTED;
 	for (OwnershipRecord linearMergedOrec : linearNestedOrecs) {
 	    linearMergedOrec.version = OwnershipRecord.ABORTED;

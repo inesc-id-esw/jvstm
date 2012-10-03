@@ -68,7 +68,7 @@ public class UnsafeSingleThreadedTransaction extends Transaction {
     }
 
     @Override
-    protected void abortTx() {
+    public void abortTx() {
 	commitTx(true);
 	// throw new
 	// Error("An UnsafeSingleThreaded transaction cannot abort.  I've committed it instead.");

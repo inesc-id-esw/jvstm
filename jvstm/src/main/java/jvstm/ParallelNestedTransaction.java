@@ -133,7 +133,7 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
     }
 
     @Override
-    protected void abortTx() {
+    public void abortTx() {
 	if (this.orec.version != OwnershipRecord.ABORTED) {
 	    manualAbort();
 	}

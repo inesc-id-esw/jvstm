@@ -61,7 +61,7 @@ public class NestedTransaction extends ReadWriteTransaction {
     }
 
     @Override
-    protected void abortTx() {
+    public void abortTx() {
 	// do not call super, we do not want to make the Orec of the ancestor
 	// aborted (at least not yet, it might happen depending on the nature 
 	// of the abort)
