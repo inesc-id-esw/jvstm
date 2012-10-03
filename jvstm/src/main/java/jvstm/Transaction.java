@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
+import java.util.logging.Logger;
 
 import jvstm.gc.GCTask;
 import jvstm.gc.TxContext;
@@ -75,14 +76,25 @@ public abstract class Transaction {
 
     // List of all tx contexts.  The GC thread will iterate this list to GC any unused ActiveTxRecords.
     public static TxContext allTxContexts = null;
+    public static final GCTask gcTask; // added by FMC for unit test purpose
+    static final String GC_PROP = "jvstm.gc.disabled";
 
     static {
 	// initialize the allTxContexts
 	Transaction.allTxContexts = new TxContext(null);
+	
 	// start the GC thread.
-	Thread gc = new Thread(new GCTask(mostRecentCommittedRecord));
-	gc.setDaemon(true);
-	gc.start();
+        boolean gcDisabled = Boolean.getBoolean(GC_PROP);
+        String NEW_LINE = System.getProperty("line.separator");
+        Logger logger = Logger.getLogger("jvstm");
+        logger.info("********** GC vbodies = " + (gcDisabled? "OFF" : "ON"));
+        logger.info(" (turn " + (gcDisabled? "ON" : "OFF") + " in property: " + GC_PROP + ")" + NEW_LINE);
+        gcTask = new GCTask(mostRecentCommittedRecord);
+        if(!gcDisabled){
+            Thread gc = new Thread(gcTask);
+            gc.setDaemon(true);
+            gc.start();
+        }
     }
 
     private static TransactionFactory TRANSACTION_FACTORY = new DefaultTransactionFactory();

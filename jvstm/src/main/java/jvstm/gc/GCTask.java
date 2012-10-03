@@ -77,6 +77,20 @@ public class GCTask implements Runnable {
             }
         }
     }
+    
+    /**
+     * This method is used for unit tests purpose to force GC running and 
+     * convert objects to the CompactLayout, when using the AOM approach.
+     * In this case we should also have disabled the previous asynchronous 
+     * task through the VM property: -Djvstm.gc.disabled=true
+     */
+    public void runGc(){
+        ActiveTransactionsRecord rec = findOldestRecordInUse();
+        if (rec.transactionNumber > this.lastCleanedRecord.transactionNumber) {
+            new MultipleCleanTask(this.lastCleanedRecord, rec).run();
+            this.lastCleanedRecord = rec;
+        }
+    }
 
     // used to pass state between two calls of findOldestRecordUpTo()
     private TxContext oldestContext = null;
