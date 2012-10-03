@@ -27,21 +27,18 @@ package jvstm;
 
 import static jvstm.UtilUnsafe.UNSAFE;
 
-import java.lang.reflect.Field;
-
-
 public class InplaceWrite<T> {
+    /**
+     * Due to the JVSTM integration in Deuce, we must keep in a separate 
+     * class all constants initialized with Unasfe operations, otherwise
+     * the JVM may crash on the bootstrap when it loads a transactional
+     * class. 
+     */
+    private static class Offsets { 
 
-    // --- Setup to use Unsafe
-    private static final long ownerOffset;
-    static { // <clinit>
-	Field f = null;
-	try {
-	    f = InplaceWrite.class.getDeclaredField("orec");
-	} catch (java.lang.NoSuchFieldException e) {
-	    throw new RuntimeException(e);
-	}
-	ownerOffset = UNSAFE.objectFieldOffset(f);
+        // --- Setup to use Unsafe
+        private static final long ownerOffset = UtilUnsafe.objectFieldOffset(InplaceWrite.class, "orec");
+        
     }
 
     public OwnershipRecord orec;
@@ -61,7 +58,7 @@ public class InplaceWrite<T> {
     }
 
     protected boolean CASowner(OwnershipRecord prevOrec, OwnershipRecord newOrec) {
-	return UNSAFE.compareAndSwapObject(this, ownerOffset, prevOrec, newOrec);
+	return UNSAFE.compareAndSwapObject(this, Offsets.ownerOffset, prevOrec, newOrec);
     }
 
 }

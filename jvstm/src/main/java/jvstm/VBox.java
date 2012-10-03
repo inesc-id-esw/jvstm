@@ -31,24 +31,25 @@ import java.lang.reflect.Field;
 import static jvstm.UtilUnsafe.UNSAFE;
 
 public class VBox<E> {
-    // --- Setup to use Unsafe
-    private static final long bodyOffset;
-    private static final long inplaceOffset;
-    static { // <clinit>
-	Field f = null;
-	try {
-	    f = VBox.class.getDeclaredField("body");
-	} catch (java.lang.NoSuchFieldException e) {
-	    throw new RuntimeException(e);
-	}
-	bodyOffset = UNSAFE.objectFieldOffset(f);
+    
+    /**
+     * We moved here all VBox constants that are initialized with Unsafe operations, 
+     * due to the JVSTM integration in Deuce. 
+     * To support the JVSTM all the transactional classes are instrumented by the Deuce
+     * to inherit from the VBox class. Yet, if a transactional class is part of the JRE 
+     * it can be loaded during the bootstrap, but the JVM bootstrap does not allow the use of 
+     * Unsafe operations. 
+     * Once the original VBox implementation uses the Unsafe class in its static constructor 
+     * then any inherited class from VBox will perform also an unsafe operation when it is 
+     * loaded, which is forbidden by the JVM bootstrap. For this reason we moved all these 
+     * constants into a separate class.     
+     */
+    private static class Offsets {
 
-	try {
-	    f = VBox.class.getDeclaredField("inplace");
-	} catch (java.lang.NoSuchFieldException e) {
-	    throw new RuntimeException(e);
-	}
-	inplaceOffset = UNSAFE.objectFieldOffset(f);
+        // --- Setup to use Unsafe
+        static final long bodyOffset = UtilUnsafe.objectFieldOffset(VBox.class, "body");
+        static final long inplaceOffset = UtilUnsafe.objectFieldOffset(VBox.class, "inplace");
+
     }
 
     public VBoxBody<E> body;
@@ -123,7 +124,7 @@ public class VBox<E> {
      * Return the body that was actually kept.
      */
     private VBoxBody<E> CASbody(VBoxBody<E> expected, VBoxBody<E> newValue) {
-        if (UNSAFE.compareAndSwapObject(this, bodyOffset, expected, newValue)) {
+        if (UNSAFE.compareAndSwapObject(this, Offsets.bodyOffset, expected, newValue)) {
             return newValue;
         } else { // if the CAS failed the new value must already be there!
             return this.body.getBody(newValue.version);
@@ -131,7 +132,7 @@ public class VBox<E> {
     }
 
     protected boolean CASinplace(InplaceWrite<E> prevBackup, InplaceWrite<E> newBackup) {
-	return UNSAFE.compareAndSwapObject(this, inplaceOffset, prevBackup, newBackup);
+	return UNSAFE.compareAndSwapObject(this, Offsets.inplaceOffset, prevBackup, newBackup);
     }
 
     // in the future, if more than one subclass of body exists, we may

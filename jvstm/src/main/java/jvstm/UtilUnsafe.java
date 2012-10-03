@@ -50,4 +50,16 @@ public final class UtilUnsafe {
     }
 
     private UtilUnsafe() { }
+    
+    public static long objectFieldOffset(Class<?> klass, String fieldName){
+        Field f = null;
+        try {
+            f = klass.getDeclaredField(fieldName);
+        } catch (java.lang.NoSuchFieldException e) {
+            throw new RuntimeException(e);
+        }
+        return UNSAFE.objectFieldOffset(f);
+
+    }
+
 }

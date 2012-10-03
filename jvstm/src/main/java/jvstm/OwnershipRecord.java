@@ -27,8 +27,6 @@ package jvstm;
 
 import static jvstm.UtilUnsafe.UNSAFE;
 
-import java.lang.reflect.Field;
-
 /*
  * Each ReadWriteTransaction uses an instance of this class to represent that
  * it owns the write access to the temporary value of a given VBox in which it
@@ -72,30 +70,25 @@ public class OwnershipRecord {
     }
 
     protected boolean CASnestedVersion(int expectedNestedVersion, int newNestedVersion) {
-	return UNSAFE.compareAndSwapObject(this, nestedVersionOffset, expectedNestedVersion, newNestedVersion);
+	return UNSAFE.compareAndSwapObject(this, Offsets.nestedVersionOffset, expectedNestedVersion, newNestedVersion);
     }
 
     protected boolean CASowner(ReadWriteTransaction expectedOwner, ReadWriteTransaction newOwner) {
-	return UNSAFE.compareAndSwapObject(this, ownerOffset, expectedOwner, newOwner);
+	return UNSAFE.compareAndSwapObject(this, Offsets.ownerOffset, expectedOwner, newOwner);
     }
 
-    // --- Setup to use Unsafe
-    private static final long nestedVersionOffset;
-    private static final long ownerOffset;
-    static { // <clinit>
-	Field f = null;
-	try {
-	    f = OwnershipRecord.class.getDeclaredField("nestedVersion");
-	} catch (java.lang.NoSuchFieldException e) {
-	    throw new RuntimeException(e);
-	}
-	nestedVersionOffset = UNSAFE.objectFieldOffset(f);
+    /**
+     * Due to the JVSTM integration in Deuce, we must keep in a separate 
+     * class all constants initialized with Unasfe operations, otherwise 
+     * the JVM may crash on the bootstrap when it loads a transactional 
+     * class. 
+     */
+    private static class Offsets {
 
-	try {
-	    f = OwnershipRecord.class.getDeclaredField("owner");
-	} catch (java.lang.NoSuchFieldException e) {
-	    throw new RuntimeException(e);
-	}
-	ownerOffset = UNSAFE.objectFieldOffset(f);
+        // --- Setup to use Unsafe
+        private static final long nestedVersionOffset = UtilUnsafe.objectFieldOffset(OwnershipRecord.class, "nestedVersion");;
+        private static final long ownerOffset = UtilUnsafe.objectFieldOffset(OwnershipRecord.class, "owner");;
+
     }
+    
 }

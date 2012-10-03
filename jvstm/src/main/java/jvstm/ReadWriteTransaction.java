@@ -408,19 +408,20 @@ public abstract class ReadWriteTransaction extends Transaction {
 		|| (!arrayWrites.isEmpty()) || (perTxValues != null && !perTxValues.isEmpty());
     }
 
-    // --- Setup to use Unsafe
-    private static final long mergedTxsOffset;
-    static { // <clinit>
-	Field f = null;
-	try {
-	    f = ReadWriteTransaction.class.getDeclaredField("mergedTxs");
-	} catch (java.lang.NoSuchFieldException e) {
-	    throw new RuntimeException(e);
-	}
-	mergedTxsOffset = UNSAFE.objectFieldOffset(f);
+    /**
+     * Due to the JVSTM integration in Deuce, we must keep in a separate 
+     * class all constants initialized with Unasfe operations, otherwise 
+     * the JVM may crash on the bootstrap when it loads a transactional 
+     * class. 
+     */
+    private static class Offsets {
+
+        // --- Setup to use Unsafe
+        private static final long mergedTxsOffset = UtilUnsafe.objectFieldOffset(ReadWriteTransaction.class, "mergedTxs");
+
     }
 
     protected boolean CASmergedTxs(Cons<ParallelNestedTransaction> expectedMergedTxs, Cons<ParallelNestedTransaction> newMergedTxs) {
-	return UNSAFE.compareAndSwapObject(this, mergedTxsOffset, expectedMergedTxs, newMergedTxs);
+	return UNSAFE.compareAndSwapObject(this, Offsets.mergedTxsOffset, expectedMergedTxs, newMergedTxs);
     }
 }
