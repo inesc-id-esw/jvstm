@@ -106,14 +106,27 @@ public class InevitableTransaction extends TopLevelTransaction {
     // to validate against this one.
     @Override
     public <T> void setBoxValue(VBox<T> vbox, T value) {
-        if ((vbox.body != null) && (vbox.body.version == this.number)) {
-            vbox.body.value = value;
+        VBoxBody<T> body = vbox.body; 
+        if ((body != null) && (body.version == this.number)) {
+            /*
+             * If the head of the versioned history corresponds to the body
+             * created by this transaction then there is no chance of this 
+             * object being reverted.
+             */
+            body.value = value;
         } else {
-            VBoxBody<T> newBody = VBox.makeNewBody(value, number, vbox.body);
-            if (vbox.body != null) { // smf: I guess that a null body this means that the VBox was created during this tx
-                this.vboxesWrittenBack = this.vboxesWrittenBack.cons(vbox);
+            VBoxBody<T> newBody;
+            if(body == null){
+                newBody = VBox.makeNewBody(value, number, vbox instanceof VBoxAom? new VBoxBody<T>(vbox.replicate(), 0, null) : null);
+            }else{
+                newBody = VBox.makeNewBody(value, number, body);
             }
-            vbox.body = newBody;
+            this.vboxesWrittenBack = this.vboxesWrittenBack.cons(vbox);
+            /* 
+             * We must prevent from concurrent reversions
+             * The following CAS of the VBoxAom retries if the object has been reverted. 
+             */
+            vbox.CASbody(body, newBody); // vbox.body = newBody;
         }
     }
 

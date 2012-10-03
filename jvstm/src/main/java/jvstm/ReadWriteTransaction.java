@@ -181,10 +181,10 @@ public abstract class ReadWriteTransaction extends Transaction {
 	return null;
     }
 
-    private <T> T readFromBody(VBox<T> vbox) {
+    protected <T> T readFromBody(VBox<T> vbox) {
         VBoxBody<T> body = vbox.body;
 
-        if (body.version > number) {
+        if (body!= null && body.version > number) {
             // signal early transaction abort
             throw EARLYABORT_EXCEPTION;
         }
@@ -198,8 +198,16 @@ public abstract class ReadWriteTransaction extends Transaction {
             readset = bodiesRead.first();
         }
         readset[next--] = vbox;
-        return body.value;
+        if(body == null)
+            /*
+             * The object (vbox) is in the compact layout (of the AOM) and the 
+             * vbox itself corresponds to the most recent committed version.  
+             */
+            return (T) vbox;
+        else
+            return body.value;
     }
+
 
     @Override
     public <T> T getBoxValue(VBox<T> vbox) {
@@ -356,9 +364,10 @@ public abstract class ReadWriteTransaction extends Transaction {
 	    // the first may not be full
 	    VBox[] array = bodiesRead.first();
 	    for (int i = next + 1; i < array.length; i++) {
-		if (array[i].body.version > myNumber) {
-		    throw COMMIT_EXCEPTION;
-		}
+	        VBoxBody body = array[i].body;
+	        if (body != null && body.version > myNumber) {
+	            throw COMMIT_EXCEPTION;
+	        }
 	    }
 
 	    // the rest are full
@@ -376,8 +385,9 @@ public abstract class ReadWriteTransaction extends Transaction {
 		// the first may not be full
 		VBox[] array = mergedTx.globalReads.first().entries;
 		for (int i = mergedTx.next + 1; i < array.length; i++) {
-		    if (array[i].body.version > myNumber) {
-			throw COMMIT_EXCEPTION;
+		    VBoxBody body = array[i].body;
+		    if (body != null && body.version > myNumber) {
+		        throw COMMIT_EXCEPTION;
 		    }
 		}
 

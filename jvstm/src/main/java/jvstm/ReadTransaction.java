@@ -50,7 +50,16 @@ public class ReadTransaction extends Transaction {
     }
 
     public <T> T getBoxValue(VBox<T> vbox) {
-        return vbox.body.getBody(number).value;
+        VBoxBody<T> vbody = vbox.body;
+        /*
+         * Due to the AOM approach we must check if the vbox.vbody is null.
+         * In that case the object is in the compact layout and the own vbox 
+         * corresponds to most recent committed version.
+         */
+        if(vbody == null)
+            return (T) vbox; // object in compact layout.
+        else 
+            return vbody.getBody(number).value;
     }
 
     public <T> void setBoxValue(VBox<T> vbox, T value) {

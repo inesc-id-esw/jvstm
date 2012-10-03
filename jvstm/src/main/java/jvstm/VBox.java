@@ -25,9 +25,6 @@
  */
 package jvstm;
 
-import java.lang.reflect.Field;
-
-
 import static jvstm.UtilUnsafe.UNSAFE;
 
 public class VBox<E> {
@@ -44,7 +41,7 @@ public class VBox<E> {
      * loaded, which is forbidden by the JVM bootstrap. For this reason we moved all these 
      * constants into a separate class.     
      */
-    private static class Offsets {
+    static class Offsets {
 
         // --- Setup to use Unsafe
         static final long bodyOffset = UtilUnsafe.objectFieldOffset(VBox.class, "body");
@@ -52,6 +49,12 @@ public class VBox<E> {
 
     }
 
+    /**
+     * This is a special auxiliary type to distinguish the overloaded constructor
+     * that is required by the VBoxAom class. 
+     */
+    protected static class AOMMarker {}
+    
     public VBoxBody<E> body;
     protected InplaceWrite<E> inplace = new InplaceWrite<E>();
 
@@ -63,6 +66,18 @@ public class VBox<E> {
         put(initial);
     }
 
+    /**
+     * This is a specific constructor required by the VBoxAom class.
+     * Any transactional class defined in the AOM (Adaptive Object Metadata)
+     * should inherit from VBoxAom, which in turn inherits from VBox, and 
+     * should initialize the versioned history with null, corresponding 
+     * to the compact layout. 
+     */
+    protected VBox(AOMMarker x) {
+        body = null;
+    }
+
+    
     // used for persistence support
     protected VBox(VBoxBody<E> body) {
         this.body = body;
@@ -127,7 +142,7 @@ public class VBox<E> {
      *
      * Return the body that was actually kept.
      */
-    private VBoxBody<E> CASbody(VBoxBody<E> expected, VBoxBody<E> newValue) {
+    protected VBoxBody<E> CASbody(VBoxBody<E> expected, VBoxBody<E> newValue) {
         if (UNSAFE.compareAndSwapObject(this, Offsets.bodyOffset, expected, newValue)) {
             return newValue;
         } else { // if the CAS failed the new value must already be there!
@@ -145,4 +160,19 @@ public class VBox<E> {
     public static <T> VBoxBody<T> makeNewBody(T value, int version, VBoxBody<T> next) {
         return new VBoxBody<T>(value, version, next);
     }
+
+    /*===========================================================================*
+     *~~~~~~~~~~~~~     METHODS of the AOM approach     ~~~~~~~~~~~~~~~~~~~~~~~~~*
+     *===========================================================================*/
+
+    private static final String ILLEGAL_AOM_USE = "this method is part of the AOM (Adaptive Object Metadata) approach and " +
+        "should be overriden by VBox inherited classes.";
+
+    public E replicate(){
+        throw new UnsupportedOperationException("Illegal use of the replicate method - " + ILLEGAL_AOM_USE);
+    }
+    public void toCompactLayout(E from){
+        throw new UnsupportedOperationException("Illegal use of the toCompactLayout method - " + ILLEGAL_AOM_USE);
+    }
+
 }
