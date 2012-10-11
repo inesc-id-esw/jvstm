@@ -169,16 +169,19 @@ public abstract class ReadWriteTransaction extends Transaction {
 
     protected <T> T getLocalValue(VBox<T> vbox) {
 	InplaceWrite<T> inplace = vbox.inplace;
-	while (inplace != null) {
-	    if (inplace.orec.owner == this) {
-		return inplace.tempValue;
-	    }
-	    inplace = inplace.next;
+	if (inplace.orec.owner == this) {
+	    return inplace.tempValue;
 	}
+
+	T value = null;
 	if (boxesWritten != EMPTY_MAP) {
-	    return (T) boxesWritten.get(vbox);
+	    value = (T)boxesWritten.get(vbox);
 	}
-	return null;
+	if ((value == null) && (parent != null)) {
+	    value = getRWParent().getLocalValue(vbox);
+	}
+
+        return value;
     }
 
     protected <T> T readFromBody(VBox<T> vbox) {
