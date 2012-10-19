@@ -42,8 +42,6 @@ public class NestedCommitRecord {
     protected final int commitNumber;
     protected volatile boolean recordCommitted = false;
 
-    public static final NestedCommitRecord NESTED_SENTINEL_RECORD = new NestedCommitRecord();
-
     public NestedCommitRecord() {
 	this.committer = null;
 	this.childrenToPropagate = Cons.empty();
@@ -77,7 +75,7 @@ public class NestedCommitRecord {
 	    currentParentOrecs = currentParentOrecs.cons(committer);
 	    for (ParallelNestedTransaction childrenCommit : childrenToPropagate) {
 		childrenCommit.orec.nestedVersion = commitNumber;
-		committer.orec.owner = parent;
+		childrenCommit.orec.owner = parent;
 		currentParentOrecs = currentParentOrecs.cons(childrenCommit);
 	    }
 	    

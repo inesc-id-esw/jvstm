@@ -51,7 +51,7 @@ public abstract class ReadWriteTransaction extends Transaction {
 	}
     };
 
-    private static void returnToPool(VBox[] array) {
+    protected static void returnToPool(VBox[] array) {
 	pool.set(pool.get().cons(array));
     }
 
@@ -79,7 +79,7 @@ public abstract class ReadWriteTransaction extends Transaction {
     protected Cons<OwnershipRecord> linearNestedOrecs = Cons.empty();
     protected int[] ancVersions;
 
-    protected volatile NestedCommitRecord nestedCommitQueue = NestedCommitRecord.NESTED_SENTINEL_RECORD;
+    protected volatile NestedCommitRecord nestedCommitQueue = new NestedCommitRecord();
 
     public ReadWriteTransaction(int number) {
 	super(number);

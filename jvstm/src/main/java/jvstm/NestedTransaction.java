@@ -78,6 +78,14 @@ public class NestedTransaction extends ReadWriteTransaction {
 	    mergedTx.orec.version = OwnershipRecord.ABORTED;
 	}
 	
+	// give the read set arrays, which were used exclusively by this nested or its children, back to the thread pool
+	Cons<VBox[]> parentArrays = this.getRWParent().bodiesRead;
+	Cons<VBox[]> myArrays = this.bodiesRead;
+	while (myArrays != parentArrays) {
+	    returnToPool(myArrays.first());
+	    myArrays = myArrays.rest();
+	}
+	
 	bodiesRead = null;
 	boxesWritten = null;
 	boxesWrittenInPlace = null;
