@@ -1,46 +1,16 @@
 ---
 layout: page
-title: Hello World!
-tagline: Supporting tagline
+title: JVSTM
+tagline: Java Versioned STM
 ---
 {% include JB/setup %}
 
-Read [Jekyll Quick Start](http://jekyllbootstrap.com/usage/jekyll-quick-start.html)
+The JVSTM (Java Versioned STM) is a Java library implementing our approach to STM (Software Transactional Memory), which introduces the concept of versioned boxes.
 
-Complete usage and documentation available at: [Jekyll Bootstrap](http://jekyllbootstrap.com)
+The Java Versioned Software Transactional Memory (JVSTM) is a pure Java library implementing an STM \[[1](#ref1)\]. JVSTM introduces the concept of versioned boxes \[[2](#ref2)\], which are transactional locations that may be read and written during
+transactions, much in the same way of other STMs, except that they keep the history of values written to them by any committed transaction.
 
-## Update Author Attributes
+\[<a id="ref1">1</a>\] Cachopo, J.: Development of Rich Domain Models with Atomic Actions. Ph.D. thesis, Technical University of Lisbon (2007)
 
-In `_config.yml` remember to specify your own data:
-    
-    title : My Blog =)
-    
-    author :
-      name : Name Lastname
-      email : blah@email.test
-      github : username
-      twitter : username
-
-The theme should reference these variables whenever needed.
-    
-## Sample Posts
-
-This blog contains sample posts which help stage pages and blog data.
-When you don't need the samples anymore just delete the `_posts/core-samples` folder.
-
-    $ rm -rf _posts/core-samples
-
-Here's a sample "posts list".
-
-<ul class="posts">
-  {% for post in site.posts %}
-    <li><span>{{ post.date | date_to_string }}</span> &raquo; <a href="{{ BASE_PATH }}{{ post.url }}">{{ post.title }}</a></li>
-  {% endfor %}
-</ul>
-
-## To-Do
-
-This theme is still unfinished. If you'd like to be added as a contributor, [please fork](http://github.com/plusjade/jekyll-bootstrap)!
-We need to clean up the themes, make theme usage guides with theme-specific markup examples.
-
-
+\[<a id="ref2">2</a>\] Cachopo, J., Rito-Silva, A.: Versioned boxes as the basis for memory transactions.
+Science of Computer Programming 63(2), 172-185 (2006)
