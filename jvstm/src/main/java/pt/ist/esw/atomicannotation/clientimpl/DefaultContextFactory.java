@@ -23,14 +23,21 @@
  * 1000 - 029 Lisboa
  * Portugal
  */
-package jvstm.atomic;
+package pt.ist.esw.atomicannotation.clientimpl;
 
-import jvstm.Atomic;
+import jvstm.atomic.DefaultAtomicContext;
 
-public abstract class ContextFactory {
+import pt.ist.esw.atomicannotation.Atomic;
+import pt.ist.esw.atomicannotation.ContextFactory;
+import pt.ist.esw.atomicannotation.AtomicContext;
+
+public final class DefaultContextFactory extends ContextFactory {
 
     public static AtomicContext newContext(Atomic atomic) {
-        throw new RuntimeException("ContextFactories must override this method.");
+        if (atomic.readOnly()) return DefaultAtomicContext.FLATTEN_READONLY;
+        if (!atomic.canFail()) return DefaultAtomicContext.FLATTEN_READWRITE;
+        if (atomic.speculativeReadOnly()) return DefaultAtomicContext.READ_ONLY;
+        return DefaultAtomicContext.READ_WRITE;
     }
 
 }

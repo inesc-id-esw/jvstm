@@ -9,7 +9,7 @@ import java.util.concurrent.Executors;
 
 import arraytree.CustomPool.ForkWork;
 
-import jvstm.Atomic;
+import pt.ist.esw.atomicannotation.Atomic;
 import jvstm.CommitException;
 import jvstm.ParallelTask;
 import jvstm.Transaction;

@@ -28,11 +28,11 @@
   <target name="compile" description="Compiles the jvstm source">
     <mkdir dir="${build.dir}"/>
     <javac includeantruntime="false" srcdir="${src.dir}" destdir="${build.dir}" extdirs="${lib.dir}" target="1.5" debug="on"/>
-    <java classname="jvstm.atomic.GenerateAtomicInstance" fork="true">
+    <!--<java classname="jvstm.atomic.GenerateAtomicInstance" fork="true">
       <arg value="${build.dir}"/>
       <classpath refid="project.class.path"/>
-    </java>
-    <java classname="jvstm.atomic.ProcessAtomicAnnotations" fork="true">
+    </java>-->
+    <java classname="pt.ist.esw.atomicannotation.ProcessAtomicAnnotations" fork="true">
       <arg value="${build.dir}"/>
       <classpath refid="project.class.path"/>
     </java>

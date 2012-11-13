@@ -27,7 +27,8 @@ package jvstm.util;
 
 import jvstm.VBox;
 import jvstm.VBoxInt;
-import jvstm.Atomic;
+
+import pt.ist.esw.atomicannotation.Atomic;
 
 import java.util.AbstractCollection;
 import java.util.Collection;

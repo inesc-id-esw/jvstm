@@ -2,7 +2,7 @@ package simple;
 
 import java.util.List;
 
-import jvstm.Atomic;
+import pt.ist.esw.atomicannotation.Atomic;
 import jvstm.VBox;
 import jvstm.atomic.Combiner;
 import jvstm.atomic.ParNest;

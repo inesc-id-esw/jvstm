@@ -27,6 +27,8 @@ package jvstm.util;
 
 import jvstm.*;
 
+import pt.ist.esw.atomicannotation.Atomic;
+
 import java.lang.reflect.Array;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReferenceArray;

@@ -2,7 +2,7 @@
 import java.util.Set;
 import java.util.Iterator;
 
-import jvstm.Atomic;
+import pt.ist.esw.atomicannotation.Atomic;
 import jvstm.VBox;
 import jvstm.VBoxInt;
 

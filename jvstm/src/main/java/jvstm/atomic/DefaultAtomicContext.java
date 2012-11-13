@@ -32,6 +32,8 @@ import jvstm.EarlyAbortException;
 import jvstm.Transaction;
 import jvstm.WriteOnReadException;
 
+import pt.ist.esw.atomicannotation.AtomicContext;
+
 public enum DefaultAtomicContext implements AtomicContext {
 
     FLATTEN_READONLY(true, true),
