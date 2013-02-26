@@ -102,11 +102,11 @@
     </repositories>
 
     <dependencies>
-        <dependency>
-            <groupId>org.ow2.asm</groupId>
-            <artifactId>asm-debug-all</artifactId>
-            <version>4.0</version>
-        </dependency>
+        <!-- <dependency> -->
+        <!--     <groupId>org.ow2.asm</groupId> -->
+        <!--     <artifactId>asm-debug-all</artifactId> -->
+        <!--     <version>4.0</version> -->
+        <!-- </dependency> -->
         <dependency>
             <groupId>pt.ist.esw</groupId>
             <artifactId>atomic-annotation</artifactId>
