@@ -6,7 +6,7 @@
   <property name="build.dir" location="${dist.dir}/classes"/>
   <property name="src.dist.dir" location="src-dist"/>
   <property name="lib.dir" location="lib"/>
-  <property name="src.test.dir" location="src/test"/>  
+  <property name="src.test.dir" location="src/test/java"/>  
   <property name="build.test.dir"  location="target/test-classes"/>
   <property name="build.test.reports" location="target/test-reports"/>
   <property name="dist.version" value="1.0-SNAPSHOT"/>

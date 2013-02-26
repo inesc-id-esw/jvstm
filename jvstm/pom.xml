@@ -2,11 +2,21 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>jvstm</groupId>
-    <artifactId>jvstm</artifactId>
+    <artifactId>jvstm-lock-free</artifactId>
     <packaging>jar</packaging>
     <version>1.0-SNAPSHOT</version>
-    <name>jvstm</name>
+    <name>jvstm-lock-free</name>
     <url>http://web.ist.utl.pt/joao.cachopo/jvstm/</url>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <version.guice>2.0</version.guice>
+        <version.junit>4.10</version.junit>
+        <version.jwormbench>1.0</version.jwormbench>
+    </properties>
+
     <build>
         <plugins>
             <plugin>
@@ -26,6 +36,10 @@
             <id>inesc-id-esw-repository</id>
             <url>http://inesc-id-esw.github.com/maven-repo/</url>
         </repository>
+        <repository>
+            <id>local-repo</id>
+            <url>file://${basedir}/local-maven-repo</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -39,6 +53,24 @@
             <artifactId>atomic-annotation</artifactId>
             <version>1.0</version>
         </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>${version.junit}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>jwormbench</groupId>
+            <artifactId>jwormbench</artifactId>
+            <version>${version.jwormbench}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.google.inject</groupId>
+            <artifactId>guice</artifactId>
+            <version>${version.guice}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <distributionManagement>
@@ -51,6 +83,5 @@
             <url>https://fenix-ashes.ist.utl.pt/nexus/content/repositories/jvstm-snapshot</url>
         </snapshotRepository>
     </distributionManagement>
-
 
 </project>
