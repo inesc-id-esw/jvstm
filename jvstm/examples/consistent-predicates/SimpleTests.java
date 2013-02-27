@@ -2,7 +2,6 @@
 import java.util.Set;
 import java.util.Iterator;
 
-import jvstm.Atomic;
 import jvstm.VBox;
 import jvstm.VBoxInt;
 
@@ -11,6 +10,8 @@ import jvstm.util.VLinkedSet;
 import jvstm.cps.ConsistencyException;
 import jvstm.cps.ConsistencyPredicate;
 import jvstm.cps.ConsistencyPredicateSystem;
+
+import pt.ist.esw.atomicannotation.Atomic;
 
 public class SimpleTests {
 
