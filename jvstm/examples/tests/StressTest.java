@@ -1,6 +1,7 @@
 import jvstm.*;
 import java.util.Random;
 import java.util.concurrent.*;
+import pt.ist.esw.atomicannotation.Atomic;
 
 public class StressTest {
 

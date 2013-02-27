@@ -1,4 +1,5 @@
 import jvstm.*;
+import pt.ist.esw.atomicannotation.Atomic;
 
 public class MonitorQueueTest {
 

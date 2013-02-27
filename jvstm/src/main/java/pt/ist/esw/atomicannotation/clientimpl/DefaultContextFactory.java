@@ -23,13 +23,21 @@
  * 1000 - 029 Lisboa
  * Portugal
  */
-package jvstm;
+package pt.ist.esw.atomicannotation.clientimpl;
 
-import java.lang.annotation.*;
+import jvstm.atomic.DefaultAtomicContext;
 
-@Target(ElementType.METHOD)
-public @interface Atomic { 
-    boolean readOnly() default false;
-    boolean canFail()  default true;
-    boolean speculativeReadOnly() default true;
+import pt.ist.esw.atomicannotation.Atomic;
+import pt.ist.esw.atomicannotation.ContextFactory;
+import pt.ist.esw.atomicannotation.AtomicContext;
+
+public final class DefaultContextFactory extends ContextFactory {
+
+    public static AtomicContext newContext(Atomic atomic) {
+        if (atomic.readOnly()) return DefaultAtomicContext.FLATTEN_READONLY;
+        if (!atomic.canFail()) return DefaultAtomicContext.FLATTEN_READWRITE;
+        if (atomic.speculativeReadOnly()) return DefaultAtomicContext.READ_ONLY;
+        return DefaultAtomicContext.READ_WRITE;
+    }
+
 }

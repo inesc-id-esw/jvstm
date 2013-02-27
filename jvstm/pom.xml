@@ -1,51 +1,87 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>jvstm</groupId>
-  <artifactId>jvstm</artifactId>
-  <packaging>jar</packaging>
-  <version>1.0-SNAPSHOT</version>
-  <name>jvstm</name>
-  <url>http://web.ist.utl.pt/joao.cachopo/jvstm/</url>
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>jvstm</groupId>
+    <artifactId>jvstm</artifactId>
+    <packaging>jar</packaging>
+    <version>1.1-SNAPSHOT</version>
+    <name>JVSTM lock-based</name>
+    <url>http://web.ist.utl.pt/joao.cachopo/jvstm/</url>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <version.maven.compiler-plugin>2.0.2</version.maven.compiler-plugin>
+        <version.maven.exec-plugin>1.2.1</version.maven.exec-plugin>
+    </properties>
+
     <build>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>2.0.2</version>
+                <version>${version.maven.compiler-plugin}</version>
                 <configuration>
-                    <source>1.5</source>
-                    <target>1.5</target>
+                    <source>1.6</source>
+                    <target>1.6</target>
                 </configuration>
             </plugin>
+
+            <!-- ProcessAtomicAnnotations immediatly after compiling -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>${version.maven.exec-plugin}</version>
+                <executions>
+                    <execution>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <mainClass>pt.ist.esw.atomicannotation.ProcessAtomicAnnotations</mainClass>
+                    <arguments>
+                        <argument>${project.build.outputDirectory}</argument>
+                    </arguments>
+                </configuration>
+            </plugin>
+
         </plugins>
     </build>
 
+    <repositories>
+        <repository>
+            <id>inesc-id-esw-repository</id>
+            <url>http://inesc-id-esw.github.com/maven-repo/</url>
+        </repository>
+        <repository>
+            <id>local-repo</id>
+            <url>file://${basedir}/local-maven-repo</url>
+        </repository>
+    </repositories>
+
     <dependencies>
-    <dependency>
-        <groupId>asm</groupId>
-        <artifactId>asm</artifactId>
-        <version>3.0</version>
-    </dependency>
+        <dependency>
+            <groupId>pt.ist.esw</groupId>
+            <artifactId>atomic-annotation</artifactId>
+            <version>1.0</version>
+        </dependency>
+    </dependencies>
 
-    <dependency>
-        <groupId>asm</groupId>
-        <artifactId>asm-commons</artifactId>
-        <version>3.0</version>
-    </dependency>
-
-  </dependencies>
-
-	<distributionManagement>
-	    <repository>
-	      <id>jvstm-release</id>
-	      <url>https://fenix-ashes.ist.utl.pt/nexus/content/repositories/jvstm-release</url>
-	    </repository>
-	    <snapshotRepository>
-	      <id>jvstm-snapshot</id>
-	      <url>https://fenix-ashes.ist.utl.pt/nexus/content/repositories/jvstm-snapshot</url>
-	    </snapshotRepository>
-	</distributionManagement>
+    <distributionManagement>
+        <repository>
+            <id>jvstm-release</id>
+            <url>https://fenix-ashes.ist.utl.pt/nexus/content/repositories/jvstm-release</url>
+        </repository>
+        <snapshotRepository>
+            <id>jvstm-snapshot</id>
+            <url>https://fenix-ashes.ist.utl.pt/nexus/content/repositories/jvstm-snapshot</url>
+        </snapshotRepository>
+    </distributionManagement>
 
 
 </project>

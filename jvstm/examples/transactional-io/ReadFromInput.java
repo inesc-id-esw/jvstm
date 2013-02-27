@@ -1,8 +1,9 @@
 import java.io.IOException;
 
-import jvstm.Atomic;
 import jvstm.util.TransactionalInputStream;
 import jvstm.VBox;
+
+import pt.ist.esw.atomicannotation.Atomic;
 
 class ReadFromInput {
     static VBox<Integer> counter = new VBox<Integer>(0);

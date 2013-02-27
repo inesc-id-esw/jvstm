@@ -25,6 +25,8 @@
  */
 package jvstm;
 
+import pt.ist.esw.atomicannotation.Atomic;
+
 public class VBoxInt extends VBox<Integer> {
 
     public VBoxInt() {
