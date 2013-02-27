@@ -9,6 +9,11 @@
     <name>JVSTM lock-based</name>
     <url>http://web.ist.utl.pt/joao.cachopo/jvstm/</url>
 
+    <scm>
+        <connection>scm:git:/afs/ist.utl.pt/groups/esw-inesc-id/git/esw</connection>
+        <developerConnection>scm:git:/afs/ist.utl.pt/groups/esw-inesc-id/git/esw</developerConnection>
+        <!-- <url>Should be a publicly browsable repository</url> -->
+    </scm>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
