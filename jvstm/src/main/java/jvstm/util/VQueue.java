@@ -25,21 +25,19 @@
  */
 package jvstm.util;
 
+import java.util.AbstractCollection;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.Queue;
+
+import jvstm.Atomic;
 import jvstm.VBox;
 import jvstm.VBoxInt;
 
-import pt.ist.esw.atomicannotation.Atomic;
-
-import java.util.AbstractCollection;
-import java.util.Collection;
-import java.util.Queue;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
-
-
 public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
-    private final VBox<Cons<E>> front = new VBox<Cons<E>>((Cons<E>)Cons.empty());
-    private final VBox<Cons<E>> rear = new VBox<Cons<E>>((Cons<E>)Cons.empty());
+    private final VBox<Cons<E>> front = new VBox<Cons<E>>((Cons<E>) Cons.empty());
+    private final VBox<Cons<E>> rear = new VBox<Cons<E>>((Cons<E>) Cons.empty());
     private final VBoxInt size = new VBoxInt(0);
 
     public VQueue() {
@@ -49,16 +47,19 @@ public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
         addAll(c);
     }
 
+    @Override
     public int size() {
         return size.getInt();
     }
 
+    @Override
     public boolean add(E o) {
         return offer(o);
     }
 
     // the Queue interface methods
 
+    @Override
     @Atomic(canFail = false)
     public boolean offer(E o) {
         Cons<E> frontElems = front.get();
@@ -73,6 +74,7 @@ public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
         return true;
     }
 
+    @Override
     @Atomic(canFail = false)
     public E poll() {
         Cons<E> frontElems = front.get();
@@ -83,6 +85,7 @@ public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
         }
     }
 
+    @Override
     @Atomic
     public E remove() {
         Cons<E> frontElems = front.get();
@@ -98,9 +101,9 @@ public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
         frontElems = frontElems.rest();
         if (frontElems.isEmpty()) {
             frontElems = rear.get().reverse();
-            if (! frontElems.isEmpty()) {
+            if (!frontElems.isEmpty()) {
                 // only clear the rear if it had anything
-                rear.put((Cons<E>)Cons.empty());
+                rear.put((Cons<E>) Cons.empty());
             }
         }
         front.put(frontElems);
@@ -108,6 +111,7 @@ public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
         return result;
     }
 
+    @Override
     @Atomic(readOnly = true)
     public E peek() {
         Cons<E> frontElems = front.get();
@@ -118,6 +122,7 @@ public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
         }
     }
 
+    @Override
     @Atomic(readOnly = true)
     public E element() {
         Cons<E> frontElems = front.get();
@@ -130,19 +135,22 @@ public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
 
     // override some methods with better performing implementations
 
+    @Override
     @Atomic(readOnly = true)
     public boolean contains(Object o) {
         return front.get().contains(o) || rear.get().contains(o);
     }
 
+    @Override
     public Iterator<E> iterator() {
         return new VQueueIterator<E>();
     }
 
+    @Override
     @Atomic(canFail = false)
     public void clear() {
-        front.put((Cons<E>)Cons.empty());
-        rear.put((Cons<E>)Cons.empty());
+        front.put((Cons<E>) Cons.empty());
+        rear.put((Cons<E>) Cons.empty());
         size.putInt(0);
     }
 
@@ -151,29 +159,32 @@ public class VQueue<E> extends AbstractCollection<E> implements Queue<E> {
         private Cons<T> rearElems;
 
         VQueueIterator() {
-            this.current = (Iterator<T>)VQueue.this.front.get().iterator();
-            this.rearElems = (Cons<T>)VQueue.this.rear.get();
+            this.current = (Iterator<T>) VQueue.this.front.get().iterator();
+            this.rearElems = (Cons<T>) VQueue.this.rear.get();
         }
-        
-        public boolean hasNext() { 
-            return current.hasNext() || (! rearElems.isEmpty());
+
+        @Override
+        public boolean hasNext() {
+            return current.hasNext() || (!rearElems.isEmpty());
         }
-        
+
+        @Override
         public T next() {
-            if (! current.hasNext()) {
-                if (! rearElems.isEmpty()) {
+            if (!current.hasNext()) {
+                if (!rearElems.isEmpty()) {
                     current = rearElems.reverse().iterator();
-                    rearElems = (Cons<T>)Cons.empty();
+                    rearElems = (Cons<T>) Cons.empty();
                 }
             }
 
-            if (! current.hasNext()) {
+            if (!current.hasNext()) {
                 throw new NoSuchElementException();
             } else {
                 return current.next();
             }
         }
-            
+
+        @Override
         public void remove() {
             throw new UnsupportedOperationException();
         }

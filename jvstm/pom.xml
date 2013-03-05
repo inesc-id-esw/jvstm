@@ -65,29 +65,61 @@
                 </configuration>
             </plugin>
 
-            <!-- ProcessAtomicAnnotations immediatly after compiling -->
+            <!-- Generate the AtomicInstance and ProcessAtomicAnnotations immediatly after compiling -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>${version.maven.exec-plugin}</version>
+                <!-- Generate AtomicInstance -->
                 <executions>
                     <execution>
+                        <id>generate-atomic-instance</id>
                         <phase>process-classes</phase>
                         <goals>
                             <goal>java</goal>
                         </goals>
+                        <configuration>
+                            <mainClass>pt.ist.esw.advice.GenerateAnnotationInstance</mainClass>
+                            <arguments>
+                                <argument>jvstm.Atomic</argument>
+                                <argument>${project.build.outputDirectory}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <!-- Process Atomic Annotations in the main code -->
+                    <execution>
+                        <id>process-annotations</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>pt.ist.esw.advice.ProcessAnnotations</mainClass>
+                            <arguments>
+                                <argument>jvstm.Atomic</argument>
+                                <argument>${project.build.outputDirectory}</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <!-- Process Atomic Annotations in the test code -->
+                    <execution>
+                        <id>process-test-annotations</id>
+                        <phase>process-test-classes</phase>
+                        <goals>
+                            <goal>java</goal>
+                        </goals>
+                        <configuration>
+                            <mainClass>pt.ist.esw.advice.ProcessAnnotations</mainClass>
+                            <arguments>
+                                <argument>jvstm.Atomic</argument>
+                                <argument>${project.build.testOutputDirectory}</argument>
+                            </arguments>
+                        </configuration>
                     </execution>
                 </executions>
-                <configuration>
-                    <mainClass>pt.ist.esw.atomicannotation.ProcessAtomicAnnotations</mainClass>
-                    <arguments>
-                        <argument>${project.build.outputDirectory}</argument>
-                    </arguments>
-                </configuration>
             </plugin>
 
         </plugins>
-
     </build>
 
     <repositories>
@@ -102,15 +134,10 @@
     </repositories>
 
     <dependencies>
-        <!-- <dependency> -->
-        <!--     <groupId>org.ow2.asm</groupId> -->
-        <!--     <artifactId>asm-debug-all</artifactId> -->
-        <!--     <version>4.0</version> -->
-        <!-- </dependency> -->
         <dependency>
             <groupId>pt.ist.esw</groupId>
-            <artifactId>atomic-annotation</artifactId>
-            <version>1.0</version>
+            <artifactId>advice</artifactId>
+            <version>1.2</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>

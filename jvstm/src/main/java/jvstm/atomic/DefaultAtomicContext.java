@@ -32,9 +32,9 @@ import jvstm.EarlyAbortException;
 import jvstm.Transaction;
 import jvstm.WriteOnReadException;
 
-import pt.ist.esw.atomicannotation.AtomicContext;
+import pt.ist.esw.advice.Advice;
 
-public enum DefaultAtomicContext implements AtomicContext {
+public enum DefaultAtomicContext implements Advice {
 
     FLATTEN_READONLY(true, true),
     FLATTEN_READWRITE(true, false),
@@ -50,7 +50,7 @@ public enum DefaultAtomicContext implements AtomicContext {
     }
 
     @Override
-    public final <V> V doTransactionally(Callable<V> method) throws Exception {
+    public final <V> V perform(Callable<V> method) throws Exception {
         boolean inTransaction = Transaction.isInTransaction();
         if (flattenTx && inTransaction) {
             return method.call();

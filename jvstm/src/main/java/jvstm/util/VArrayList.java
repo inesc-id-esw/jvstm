@@ -25,13 +25,20 @@
  */
 package jvstm.util;
 
-import jvstm.*;
-
-import pt.ist.esw.atomicannotation.Atomic;
-
 import java.lang.reflect.Array;
-import java.util.*;
+import java.util.AbstractList;
+import java.util.Collection;
+import java.util.Deque;
+import java.util.Iterator;
+import java.util.ListIterator;
+import java.util.NoSuchElementException;
+import java.util.RandomAccess;
 import java.util.concurrent.atomic.AtomicReferenceArray;
+
+import jvstm.Atomic;
+import jvstm.VArray;
+import jvstm.VBox;
+import jvstm.VBoxInt;
 
 /** Versioned ArrayList implementation. **/
 /* Lots of optimizations can still be done. Wherever a method's implementation
@@ -40,7 +47,11 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
 public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Deque<E> {
 
     private final VBox<VArray<E>> array;
-    private final VArray<E> array() { return array.get(); }
+
+    private final VArray<E> array() {
+        return array.get();
+    }
+
     private final VBoxInt size;
 
     public VArrayList() {
@@ -64,9 +75,9 @@ public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Dequ
     public boolean add(E e) {
         int size = size();
 
-        ensureCapacity(size+1);
+        ensureCapacity(size + 1);
         array().put(size, e);
-        this.size.putInt(size+1);
+        this.size.putInt(size + 1);
 
         return true;
     }
@@ -79,20 +90,22 @@ public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Dequ
             throw new IndexOutOfBoundsException();
         }
 
-        ensureCapacity(size+1);
+        ensureCapacity(size + 1);
         VArray<E> array = array();      // Must be done AFTER ensureCapacity!
 
-        for (int i = size-1; i >= index; i--) {
-            array.put(i+1, array.get(i));
+        for (int i = size - 1; i >= index; i--) {
+            array.put(i + 1, array.get(i));
         }
         array.put(index, element);
-        this.size.put(size+1);
+        this.size.put(size + 1);
     }
 
     @Override
     @Atomic(speculativeReadOnly = false)
     public boolean addAll(Collection<? extends E> c) {
-        if (c.size() == 0) return false;
+        if (c.size() == 0) {
+            return false;
+        }
 
         int size = size();
 
@@ -111,7 +124,9 @@ public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Dequ
     @Atomic(speculativeReadOnly = false)
     public boolean addAll(int index, Collection<? extends E> c) {
         int size = size();
-        if (index > size) throw new IndexOutOfBoundsException();
+        if (index > size) {
+            throw new IndexOutOfBoundsException();
+        }
 
         ensureCapacity(size + c.size());
         return super.addAll(index, c);
@@ -138,13 +153,18 @@ public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Dequ
 
     @Atomic
     public void ensureCapacity(int minCapacity) {
-        if (minCapacity <= array().length) return;
+        if (minCapacity <= array().length) {
+            return;
+        }
 
         // Calculate new size for array
         int minCapHighBit = Integer.highestOneBit(minCapacity);
         int newCapacity = minCapHighBit << 1;
-        if (newCapacity < 0) newCapacity = Integer.MAX_VALUE;
-        else if ((minCapacity & (minCapHighBit >> 1)) > 0) newCapacity += minCapHighBit;
+        if (newCapacity < 0) {
+            newCapacity = Integer.MAX_VALUE;
+        } else if ((minCapacity & (minCapHighBit >> 1)) > 0) {
+            newCapacity += minCapHighBit;
+        }
 
         resize(newCapacity);
     }
@@ -186,7 +206,9 @@ public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Dequ
 
     @Override
     public E get(int index) {
-        if (index >= size()) throw new IndexOutOfBoundsException();
+        if (index >= size()) {
+            throw new IndexOutOfBoundsException();
+        }
         return array().get(index);
     }
 
@@ -212,7 +234,9 @@ public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Dequ
     @Atomic(speculativeReadOnly = false)
     public E remove(int index) {
         int size = size();
-        if (index >= size) throw new IndexOutOfBoundsException();
+        if (index >= size) {
+            throw new IndexOutOfBoundsException();
+        }
 
         VArray<E> array = array();
         int newSize = size - 1;
@@ -220,7 +244,7 @@ public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Dequ
         E oldValue = array.get(index);
 
         for (int i = index; i < newSize; i++) {
-            array.put(i, array.get(i+1));
+            array.put(i, array.get(i + 1));
         }
         array.put(newSize, null);
         this.size.put(newSize);
@@ -262,7 +286,9 @@ public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Dequ
     @Override
     @Atomic(speculativeReadOnly = false)
     public E set(int index, E element) {
-        if (index >= size()) throw new IndexOutOfBoundsException();
+        if (index >= size()) {
+            throw new IndexOutOfBoundsException();
+        }
         VArray<E> array = array();
 
         E oldValue = array.get(index);
@@ -298,7 +324,9 @@ public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Dequ
             a[i] = (T) array.get(i);
         }
 
-        if (a.length > size) a[size] = null;
+        if (a.length > size) {
+            a[size] = null;
+        }
 
         return a;
     }
@@ -334,14 +362,18 @@ public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Dequ
     @Override
     @Atomic(readOnly = true)
     public E getFirst() {
-        if (isEmpty()) throw new NoSuchElementException();
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
         return peekFirst();
     }
 
     @Override
     @Atomic(readOnly = true)
     public E getLast() {
-        if (isEmpty()) throw new NoSuchElementException();
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
         return peekLast();
     }
 
@@ -380,7 +412,7 @@ public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Dequ
     @Atomic(readOnly = true)
     public E peekLast() {
         try {
-            return get(size()-1);
+            return get(size() - 1);
         } catch (IndexOutOfBoundsException e) {
             return null;
         }
@@ -404,7 +436,7 @@ public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Dequ
     @Atomic(speculativeReadOnly = false)
     public E pollLast() {
         try {
-            return remove(size()-1);
+            return remove(size() - 1);
         } catch (IndexOutOfBoundsException e) {
             return null;
         }
@@ -443,7 +475,7 @@ public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Dequ
     @Atomic(speculativeReadOnly = false)
     public E removeLast() {
         try {
-            return remove(size()-1);
+            return remove(size() - 1);
         } catch (IndexOutOfBoundsException e) {
             throw new NoSuchElementException();
         }
@@ -492,31 +524,34 @@ public class VArrayList<E> extends AbstractList<E> implements RandomAccess, Dequ
 
     public VArrayList(Iterator<? extends E> it) {
         this();
-        while (it.hasNext()) add(it.next());
+        while (it.hasNext()) {
+            add(it.next());
+        }
     }
 
     public E first() {
         return getFirst();
     }
 
-
     public E last() {
         return getLast();
     }
 
-    /** Returns an Iterable object, suitable for using with foreach to iterate
-      * over the current list in reverse order.
-      **/
+    /**
+     * Returns an Iterable object, suitable for using with foreach to iterate
+     * over the current list in reverse order.
+     **/
     public Iterable<E> reverseIteration() {
         return new ListIteratorReverser<E>(listIterator(size()));
     }
 
-   /** Returns a new list, with the same elements as the current list, but with
+    /**
+     * Returns a new list, with the same elements as the current list, but with
      * a reversed order.
      **/
-   @Atomic(readOnly = true)
-   public VArrayList<E> reversed() {
-       return new VArrayList<E>(descendingIterator());
-   }
+    @Atomic(readOnly = true)
+    public VArrayList<E> reversed() {
+        return new VArrayList<E>(descendingIterator());
+    }
 
 }
