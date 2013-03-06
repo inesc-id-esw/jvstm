@@ -1,6 +1,6 @@
 
 import jvstm.*;
-import pt.ist.esw.atomicannotation.Atomic;
+import jvstm.Atomic;
 
 public class SudokuSolver2 {
 

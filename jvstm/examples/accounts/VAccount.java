@@ -1,5 +1,5 @@
 import jvstm.*;
-import pt.ist.esw.atomicannotation.Atomic;
+import jvstm.Atomic;
 
 class VAccount implements Account {
     private VBox<Long> balance = new VBox<Long>();

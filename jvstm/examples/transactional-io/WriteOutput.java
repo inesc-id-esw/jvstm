@@ -24,7 +24,7 @@
  * Portugal
  */
 import jvstm.util.TransactionalOutputStream;
-import pt.ist.esw.atomicannotation.Atomic;
+import jvstm.Atomic;
 
 class WriteOutput {
     private static jvstm.VBox<Integer> box = new jvstm.VBox<Integer>(0);

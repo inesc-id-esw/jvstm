@@ -11,7 +11,7 @@ import jvstm.cps.ConsistencyException;
 import jvstm.cps.ConsistencyPredicate;
 import jvstm.cps.ConsistencyPredicateSystem;
 
-import pt.ist.esw.atomicannotation.Atomic;
+import jvstm.Atomic;
 
 public class SimpleTests {
 
