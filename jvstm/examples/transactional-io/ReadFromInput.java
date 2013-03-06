@@ -3,7 +3,7 @@ import java.io.IOException;
 import jvstm.util.TransactionalInputStream;
 import jvstm.VBox;
 
-import pt.ist.esw.atomicannotation.Atomic;
+import jvstm.Atomic;
 
 class ReadFromInput {
     static VBox<Integer> counter = new VBox<Integer>(0);
