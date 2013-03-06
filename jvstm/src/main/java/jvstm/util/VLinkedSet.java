@@ -25,19 +25,18 @@
  */
 package jvstm.util;
 
-import jvstm.VBox;
-import jvstm.VBoxInt;
-import pt.ist.esw.atomicannotation.Atomic;
-
+import java.lang.reflect.Array;
 import java.util.Collection;
-import java.util.Set;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+import java.util.Set;
 
-import java.lang.reflect.Array;
+import jvstm.Atomic;
+import jvstm.VBox;
+import jvstm.VBoxInt;
 
 public class VLinkedSet<E> implements Set<E> {
-    private final VBox<Cons<E>> entries = new VBox<Cons<E>>((Cons<E>)Cons.empty());
+    private final VBox<Cons<E>> entries = new VBox<Cons<E>>((Cons<E>) Cons.empty());
     private final VBoxInt size = new VBoxInt(0);
 
     public VLinkedSet() {
@@ -47,22 +46,27 @@ public class VLinkedSet<E> implements Set<E> {
         addAll(c);
     }
 
+    @Override
     public int size() {
         return size.getInt();
     }
 
+    @Override
     public boolean isEmpty() {
         return entries.get().isEmpty();
     }
 
+    @Override
     public boolean contains(Object o) {
         return entries.get().contains(o);
     }
 
+    @Override
     public Iterator<E> iterator() {
         return new VLinkedSetIterator<E>();
     }
 
+    @Override
     @Atomic(readOnly = true)
     public Object[] toArray() {
         int size = size();
@@ -77,13 +81,14 @@ public class VLinkedSet<E> implements Set<E> {
         return result;
     }
 
+    @Override
     @Atomic(readOnly = true)
     public <T> T[] toArray(T[] a) {
         int size = size();
         Cons<E> elems = entries.get();
 
         if (a.length < size) {
-            a = (T[])Array.newInstance(a.getClass().getComponentType(), size);
+            a = (T[]) Array.newInstance(a.getClass().getComponentType(), size);
         }
 
         Iterator<E> iter = elems.iterator();
@@ -99,6 +104,7 @@ public class VLinkedSet<E> implements Set<E> {
         return a;
     }
 
+    @Override
     @Atomic(canFail = false)
     public boolean add(E o) {
         Cons<E> oldElems = entries.get();
@@ -113,6 +119,7 @@ public class VLinkedSet<E> implements Set<E> {
         }
     }
 
+    @Override
     @Atomic(canFail = false)
     public boolean remove(Object o) {
         Cons<E> oldElems = entries.get();
@@ -127,11 +134,12 @@ public class VLinkedSet<E> implements Set<E> {
         }
     }
 
+    @Override
     public boolean containsAll(Collection<?> c) {
         Cons<E> elems = entries.get();
 
         for (Object o : c) {
-            if (! elems.contains(o)) {
+            if (!elems.contains(o)) {
                 return false;
             }
         }
@@ -139,6 +147,7 @@ public class VLinkedSet<E> implements Set<E> {
         return true;
     }
 
+    @Override
     @Atomic(canFail = false)
     public boolean addAll(Collection<? extends E> c) {
         Cons<E> prev = entries.get();
@@ -160,6 +169,7 @@ public class VLinkedSet<E> implements Set<E> {
         return added > 0;
     }
 
+    @Override
     @Atomic(canFail = false)
     public boolean retainAll(Collection<?> c) {
         Cons<E> result = Cons.empty();
@@ -183,6 +193,7 @@ public class VLinkedSet<E> implements Set<E> {
         return removed > 0;
     }
 
+    @Override
     @Atomic(canFail = false)
     public boolean removeAll(Collection<?> c) {
         Cons<E> prev = entries.get();
@@ -204,30 +215,33 @@ public class VLinkedSet<E> implements Set<E> {
         return removed > 0;
     }
 
+    @Override
     @Atomic(canFail = false)
     public void clear() {
-        entries.put((Cons<E>)Cons.empty());
+        entries.put((Cons<E>) Cons.empty());
         size.putInt(0);
     }
 
+    @Override
     @Atomic(readOnly = true)
     public boolean equals(Object o) {
         if (o == this) {
             return true;
         }
 
-        if (! (o instanceof Set)) {
+        if (!(o instanceof Set)) {
             return false;
         }
 
-        Set<?> otherSet = (Set<?>)o;
+        Set<?> otherSet = (Set<?>) o;
         if (this.size() != otherSet.size()) {
             return false;
         }
 
         return containsAll(otherSet);
     }
-   
+
+    @Override
     @Atomic(readOnly = true)
     public int hashCode() {
         int value = 0;
@@ -250,7 +264,7 @@ public class VLinkedSet<E> implements Set<E> {
         if (oldElems != newElems) {
             entries.put(newElems);
             size.dec();
-        }        
+        }
     }
 
     private class VLinkedSetIterator<T> implements Iterator<T> {
@@ -258,14 +272,16 @@ public class VLinkedSet<E> implements Set<E> {
         private Cons<T> previous = null;
 
         VLinkedSetIterator() {
-            this.current = (Cons<T>)VLinkedSet.this.entries.get();
+            this.current = (Cons<T>) VLinkedSet.this.entries.get();
         }
-        
-        public boolean hasNext() { 
+
+        @Override
+        public boolean hasNext() {
             return (current != Cons.EMPTY);
         }
-        
-        public T next() { 
+
+        @Override
+        public T next() {
             if (current == Cons.EMPTY) {
                 throw new NoSuchElementException();
             } else {
@@ -275,7 +291,8 @@ public class VLinkedSet<E> implements Set<E> {
                 return result;
             }
         }
-            
+
+        @Override
         public void remove() {
             if (previous == null) {
                 throw new IllegalStateException();

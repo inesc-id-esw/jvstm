@@ -23,17 +23,21 @@
  * 1000 - 029 Lisboa
  * Portugal
  */
-package pt.ist.esw.atomicannotation.clientimpl;
+package jvstm.atomic;
 
-import jvstm.atomic.DefaultAtomicContext;
+import jvstm.Atomic;
+import pt.ist.esw.advice.Advice;
+import pt.ist.esw.advice.AdviceFactory;
 
-import pt.ist.esw.atomicannotation.Atomic;
-import pt.ist.esw.atomicannotation.ContextFactory;
-import pt.ist.esw.atomicannotation.AtomicContext;
+public final class AtomicAdviceFactory extends AdviceFactory<Atomic> {
 
-public final class DefaultContextFactory extends ContextFactory {
+    private static AdviceFactory<Atomic> instance = new AtomicAdviceFactory();
 
-    public static AtomicContext newContext(Atomic atomic) {
+    public static AdviceFactory<Atomic> getInstance() {
+            return instance;
+    }
+
+    public Advice newAdvice(Atomic atomic) {
         if (atomic.readOnly()) return DefaultAtomicContext.FLATTEN_READONLY;
         if (!atomic.canFail()) return DefaultAtomicContext.FLATTEN_READWRITE;
         if (atomic.speculativeReadOnly()) return DefaultAtomicContext.READ_ONLY;
