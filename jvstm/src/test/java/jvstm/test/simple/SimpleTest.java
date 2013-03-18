@@ -14,7 +14,7 @@ public class SimpleTest {
     @Atomic
     private void runAtomicMethod() {
         // if running within an atomic there is already a transaction
-        assertNotNull(jvstm.Transaction.current());
+        assertNotNull("Expected an existing transaction", jvstm.Transaction.current());
     }
 
 }

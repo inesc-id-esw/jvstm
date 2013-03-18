@@ -78,6 +78,7 @@
                         <configuration>
                             <mainClass>pt.ist.esw.advice.ProcessAnnotations</mainClass>
                             <arguments>
+                                <argument>-a</argument>
                                 <argument>jvstm.Atomic</argument>
                                 <argument>${project.build.outputDirectory}</argument>
                             </arguments>
@@ -93,6 +94,7 @@
                         <configuration>
                             <mainClass>pt.ist.esw.advice.ProcessAnnotations</mainClass>
                             <arguments>
+                                <argument>-a</argument>
                                 <argument>jvstm.Atomic</argument>
                                 <argument>${project.build.testOutputDirectory}</argument>
                             </arguments>
@@ -106,8 +108,8 @@
 
     <repositories>
         <repository>
-            <id>inesc-id-esw-repository</id>
-            <url>http://inesc-id-esw.github.com/maven-repo/</url>
+            <id>advice-repository</id>
+            <url>http://inesc-id-esw.github.com/advice/maven-repo/</url>
         </repository>
         <repository>
             <id>local-repo</id>
@@ -119,7 +121,7 @@
         <dependency>
             <groupId>pt.ist.esw</groupId>
             <artifactId>advice</artifactId>
-            <version>1.2</version>
+            <version>1.5</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
