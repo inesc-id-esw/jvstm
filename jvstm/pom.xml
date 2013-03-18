@@ -4,7 +4,7 @@
     <groupId>jvstm</groupId>
     <artifactId>jvstm-fenix</artifactId>
     <packaging>jar</packaging>
-    <version>1.3-SNAPSHOT</version>
+    <version>1.3</version>
     <name>JVSTM lock-based for Fenix</name>
     <url>http://web.ist.utl.pt/joao.cachopo/jvstm/</url>
 
