@@ -25,25 +25,40 @@
  */
 package jvstm;
 
-/**
- * This class should be abstract and must be instantiated and thrown by a
- * concrete implementation of the TransactionSignaller interface.
- */
-public abstract class CommitException extends RuntimeException {
-    private static final long serialVersionUID = 1L;
-    private final Transaction tx;
+public class DefaultTransactionSignaller extends TransactionSignaller {
 
-    protected CommitException() {
-	super();
-	this.tx = null;
+    private static class DefaultCommitException extends CommitException {
+        private static final long serialVersionUID = 1L;
+
+        public DefaultCommitException() {
+        }
+
+        public DefaultCommitException(Transaction tx) {
+            super(tx);
+        }
+
     }
 
-    protected CommitException(Transaction tx) {
-	this.tx = tx;
+    private static class DefaultEarlyAbortException extends EarlyAbortException {
+        private static final long serialVersionUID = 1L;
     }
 
-    public Transaction getTransactionCausedConflict() {
-	return this.tx;
+    private static final CommitException COMMIT_EXCEPTION = new DefaultCommitException();
+    private static final EarlyAbortException EARLYABORT_EXCEPTION = new DefaultEarlyAbortException();
+
+    @Override
+    public void signalCommitFail() {
+        throw COMMIT_EXCEPTION;
+    }
+
+    @Override
+    public void signalCommitFail(Transaction tx) {
+        throw new DefaultCommitException(tx);
+    }
+
+    @Override
+    public void signalEarlyAbort() {
+        throw EARLYABORT_EXCEPTION;
     }
 
 }

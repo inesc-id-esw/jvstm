@@ -45,8 +45,10 @@ package jvstm;
  * catch all occurrences of <code>Exception</code> and then discard
  * the exception.
  *
+ * This class should be abstract and must be instantiated and thrown by a
+ * concrete implementation of the TransactionSignaller interface.
  */
-public class EarlyAbortException extends CommitException {
+public abstract class EarlyAbortException extends CommitException {
     private static final long serialVersionUID = 1L;
     protected EarlyAbortException() { super(); }
 }

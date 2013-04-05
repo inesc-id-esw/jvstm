@@ -35,8 +35,6 @@ import java.util.Map;
 import jvstm.util.Cons;
 
 public abstract class ReadWriteTransaction extends Transaction {
-    protected static final CommitException COMMIT_EXCEPTION = new CommitException();
-    protected static final EarlyAbortException EARLYABORT_EXCEPTION = new EarlyAbortException();
 
     protected static final Object NULL_VALUE = new Object();
 
@@ -189,7 +187,7 @@ public abstract class ReadWriteTransaction extends Transaction {
 
         if (body!= null && body.version > number) {
             // signal early transaction abort
-            throw EARLYABORT_EXCEPTION;
+            TransactionSignaller.SIGNALLER.signalEarlyAbort();
         }
 
         VBox[] readset = null;
@@ -369,7 +367,7 @@ public abstract class ReadWriteTransaction extends Transaction {
 	    for (int i = next + 1; i < array.length; i++) {
 	        VBoxBody body = array[i].body;
 	        if (body != null && body.version > myNumber) {
-	            throw COMMIT_EXCEPTION;
+	            TransactionSignaller.SIGNALLER.signalCommitFail();
 	        }
 	    }
 
@@ -377,7 +375,7 @@ public abstract class ReadWriteTransaction extends Transaction {
 	    for (VBox[] ar : bodiesRead.rest()) {
 		for (int i = 0; i < ar.length; i++) {
 		    if (ar[i].body.version > myNumber) {
-			throw COMMIT_EXCEPTION;
+		        TransactionSignaller.SIGNALLER.signalCommitFail();
 		    }
 		}
 	    }
@@ -390,7 +388,7 @@ public abstract class ReadWriteTransaction extends Transaction {
 		for (int i = mergedTx.next + 1; i < array.length; i++) {
 		    VBoxBody body = array[i].body;
 		    if (body != null && body.version > myNumber) {
-		        throw COMMIT_EXCEPTION;
+		        TransactionSignaller.SIGNALLER.signalCommitFail();
 		    }
 		}
 
@@ -399,7 +397,7 @@ public abstract class ReadWriteTransaction extends Transaction {
 		    array = block.entries;
 		    for (int i = 0; i < array.length; i++) {
 			if (array[i].body.version > myNumber) {
-			    throw COMMIT_EXCEPTION;
+			    TransactionSignaller.SIGNALLER.signalCommitFail();
 			}
 		    }
 		}
@@ -409,7 +407,7 @@ public abstract class ReadWriteTransaction extends Transaction {
 	// VArray
 	for (VArrayEntry<?> entry : arraysRead) {
 	    if (!entry.validate()) {
-		throw ReadWriteTransaction.COMMIT_EXCEPTION;
+	        TransactionSignaller.SIGNALLER.signalCommitFail();
 	    }
 	}
     }

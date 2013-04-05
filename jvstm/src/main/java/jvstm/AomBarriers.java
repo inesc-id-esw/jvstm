@@ -190,7 +190,8 @@ public class AomBarriers {
             VBoxBody<T> body = ref.body;
 
             if (body!= null && body.version > txNumber) {
-                throw new CommitException();
+                TransactionSignaller.SIGNALLER.signalCommitFail();
+                throw new AssertionError("Impossible condition - Commit fail signalled!");
             }        
             if(body == null)
                 return ref.replicate();

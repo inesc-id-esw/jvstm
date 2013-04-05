@@ -190,7 +190,7 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
     protected <T> T readGlobal(VBox<T> vbox) {
 	VBoxBody<T> body = vbox.body;
 	if (body.version > number) {
-	    throw EARLYABORT_EXCEPTION;
+	    TransactionSignaller.SIGNALLER.signalEarlyAbort();
 	}
 
 	ReadBlock readBlock = null;
@@ -234,7 +234,7 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 		if (entryNestedVersion > versionOnAnc) {
 		    // eager w-r conflict, may restart immediately
 		    manualAbort();
-		    throw new CommitException(inplaceOrec.owner);
+		    TransactionSignaller.SIGNALLER.signalCommitFail(inplaceOrec.owner);
 		}
 		nestedReads.put(vbox, inplaceWrite);
 		return (value == NULL_VALUE) ? null : value;
@@ -331,7 +331,7 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 			entry.setReadOwner(iter);
 			return (wsEntry.getWriteValue() == null ? (T) NULL_VALUE : wsEntry.getWriteValue());
 		    } else {
-			throw new CommitException(iter);
+		        TransactionSignaller.SIGNALLER.signalCommitFail(iter);
 		    }
 		}
 	    }
@@ -467,7 +467,7 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 	    int maxVersion = retrieveAncestorVersion(iter.orec.owner);
 	    if (maxVersion >= 0) {
 		manualAbort();
-		throw new CommitException(iter.orec.owner);
+		TransactionSignaller.SIGNALLER.signalCommitFail(iter.orec.owner);
 	    }
 	    iter = iter.next;
 	} while (iter != null);
@@ -486,7 +486,7 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 		int maxVersion = retrieveAncestorVersion(iter.orec.owner);
 		if (maxVersion >= 0) {
 		    manualAbort();
-		    throw new CommitException(iter.orec.owner);
+		    TransactionSignaller.SIGNALLER.signalCommitFail(iter.orec.owner);
 		}
 		iter = iter.next;
 	    } while (iter != null);
@@ -501,7 +501,7 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 		    int maxVersion = retrieveAncestorVersion(iter.orec.owner);
 		    if (maxVersion >= 0) {
 			manualAbort();
-			throw new CommitException(iter.orec.owner);
+			TransactionSignaller.SIGNALLER.signalCommitFail(iter.orec.owner);
 		    }
 		    iter = iter.next;
 		} while (iter != null);
@@ -530,7 +530,7 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 			continue;
 		    }
 		    if (parentWrite.nestedVersion > maxVersionOnParent) {
-			throw new CommitException(parent);
+		        TransactionSignaller.SIGNALLER.signalCommitFail(parent);
 		    }
 		}
 	    }
