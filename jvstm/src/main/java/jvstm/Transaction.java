@@ -409,6 +409,16 @@ public abstract class Transaction {
     // of the world
     protected int number;
     protected final Transaction parent;
+    /*
+     * This orec identifies newly created objects by this transaction.
+     * We say these objects are in captured memory corresponding to memory
+     * allocated inside a transaction that cannot escape (i.e., is captured
+     * by) its allocating transaction.
+     * Later and before performing an STM barrier we can check if an object is
+     * in captured memory and in that case we can read or update it in place
+     * avoiding the STM barrier.
+     */
+    public final OwnershipRecord orecForNewObjects = new OwnershipRecord();
 
     public Transaction(Transaction parent, int number) {
 	this.parent = parent;
@@ -443,7 +453,7 @@ public abstract class Transaction {
 	finishTx();
     }
 
-    protected void commitTx(boolean finishAlso) {
+    public void commitTx(boolean finishAlso) {
 	doCommit();
 
 	if (finishAlso) {

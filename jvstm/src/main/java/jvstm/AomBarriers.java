@@ -138,7 +138,7 @@ public class AomBarriers {
             putInInevitableTrx(ref, newValue, fieldOffset);
     }
 
-    private static <T extends VBoxAom<T>> T getTarget(ReadWriteTransaction trx, T ref){
+    public static <T extends VBoxAom<T>> T getTarget(ReadWriteTransaction trx, T ref){
         /*
          * Check if the transaction trx is the current writer and owner of the
          * ref object.

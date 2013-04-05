@@ -39,7 +39,20 @@ public class VBoxAom<E> extends VBox<E>{
          */
         super(DEFAULT_MARKER);
     }
-    
+
+    /**
+     * In this case the object will be instantiated in captured memory,
+     * corresponding to memory  allocated inside a transaction that
+     * cannot escape (i.e., is captured by) its allocating transaction.
+     */
+    public VBoxAom(Transaction owner){
+        /**
+         * The super constructor will initialize the body with null,
+         * corresponding to the compact layout.
+         */
+        super(DEFAULT_MARKER, owner);
+    }
+
     /**
      * The correct constraint for T should be: T extends E & VBox<E>.
      * Yet, Java generics does not allow the previous constraint.

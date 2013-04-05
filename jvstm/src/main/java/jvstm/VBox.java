@@ -56,13 +56,14 @@ public class VBox<E> {
     protected static class AOMMarker {}
     
     public VBoxBody<E> body;
-    protected InplaceWrite<E> inplace = new InplaceWrite<E>();
+    protected InplaceWrite<E> inplace;
 
     public VBox() {
         this((E)null);
     }
     
     public VBox(E initial) {
+        inplace = new InplaceWrite<E>();
         put(initial);
     }
 
@@ -74,13 +75,27 @@ public class VBox<E> {
      * to the compact layout. 
      */
     protected VBox(AOMMarker x) {
+        inplace = new InplaceWrite<E>();
         body = null;
     }
 
-    
+    /**
+     * In this case the object will be instantiated in captured memory,
+     * corresponding to memory  allocated inside a transaction that
+     * cannot escape (i.e., is captured by) its allocating transaction.
+     */
+    protected VBox(AOMMarker x, Transaction owner) {
+        inplace = new InplaceWrite<E>(owner);
+        body = null;
+    }
+
     // used for persistence support
     protected VBox(VBoxBody<E> body) {
         this.body = body;
+    }
+
+    public OwnershipRecord getOrec(){
+        return inplace.orec;
     }
 
     public E get() {

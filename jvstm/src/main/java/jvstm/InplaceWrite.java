@@ -51,6 +51,12 @@ public class InplaceWrite<T> {
 	this.next = null;
     }
 
+    public InplaceWrite(Transaction trx) {
+        this.orec = trx.orecForNewObjects;
+        this.tempValue = null;
+        this.next = null;
+    }
+
     public InplaceWrite(OwnershipRecord owner, T tempValue, InplaceWrite<T> next) {
 	this.orec = owner;
 	this.tempValue = tempValue;
