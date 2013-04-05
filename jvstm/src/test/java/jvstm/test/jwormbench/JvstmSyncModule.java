@@ -1,7 +1,6 @@
 package jvstm.test.jwormbench;
 
-import jvstm.Transaction;
-
+import jwormbench.factories.ICoordinateFactory;
 import jwormbench.factories.INodeFactory;
 import jwormbench.factories.IStepFactory;
 
@@ -12,7 +11,7 @@ public class JvstmSyncModule extends AbstractModule{
   static{
     //
     // Print number of aborted transactions
-    // 
+    //
       /*
     Runtime.getRuntime().addShutdownHook(new Thread() {
       public void run() {
@@ -26,8 +25,14 @@ public class JvstmSyncModule extends AbstractModule{
     bind(IStepFactory.class)
     .to(JvstmStepFactory.class)
     .in(Singleton.class);
+
     bind(INodeFactory.class)
     .to(JvstmBenchNodeFactory.class)
     .in(Singleton.class);
+
+    bind(ICoordinateFactory.class)
+    .to(JvstmCoordinateFactory.class)
+    .in(Singleton.class);
+
   }
 }
