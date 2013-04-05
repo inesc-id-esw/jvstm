@@ -261,7 +261,13 @@ public final class WriteSet {
 	Cons<GarbageCollectable> newBodies = Cons.empty();
 	VBox[] vboxes = boxesToCommit.allWrittenVBoxes;
 	Object[] values = boxesToCommit.allWrittenValues;
-	for (int i = min; i < max; i++) {
+    /*
+     * We inverted the write-back loop to keep a direct correspondence between the vboxes array
+     * and the cons of vbodies.
+     * !!!! ATENTION => this is a requirement for the versioned history reversion process of
+     * the AOM (adaptive object metadata).
+     */
+    for (int i = max - 1; i >= min; i--) {
 	    VBox vbox = vboxes[i];
 	    Object newValue = values[i];
 

@@ -29,7 +29,7 @@ import static jvstm.UtilUnsafe.UNSAFE;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 
 import jvstm.util.Cons;
@@ -275,7 +275,7 @@ public abstract class ReadWriteTransaction extends Transaction {
 		     // greater than ours and either abort or try to upgrade the
 		     // transaction
 		if (boxesWritten == EMPTY_MAP) {
-		    boxesWritten = new HashMap<VBox, Object>();
+		    boxesWritten = new IdentityHashMap<VBox, Object>();
 		}
 		boxesWritten.put(vbox, value == null ? NULL_VALUE : value);
 		return; // break
@@ -307,7 +307,7 @@ public abstract class ReadWriteTransaction extends Transaction {
     @Override
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
 	if (perTxValues == EMPTY_MAP) {
-	    perTxValues = new HashMap<PerTxBox, Object>();
+	    perTxValues = new IdentityHashMap<PerTxBox, Object>();
 	}
 	perTxValues.put(box, value);
     }
@@ -340,8 +340,8 @@ public abstract class ReadWriteTransaction extends Transaction {
     @Override
     public <T> void setArrayValue(VArrayEntry<T> entry, T value) {
 	if (arrayWrites == EMPTY_MAP) {
-	    arrayWrites = new HashMap<VArrayEntry<?>, VArrayEntry<?>>();
-	    arrayWritesCount = new HashMap<VArray<?>, Integer>();
+	    arrayWrites = new IdentityHashMap<VArrayEntry<?>, VArrayEntry<?>>();
+	    arrayWritesCount = new IdentityHashMap<VArray<?>, Integer>();
 	}
 	entry.setWriteValue(value, this.nestedCommitQueue.commitNumber);
 	if (arrayWrites.put(entry, entry) != null)
@@ -374,7 +374,8 @@ public abstract class ReadWriteTransaction extends Transaction {
 	    // the rest are full
 	    for (VBox[] ar : bodiesRead.rest()) {
 		for (int i = 0; i < ar.length; i++) {
-		    if (ar[i].body.version > myNumber) {
+            VBoxBody body = ar[i].body;
+            if (body != null && body.version > myNumber) {
 		        TransactionSignaller.SIGNALLER.signalCommitFail();
 		    }
 		}
@@ -396,7 +397,8 @@ public abstract class ReadWriteTransaction extends Transaction {
 		for (ReadBlock block : mergedTx.globalReads.rest()) {
 		    array = block.entries;
 		    for (int i = 0; i < array.length; i++) {
-			if (array[i].body.version > myNumber) {
+                VBoxBody body = array[i].body;
+                if (body != null && body.version > myNumber) {
 			    TransactionSignaller.SIGNALLER.signalCommitFail();
 			}
 		    }

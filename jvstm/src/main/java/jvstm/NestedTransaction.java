@@ -25,7 +25,7 @@
  */
 package jvstm;
 
-import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 
 import jvstm.util.Cons;
@@ -136,7 +136,7 @@ public class NestedTransaction extends ReadWriteTransaction {
 		}
 	    } else {
 		if (boxesWritten == EMPTY_MAP) {
-		    boxesWritten = new HashMap<VBox, Object>();
+		    boxesWritten = new IdentityHashMap<VBox, Object>();
 		}
 		boxesWritten.put(vbox, value == null ? NULL_VALUE : value);
 		return;
@@ -197,7 +197,7 @@ public class NestedTransaction extends ReadWriteTransaction {
 		continue;
 	    } else {
 		if (parent.boxesWritten == EMPTY_MAP) {
-		    parent.boxesWritten = new HashMap<VBox, Object>();
+		    parent.boxesWritten = new IdentityHashMap<VBox, Object>();
 		}
 		parent.boxesWritten.put(vbox, value);
 	    }

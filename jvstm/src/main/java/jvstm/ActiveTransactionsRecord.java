@@ -276,7 +276,7 @@ public class ActiveTransactionsRecord {
      *===========================================================================*/
 
     static final String NEW_LINE = System.getProperty("line.separator");
-    static final String REVERSION_PROP = "jvstm.aom.reversion.disabled";
+    static final String REVERSION_PROP = "jvstm.aom.reversion";
     static final boolean REVERSION;
     // public static int nrOfCleans = 0;
     public static int nrOfReversions = 0;
@@ -291,7 +291,7 @@ public class ActiveTransactionsRecord {
                 }
             });
         Logger logger = Logger.getLogger("jvstm");
-        REVERSION = !Boolean.getBoolean(REVERSION_PROP);
+        REVERSION = Boolean.getBoolean(REVERSION_PROP);
         logger.info("********** AOM reversion = " + (REVERSION? "ON" : "OFF"));
         logger.info(" (turn " + (!REVERSION? "ON" : "OFF") + " in property: " + REVERSION_PROP + ")" + NEW_LINE);
     }

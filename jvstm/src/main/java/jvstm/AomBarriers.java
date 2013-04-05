@@ -171,6 +171,11 @@ public class AomBarriers {
 
     /*===========================================================================*
      *~~~~~~~~~~~~~   BARRIERS for INEVITABLE transactions   ~~~~~~~~~~~~~~~~~~~~*
+     * !!!! Regarding the use of AOM in Deuce, maybe we do not require
+     * InevitableTransactions when the barriers are accessed out of a transactional
+     * scope, because in Deuce we cannot invoke an STM barrier without a transaction.
+     * So in this case maybe we could update memory in place and without taking
+     * precautions to preserve consistency.
      *===========================================================================*/
 
     /**
