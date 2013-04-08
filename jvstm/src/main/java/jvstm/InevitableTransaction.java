@@ -41,7 +41,7 @@ import jvstm.util.Cons;
 public class InevitableTransaction extends TopLevelTransaction {
 
     private Cons<VBox> vboxesWrittenBack = Cons.empty();
-    
+
     public InevitableTransaction(ActiveTransactionsRecord activeRecord) {
         super(activeRecord);
     }
@@ -106,11 +106,11 @@ public class InevitableTransaction extends TopLevelTransaction {
     // to validate against this one.
     @Override
     public <T> void setBoxValue(VBox<T> vbox, T value) {
-        VBoxBody<T> body = vbox.body; 
+        VBoxBody<T> body = vbox.body;
         if ((body != null) && (body.version == this.number)) {
             /*
              * If the head of the versioned history corresponds to the body
-             * created by this transaction then there is no chance of this 
+             * created by this transaction then there is no chance of this
              * object being reverted.
              */
             body.value = value;
@@ -122,9 +122,9 @@ public class InevitableTransaction extends TopLevelTransaction {
                 newBody = VBox.makeNewBody(value, number, body);
             }
             this.vboxesWrittenBack = this.vboxesWrittenBack.cons(vbox);
-            /* 
+            /*
              * We must prevent from concurrent reversions
-             * The following CAS of the VBoxAom retries if the object has been reverted. 
+             * The following CAS of the VBoxAom retries if the object has been reverted.
              */
             vbox.CASbody(body, newBody); // vbox.body = newBody;
         }
@@ -133,7 +133,7 @@ public class InevitableTransaction extends TopLevelTransaction {
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
         throw new Error(getClass().getSimpleName() + " doesn't support PerTxBoxes yet");
     }
-    
+
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
         throw new Error(getClass().getSimpleName() + " doesn't support PerTxBoxes yet");
     }
@@ -142,7 +142,7 @@ public class InevitableTransaction extends TopLevelTransaction {
     protected WriteSet makeWriteSet() {
         return new WriteSet(vboxesWrittenBack);
     }
-    
+
     @Override
     protected void tryCommit() {
         // we know we're valid and we're already enqueued. just set the writeset

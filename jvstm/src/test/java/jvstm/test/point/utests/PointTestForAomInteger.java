@@ -7,7 +7,7 @@ import jvstm.test.point.impl.AomIntegerPointFactory;
 public class PointTestForAomInteger extends TestPoint<Integer>{
 
     public PointTestForAomInteger() {
-	super(new AomIntegerPointFactory());
+        super(new AomIntegerPointFactory());
     }
 
 }

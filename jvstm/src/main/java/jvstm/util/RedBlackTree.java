@@ -28,7 +28,7 @@ package jvstm.util;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-public class RedBlackTree<E extends Comparable<? super E>> implements Iterable<E> { 
+public class RedBlackTree<E extends Comparable<? super E>> implements Iterable<E> {
     private static final boolean RED = true;
     private static final boolean BLACK = false;
 
@@ -75,21 +75,21 @@ public class RedBlackTree<E extends Comparable<? super E>> implements Iterable<E
             }
         }
     }
-    
+
     private RedBlackTree<E> lbalance(boolean color, E elem, RedBlackTree<E> left, RedBlackTree<E> right) {
         if (color == BLACK) {
             if ((left != EMPTY) && (left.color == RED)) {
                 if (left.left.color == RED) {
-                    return new RedBlackTree<E>(RED, 
-                                               left.elem, 
-                                               new RedBlackTree<E>(BLACK, left.left.elem, left.left.left, left.left.right), 
+                    return new RedBlackTree<E>(RED,
+                                               left.elem,
+                                               new RedBlackTree<E>(BLACK, left.left.elem, left.left.left, left.left.right),
                                                new RedBlackTree<E>(BLACK, elem, left.right, right));
                 }
 
                 if (left.right.color == RED) {
-                    return new RedBlackTree<E>(RED, 
-                                               left.right.elem, 
-                                               new RedBlackTree<E>(BLACK, left.elem, left.left, left.right.left), 
+                    return new RedBlackTree<E>(RED,
+                                               left.right.elem,
+                                               new RedBlackTree<E>(BLACK, left.elem, left.left, left.right.left),
                                                new RedBlackTree<E>(BLACK, elem, left.right.right, right));
                 }
             }
@@ -102,16 +102,16 @@ public class RedBlackTree<E extends Comparable<? super E>> implements Iterable<E
         if (color == BLACK) {
             if ((right != EMPTY) && (right.color == RED)) {
                 if (right.left.color == RED) {
-                    return new RedBlackTree<E>(RED, 
-                                               right.left.elem, 
-                                               new RedBlackTree<E>(BLACK, elem, left, right.left.left), 
+                    return new RedBlackTree<E>(RED,
+                                               right.left.elem,
+                                               new RedBlackTree<E>(BLACK, elem, left, right.left.left),
                                                new RedBlackTree<E>(BLACK, right.elem, right.left.right, right.right));
                 }
 
                 if (right.right.color == RED) {
-                    return new RedBlackTree<E>(RED, 
-                                               right.elem, 
-                                               new RedBlackTree<E>(BLACK, elem, left, right.left), 
+                    return new RedBlackTree<E>(RED,
+                                               right.elem,
+                                               new RedBlackTree<E>(BLACK, elem, left, right.left),
                                                new RedBlackTree<E>(BLACK, right.right.elem, right.right.left, right.right.right));
                 }
             }
@@ -191,14 +191,14 @@ public class RedBlackTree<E extends Comparable<? super E>> implements Iterable<E
     }
 
     private static final Iterator EMPTY_ITERATOR = new Iterator() {
-            public boolean hasNext() { 
+            public boolean hasNext() {
                 return false;
             }
-        
+
             public Object next() {
                 throw new NoSuchElementException();
             }
-        
+
             public void remove() {
                 throw new UnsupportedOperationException();
             }
@@ -222,7 +222,7 @@ public class RedBlackTree<E extends Comparable<? super E>> implements Iterable<E
         RBTIterator() {
             this.path = Cons.empty();
         }
-        
+
         RBTIterator(RedBlackTree<T> root) {
             this();
             if (root != EMPTY) {
@@ -237,11 +237,11 @@ public class RedBlackTree<E extends Comparable<? super E>> implements Iterable<E
             }
             this.next = node;
         }
-        
-        public boolean hasNext() { 
+
+        public boolean hasNext() {
             return next != null;
         }
-        
+
         public T next() {
             if (next == null) {
                 throw new NoSuchElementException();
@@ -263,7 +263,7 @@ public class RedBlackTree<E extends Comparable<? super E>> implements Iterable<E
                 return result;
             }
         }
-        
+
         public void remove() {
             throw new UnsupportedOperationException();
         }
@@ -272,7 +272,7 @@ public class RedBlackTree<E extends Comparable<? super E>> implements Iterable<E
     static class BoundedRBTIterator<T extends Comparable<? super T>> extends RBTIterator<T> {
         private RedBlackTree<T> last;
 
-        
+
         BoundedRBTIterator(RedBlackTree<T> root, RedBlackTree<T> from, RedBlackTree<T> to) {
             super();
             this.last = to;

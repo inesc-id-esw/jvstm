@@ -11,25 +11,25 @@ import jwormbench.core.IWorm;
 
 /**
  * Abstracts the node object within the BenchWorld.
- * 
- * @author F. Miguel Carvalho mcarvalho[@]cc.isel.pt 
+ *
+ * @author F. Miguel Carvalho mcarvalho[@]cc.isel.pt
  */
 public class BenchWorldNodeVBox implements INode{
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // ---------------------- FIELDS --------------------- 
-    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~    
+    // ---------------------- FIELDS ---------------------
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     protected VBox<Integer> value = new VBox<Integer>();
     protected IWorm worm;
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // -------------------   CONSTRUCTOR ----------------- 
+    // -------------------   CONSTRUCTOR -----------------
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     public BenchWorldNodeVBox(int value){
-	this.value.put(value);
-	worm = null;
+        this.value.put(value);
+        worm = null;
     }
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // -------------------   PROPERTIES  ----------------- 
+    // -------------------   PROPERTIES  -----------------
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     /**
      * @see wormbench.INode#getValue()
@@ -41,7 +41,7 @@ public class BenchWorldNodeVBox implements INode{
      * @see wormbench.INode#setValue(int)
      */
     public void setValue(int value) {
-	this.value.put(value);
+        this.value.put(value);
     }
     /**
      * @see wormbench.INode#getWorm()

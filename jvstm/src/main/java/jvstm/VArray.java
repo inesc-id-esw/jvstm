@@ -166,15 +166,15 @@ final class VArrayEntry<E> implements Comparable<VArrayEntry<E>> {
     //    written during the Tx commit operation
     private E object;
 
-    // This field is used for parallel nested writes in the array so that 
+    // This field is used for parallel nested writes in the array so that
     // a nested tx may safely read VArrayEntries that were written in the nesting tree
     // -- Only used when VArrayEntry is in the read-set of a parallel nested transaction
     volatile int nestedVersion;
-    
+
     // Also used for nesting, represents the owner of the entry when it was read.
     // -- Only used when VArrayEntry is in the read-set of a parallel nested transaction
     ReadWriteTransaction owner;
-    
+
     VArrayEntry(VArray<E> array, int index) {
         this.array = array;
         this.index = index;
@@ -231,9 +231,9 @@ final class VArrayEntry<E> implements Comparable<VArrayEntry<E>> {
     }
 
     public void setReadOwner(ReadWriteTransaction owner) {
-	this.owner = owner;
+        this.owner = owner;
     }
-    
+
     // Only used when VArrayEntry is part of the write-set
     public void setWriteValue(E value, int nestedVersion) {
         object = value;

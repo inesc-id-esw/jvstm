@@ -51,7 +51,7 @@ public class DefaultConsistencyCheckTransaction extends ReadTransaction implemen
         }
         numStarts++;
     }
-    
+
     protected void finish() {
         numStarts--;
         if (numStarts == 0) {

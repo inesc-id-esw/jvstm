@@ -9,7 +9,7 @@ import jvstm.test.point.impl.AomIntPointFactory;
 public class AomGcTestForIntPoint extends AomGcTest<Integer>{
 
     public AomGcTestForIntPoint() {
-	super(new AomIntPointFactory());
+        super(new AomIntPointFactory());
     }
-    
+
 }

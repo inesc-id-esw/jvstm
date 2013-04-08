@@ -8,26 +8,26 @@ public class TestJWormBench {
 
     @Test
     public void testJWormBench1() throws InterruptedException{
-	RunJWormBench.performTest(512, 4, 21);
+        RunJWormBench.performTest(512, 4, 21);
     }
     @Test
     public void testJWormBench2() throws InterruptedException{
-	RunJWormBench.performTest(512, 4, 22);
+        RunJWormBench.performTest(512, 4, 22);
     }
     @Test
     public void testJWormBench3() throws InterruptedException{
-	RunJWormBench.performTest(512, 4, 23);
+        RunJWormBench.performTest(512, 4, 23);
     }
     @Test
     public void testJWormBench4() throws InterruptedException{
-	RunJWormBench.performTest(512, 4, 51);
+        RunJWormBench.performTest(512, 4, 51);
     }
     @Test
     public void testJWormBench5() throws InterruptedException{
-	RunJWormBench.performTest(512, 4, 52);
+        RunJWormBench.performTest(512, 4, 52);
     }
     @Test
     public void testJWormBench6() throws InterruptedException{
-	RunJWormBench.performTest(512, 4, 53);
+        RunJWormBench.performTest(512, 4, 53);
     }
 }

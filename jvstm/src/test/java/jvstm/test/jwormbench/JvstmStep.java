@@ -30,7 +30,7 @@ public class JvstmStep extends AbstractStep{
       };
       if(op.getKind().ordinal() < 5)
         res = Transaction.doIt(task, true);
-      else 
+      else
         res = Transaction.doIt(task, false);
     } catch (Exception e) {
       throw new RuntimeException(e);

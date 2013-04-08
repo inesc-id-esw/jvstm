@@ -14,13 +14,13 @@ import jvstm.test.point.impl.AomIntPoint;
 
 public class RunRwWithRw{
     public static void main(String [] args) throws Exception{
-	RunRwWithRw.performTest(new AomIntPoint(7, 8));
+        RunRwWithRw.performTest(new AomIntPoint(7, 8));
     }
-    
+
   private static final ScheduledExecutorService executor = Executors.newScheduledThreadPool(4);
 
   public static <T extends Number> void performTest(final Point<T> p) throws Exception{
-    final long initX = p.getX().longValue(); 
+    final long initX = p.getX().longValue();
     final long initY = p.getY().longValue();
     //
     // ThreadLocal -> rwTrx2
@@ -30,7 +30,7 @@ public class RunRwWithRw{
     Assert.assertEquals(initX, t2readX);
     SuspendedTransaction r2Token =  rwTrx2.suspendTx();
     //
-    // ThreadLocal -> rwTrx1 
+    // ThreadLocal -> rwTrx1
     //
     TopLevelTransaction rwTrx1 = (TopLevelTransaction) Transaction.begin(false);
     long t1readX = p.getX().longValue();
@@ -44,7 +44,7 @@ public class RunRwWithRw{
     Assert.assertEquals(initY, t2readY);
     r2Token  = rwTrx2.suspendTx();
     //
-    // ThreadLocal -> rwTrx1 
+    // ThreadLocal -> rwTrx1
     //
     rwTrx1.resume(r1Token);
     long t1readY = p.getY().longValue();
@@ -57,7 +57,7 @@ public class RunRwWithRw{
     p.setX(t2readX + 3);
     r2Token = rwTrx2.suspendTx();
     //
-    // ThreadLocal -> rwTrx1 
+    // ThreadLocal -> rwTrx1
     //
     rwTrx1.resume(r1Token );
     p.setX(t1readX + 7);
@@ -69,7 +69,7 @@ public class RunRwWithRw{
     p.setY(t2readY - 3);
     r2Token  = rwTrx2.suspendTx();
     //
-    // ThreadLocal -> rwTrx1 
+    // ThreadLocal -> rwTrx1
     //
     rwTrx1.resume(r1Token );
     p.setY(t1readY - 7);
@@ -81,7 +81,7 @@ public class RunRwWithRw{
     Transaction.commit();
     r2Token = rwTrx2.suspendTx();
     //
-    // ThreadLocal -> rwTrx1 
+    // ThreadLocal -> rwTrx1
     //
     rwTrx1.resume(r1Token );
     try{

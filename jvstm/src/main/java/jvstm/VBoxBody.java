@@ -31,7 +31,7 @@ public class VBoxBody<E> implements GarbageCollectable {
     // this static field is used to change the non-static final field "next"
     // see the comments on the clearPrevious method
     private static final Field NEXT_FIELD;
-    
+
     static {
         try {
             NEXT_FIELD = VBoxBody.class.getDeclaredField("next");
@@ -44,7 +44,7 @@ public class VBoxBody<E> implements GarbageCollectable {
     public final int version;
     public final VBoxBody<E> next;
     public volatile E value;
-    
+
     public VBoxBody(E value, int version, VBoxBody<E> next) {
         this.version = version;
         this.next = next;
@@ -61,7 +61,7 @@ public class VBoxBody<E> implements GarbageCollectable {
 
     public void clearPrevious() {
         // we set the next field to null via reflection because it is
-        // a final field 
+        // a final field
 
         // making the field final is crucial to ensure that the field
         // is properly initialized (and visible to other threads)

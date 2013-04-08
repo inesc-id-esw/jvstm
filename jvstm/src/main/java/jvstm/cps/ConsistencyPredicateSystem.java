@@ -33,7 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.lang.reflect.Method;
 
 public class ConsistencyPredicateSystem {
-    
+
     // keeps a map of the consistency predicates for each class
     private final static Map<Class,Cons<Method>> PREDICATES_PER_CLASS = new ConcurrentHashMap<Class,Cons<Method>>();
 

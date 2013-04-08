@@ -53,12 +53,12 @@ public class ReadTransaction extends Transaction {
         VBoxBody<T> vbody = vbox.body;
         /*
          * Due to the AOM approach we must check if the vbox.vbody is null.
-         * In that case the object is in the compact layout and the own vbox 
+         * In that case the object is in the compact layout and the own vbox
          * corresponds to most recent committed version.
          */
         if(vbody == null)
             return (T) vbox; // object in compact layout.
-        else 
+        else
             return vbody.getBody(number).value;
     }
 
@@ -69,7 +69,7 @@ public class ReadTransaction extends Transaction {
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
         return initial;
     }
-    
+
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
         throw WRITE_ON_READ_EXCEPTION;
     }
@@ -87,16 +87,16 @@ public class ReadTransaction extends Transaction {
 
     @Override
     public Transaction makeUnsafeMultithreaded() {
-	throw new Error("Read Transaction cannot be unsafe multithreaded yet!");
+        throw new Error("Read Transaction cannot be unsafe multithreaded yet!");
     }
 
     @Override
     public Transaction makeParallelNestedTransaction(boolean readOnly) {
-	throw new Error("Read Transaction cannot have parallel nested transactions yet!");
+        throw new Error("Read Transaction cannot have parallel nested transactions yet!");
     }
 
     @Override
     public boolean isWriteTransaction() {
-	return false;
+        return false;
     }
 }

@@ -29,16 +29,16 @@ import static jvstm.UtilUnsafe.UNSAFE;
 
 public class InplaceWrite<T> {
     /**
-     * Due to the JVSTM integration in Deuce, we must keep in a separate 
+     * Due to the JVSTM integration in Deuce, we must keep in a separate
      * class all constants initialized with Unasfe operations, otherwise
      * the JVM may crash on the bootstrap when it loads a transactional
-     * class. 
+     * class.
      */
-    private static class Offsets { 
+    private static class Offsets {
 
         // --- Setup to use Unsafe
         private static final long ownerOffset = UtilUnsafe.objectFieldOffset(InplaceWrite.class, "orec");
-        
+
     }
 
     public OwnershipRecord orec;
@@ -46,9 +46,9 @@ public class InplaceWrite<T> {
     public InplaceWrite<T> next;
 
     public InplaceWrite() {
-	this.orec = OwnershipRecord.DEFAULT_COMMITTED_OWNER;
-	this.tempValue = null;
-	this.next = null;
+        this.orec = OwnershipRecord.DEFAULT_COMMITTED_OWNER;
+        this.tempValue = null;
+        this.next = null;
     }
 
     public InplaceWrite(Transaction trx) {
@@ -58,13 +58,13 @@ public class InplaceWrite<T> {
     }
 
     public InplaceWrite(OwnershipRecord owner, T tempValue, InplaceWrite<T> next) {
-	this.orec = owner;
-	this.tempValue = tempValue;
-	this.next = next;
+        this.orec = owner;
+        this.tempValue = tempValue;
+        this.next = next;
     }
 
     protected boolean CASowner(OwnershipRecord prevOrec, OwnershipRecord newOrec) {
-	return UNSAFE.compareAndSwapObject(this, Offsets.ownerOffset, prevOrec, newOrec);
+        return UNSAFE.compareAndSwapObject(this, Offsets.ownerOffset, prevOrec, newOrec);
     }
 
 }

@@ -7,7 +7,7 @@ public class AomIntegerPointFactory implements PointFactory<Integer>{
 
     @Override
     public Point<Integer> make(Number x, Number y) {
-	return new AomIntegerPoint(x.intValue(), y.intValue());
+        return new AomIntegerPoint(x.intValue(), y.intValue());
     }
 
 }

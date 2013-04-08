@@ -18,7 +18,7 @@ public class RunRwWithRwConflictSameFields{
   public static <T extends Number> void performTest(final Point<T> p) throws Exception{
     p.setX(13);
     p.setY(14);
-    final long initX = p.getX().longValue(); 
+    final long initX = p.getX().longValue();
     final long initY = p.getY().longValue();
     final Transaction rwTrx1 = Transaction.begin(false);
     SuspendedTransaction r1Token = rwTrx1.suspendTx();
@@ -34,8 +34,8 @@ public class RunRwWithRwConflictSameFields{
     Assert.assertEquals(update(initY), p.getY().longValue());
     final SuspendedTransaction r2Token = rwTrx2.suspendTx();
     //
-    // ThreadLocal -> rwTrx1 -> this transaction will exchange 
-    // the values of x and y. 
+    // ThreadLocal -> rwTrx1 -> this transaction will exchange
+    // the values of x and y.
     //
     rwTrx1.resume(r1Token);
     long currX = p.getX().longValue();
@@ -52,7 +52,7 @@ public class RunRwWithRwConflictSameFields{
     currX = p.getX().longValue();
     long currY = p.getY().longValue();
     Assert.assertEquals(initX, currX);
-    Assert.assertEquals(initY, currY);    
+    Assert.assertEquals(initY, currY);
     //
     // ThreadLocal -> rwTrx2
     //
@@ -66,15 +66,15 @@ public class RunRwWithRwConflictSameFields{
     Future<?> fT1 = executor.schedule(new Runnable() { public void run() {
       rwTrx1.resume(r1TokenB);
       try {
-        Transaction.commit();      
+        Transaction.commit();
       } catch (CommitException e) {
         Assert.assertTrue(true);
         rwTrx1.abortTx();
         //
-        // ThreadLocal -> rwTrx1 -> restart a new transaction 
-        // that will try to exchange the values of x and y. 
+        // ThreadLocal -> rwTrx1 -> restart a new transaction
+        // that will try to exchange the values of x and y.
         //
-        try {fT2.get();} 
+        try {fT2.get();}
         catch (Exception e2) {throw new RuntimeException(e2);}
         Transaction.begin(false);
         long currX = p.getX().longValue();
@@ -107,6 +107,6 @@ public class RunRwWithRwConflictSameFields{
   }
   private static long update(long src){
     return (src*4+6)/2;
-  } 
+  }
 
 }

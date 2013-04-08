@@ -29,7 +29,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 public class ChainedIterator<E> implements Iterator<E> {
-    
+
     private Iterator<? extends Iterator<? extends E>> iterators;
     private Iterator<? extends E> current;
 

@@ -40,266 +40,266 @@ import jvstm.util.Cons;
  * equivalent to some sequential order (plus the properties of opacity). If that
  * guarantee is already provided by the disjoint accesses of each subpart,
  * consider using UnsafeParallelTransaction.
- * 
+ *
  * @author nmld
- * 
+ *
  */
 public class ParallelNestedTransaction extends ReadWriteTransaction {
 
     protected static final ExecuteParallelNestedTxSequentiallyException EXECUTE_SEQUENTIALLY_EXCEPTION = new ExecuteParallelNestedTxSequentiallyException();
 
     protected ThreadLocal<AtomicInteger> blocksFree = new ThreadLocal<AtomicInteger>() {
-	@Override
-	protected AtomicInteger initialValue() {
-	    return new AtomicInteger(0);
-	}
+        @Override
+        protected AtomicInteger initialValue() {
+            return new AtomicInteger(0);
+        }
     };
 
     protected ThreadLocal<Cons<ReadBlock>> blocksPool = new ThreadLocal<Cons<ReadBlock>>() {
-	@Override
-	protected Cons<ReadBlock> initialValue() {
-	    return Cons.empty();
-	}
+        @Override
+        protected Cons<ReadBlock> initialValue() {
+            return Cons.empty();
+        }
     };
 
     protected Cons<ReadBlock> globalReads;
     protected Map<VBox, InplaceWrite> nestedReads;
 
     public ParallelNestedTransaction(ReadWriteTransaction parent) {
-	super(parent);
+        super(parent);
 
-	int[] parentVers = parent.ancVersions;
-	super.ancVersions = new int[parentVers.length + 1];
-	super.ancVersions[0] = parent.nestedCommitQueue.commitNumber;
-	for (int i = 0; i < parentVers.length; i++) {
-	    this.ancVersions[i + 1] = parentVers[i];
-	}
+        int[] parentVers = parent.ancVersions;
+        super.ancVersions = new int[parentVers.length + 1];
+        super.ancVersions[0] = parent.nestedCommitQueue.commitNumber;
+        for (int i = 0; i < parentVers.length; i++) {
+            this.ancVersions[i + 1] = parentVers[i];
+        }
 
-	this.nestedReads = new HashMap<VBox, InplaceWrite>();
-	this.globalReads = Cons.empty();
-	this.boxesWritten = parent.boxesWritten;
+        this.nestedReads = new HashMap<VBox, InplaceWrite>();
+        this.globalReads = Cons.empty();
+        this.boxesWritten = parent.boxesWritten;
     }
 
     public ParallelNestedTransaction(ReadWriteTransaction parent, boolean multithreaded) {
-	super(parent);
-	super.ancVersions = EMPTY_VERSIONS;
-	this.nestedReads = ReadWriteTransaction.EMPTY_MAP;
-	this.globalReads = Cons.empty();
+        super(parent);
+        super.ancVersions = EMPTY_VERSIONS;
+        this.nestedReads = ReadWriteTransaction.EMPTY_MAP;
+        this.globalReads = Cons.empty();
     }
 
     @Override
     public Transaction makeUnsafeMultithreaded() {
-	throw new Error("An Unsafe Parallel Transaction may only be spawned by another Unsafe or a Top-Level transaction");
+        throw new Error("An Unsafe Parallel Transaction may only be spawned by another Unsafe or a Top-Level transaction");
     }
 
     @Override
     public Transaction makeNestedTransaction(boolean readOnly) {
-	throw new Error(
-		"A Parallel Nested Transaction cannot spawn a Linear Nested Transaction yet. Consider using a single Parallel Nested Transaction instead.");
+        throw new Error(
+                "A Parallel Nested Transaction cannot spawn a Linear Nested Transaction yet. Consider using a single Parallel Nested Transaction instead.");
     }
 
     @Override
     protected Transaction commitAndBeginTx(boolean readOnly) {
-	commitTx(true);
-	return beginWithActiveRecord(readOnly, null);
+        commitTx(true);
+        return beginWithActiveRecord(readOnly, null);
     }
 
     // Returns -2 if self; -1 if not anc; >= 0 as version on anc otherwise
     protected int retrieveAncestorVersion(Transaction tx) {
-	if (tx == this)
-	    return -2;
+        if (tx == this)
+            return -2;
 
-	int i = 0;
-	Transaction nextParent = parent;
-	while (nextParent != null) {
-	    if (nextParent == tx) {
-		return ancVersions[i];
-	    }
-	    nextParent = nextParent.parent;
-	    i++;
-	}
-	return -1;
+        int i = 0;
+        Transaction nextParent = parent;
+        while (nextParent != null) {
+            if (nextParent == tx) {
+                return ancVersions[i];
+            }
+            nextParent = nextParent.parent;
+            i++;
+        }
+        return -1;
     }
 
     private Transaction retrieveLowestCommonAncestor(Transaction tx) {
-	Transaction current = tx;
-	while (current != null) {
-	    if (retrieveAncestorVersion(current) >= 0) {
-		return current;
-	    }
-	    current = current.parent;
-	}
-	return null;
+        Transaction current = tx;
+        while (current != null) {
+            if (retrieveAncestorVersion(current) >= 0) {
+                return current;
+            }
+            current = current.parent;
+        }
+        return null;
     }
 
     @Override
     public void abortTx() {
-	if (this.orec.version != OwnershipRecord.ABORTED) {
-	    manualAbort();
-	}
-	Transaction.current.set(parent);
+        if (this.orec.version != OwnershipRecord.ABORTED) {
+            manualAbort();
+        }
+        Transaction.current.set(parent);
     }
 
     private void manualAbort() {
-	for (ParallelNestedTransaction mergedIntoParent : getRWParent().mergedTxs) {
-	    for (VBox vboxMergedIntoParent : mergedIntoParent.boxesWrittenInPlace) {
-		revertOverwrite(vboxMergedIntoParent);
-	    }
-	}
-	for (VBox vboxMergedIntoParent : getRWParent().boxesWrittenInPlace) {
-	    revertOverwrite(vboxMergedIntoParent);
-	}
+        for (ParallelNestedTransaction mergedIntoParent : getRWParent().mergedTxs) {
+            for (VBox vboxMergedIntoParent : mergedIntoParent.boxesWrittenInPlace) {
+                revertOverwrite(vboxMergedIntoParent);
+            }
+        }
+        for (VBox vboxMergedIntoParent : getRWParent().boxesWrittenInPlace) {
+            revertOverwrite(vboxMergedIntoParent);
+        }
 
-	this.orec.version = OwnershipRecord.ABORTED;
-	for (ReadWriteTransaction child : mergedTxs) {
-	    child.orec.version = OwnershipRecord.ABORTED;
-	}
-	super.boxesWritten = null;
+        this.orec.version = OwnershipRecord.ABORTED;
+        for (ReadWriteTransaction child : mergedTxs) {
+            child.orec.version = OwnershipRecord.ABORTED;
+        }
+        super.boxesWritten = null;
 
-	int i = 0;
-	for (ReadBlock block : globalReads) {
-	    block.free = true;
-	    i++;
-	}
-	blocksFree.get().addAndGet(i);
+        int i = 0;
+        for (ReadBlock block : globalReads) {
+            block.free = true;
+            i++;
+        }
+        blocksFree.get().addAndGet(i);
 
-	this.globalReads = null;
-	this.nestedReads = null;
-	super.mergedTxs = null;
+        this.globalReads = null;
+        this.nestedReads = null;
+        super.mergedTxs = null;
     }
 
     protected void revertOverwrite(VBox vboxWritten) {
-	InplaceWrite write = vboxWritten.inplace;
-	if (write.orec.owner != this) {
-	    return;
-	}
-	InplaceWrite overwritten = write;
-	while (overwritten.next != null) {
-	    overwritten = overwritten.next;
-	    if (overwritten.orec.owner != this && overwritten.orec.version == OwnershipRecord.RUNNING) {
-		write.tempValue = overwritten.tempValue;
-		write.next = overwritten.next;
-		overwritten.orec.owner = overwritten.orec.owner; // enforce
-								 // visibility
-		write.orec = overwritten.orec;
-		return;
-	    }
-	}
+        InplaceWrite write = vboxWritten.inplace;
+        if (write.orec.owner != this) {
+            return;
+        }
+        InplaceWrite overwritten = write;
+        while (overwritten.next != null) {
+            overwritten = overwritten.next;
+            if (overwritten.orec.owner != this && overwritten.orec.version == OwnershipRecord.RUNNING) {
+                write.tempValue = overwritten.tempValue;
+                write.next = overwritten.next;
+                overwritten.orec.owner = overwritten.orec.owner; // enforce
+                                                                 // visibility
+                write.orec = overwritten.orec;
+                return;
+            }
+        }
     }
 
     protected <T> T readGlobal(VBox<T> vbox) {
-	VBoxBody<T> body = vbox.body;
-	if (body.version > number) {
-	    TransactionSignaller.SIGNALLER.signalEarlyAbort();
-	}
+        VBoxBody<T> body = vbox.body;
+        if (body.version > number) {
+            TransactionSignaller.SIGNALLER.signalEarlyAbort();
+        }
 
-	ReadBlock readBlock = null;
-	if (next < 0) {
-	    if (blocksFree.get().get() > 0) {
-		for (ReadBlock poolBlock : blocksPool.get()) {
-		    if (poolBlock.free) {
-			poolBlock.free = false;
-			readBlock = poolBlock;
-			blocksFree.get().decrementAndGet();
-			break;
-		    }
-		}
-	    } else {
-		readBlock = new ReadBlock(blocksFree.get());
-	    }
-	    next = 999;
-	    globalReads = globalReads.cons(readBlock);
-	} else {
-	    readBlock = globalReads.first();
-	}
-	readBlock.entries[next--] = vbox;
-	return body.value;
+        ReadBlock readBlock = null;
+        if (next < 0) {
+            if (blocksFree.get().get() > 0) {
+                for (ReadBlock poolBlock : blocksPool.get()) {
+                    if (poolBlock.free) {
+                        poolBlock.free = false;
+                        readBlock = poolBlock;
+                        blocksFree.get().decrementAndGet();
+                        break;
+                    }
+                }
+            } else {
+                readBlock = new ReadBlock(blocksFree.get());
+            }
+            next = 999;
+            globalReads = globalReads.cons(readBlock);
+        } else {
+            readBlock = globalReads.first();
+        }
+        readBlock.entries[next--] = vbox;
+        return body.value;
     }
 
     @Override
     public <T> T getBoxValue(VBox<T> vbox) {
-	InplaceWrite<T> inplaceWrite = vbox.inplace;
-	T value = inplaceWrite.tempValue;
-	OwnershipRecord inplaceOrec = inplaceWrite.orec;
+        InplaceWrite<T> inplaceWrite = vbox.inplace;
+        T value = inplaceWrite.tempValue;
+        OwnershipRecord inplaceOrec = inplaceWrite.orec;
 
-	if (inplaceOrec.version > 0 && inplaceOrec.version <= number) {
-	    value = readGlobal(vbox);
-	    return value;
-	}
+        if (inplaceOrec.version > 0 && inplaceOrec.version <= number) {
+            value = readGlobal(vbox);
+            return value;
+        }
 
-	do {
-	    int entryNestedVersion = inplaceOrec.nestedVersion;
-	    int versionOnAnc = retrieveAncestorVersion(inplaceOrec.owner);
-	    if (versionOnAnc >= 0) {
-		if (entryNestedVersion > versionOnAnc) {
-		    // eager w-r conflict, may restart immediately
-		    manualAbort();
-		    TransactionSignaller.SIGNALLER.signalCommitFail(inplaceOrec.owner);
-		}
-		nestedReads.put(vbox, inplaceWrite);
-		return (value == NULL_VALUE) ? null : value;
-	    }
-	    if (versionOnAnc == -2) {
-		return (value == NULL_VALUE) ? null : value;
-	    }
-	    inplaceWrite = inplaceWrite.next;
-	    if (inplaceWrite == null) {
-		break;
-	    }
-	    value = inplaceWrite.tempValue;
-	    inplaceOrec = inplaceWrite.orec;
-	} while (true);
+        do {
+            int entryNestedVersion = inplaceOrec.nestedVersion;
+            int versionOnAnc = retrieveAncestorVersion(inplaceOrec.owner);
+            if (versionOnAnc >= 0) {
+                if (entryNestedVersion > versionOnAnc) {
+                    // eager w-r conflict, may restart immediately
+                    manualAbort();
+                    TransactionSignaller.SIGNALLER.signalCommitFail(inplaceOrec.owner);
+                }
+                nestedReads.put(vbox, inplaceWrite);
+                return (value == NULL_VALUE) ? null : value;
+            }
+            if (versionOnAnc == -2) {
+                return (value == NULL_VALUE) ? null : value;
+            }
+            inplaceWrite = inplaceWrite.next;
+            if (inplaceWrite == null) {
+                break;
+            }
+            value = inplaceWrite.tempValue;
+            inplaceOrec = inplaceWrite.orec;
+        } while (true);
 
-	if (boxesWritten != EMPTY_MAP) {
-	    value = (T) boxesWritten.get(vbox);
-	    if (value != null) {
-		return (value == NULL_VALUE) ? null : value;
-	    }
-	}
+        if (boxesWritten != EMPTY_MAP) {
+            value = (T) boxesWritten.get(vbox);
+            if (value != null) {
+                return (value == NULL_VALUE) ? null : value;
+            }
+        }
 
-	value = readGlobal(vbox);
-	return value;
+        value = readGlobal(vbox);
+        return value;
 
     }
 
     @Override
     public <T> void setBoxValue(jvstm.VBox<T> vbox, T value) {
-	InplaceWrite<T> inplaceWrite = vbox.inplace;
-	OwnershipRecord currentOwner = inplaceWrite.orec;
-	if (currentOwner.owner == this) { // we are already the current writer
-	    inplaceWrite.tempValue = (value == null ? (T) NULL_VALUE : value);
-	    return;
-	}
+        InplaceWrite<T> inplaceWrite = vbox.inplace;
+        OwnershipRecord currentOwner = inplaceWrite.orec;
+        if (currentOwner.owner == this) { // we are already the current writer
+            inplaceWrite.tempValue = (value == null ? (T) NULL_VALUE : value);
+            return;
+        }
 
-	while (true) {
-	    if (currentOwner.version != 0) {
-		if (currentOwner.version <= this.number) {
-		    if (inplaceWrite.CASowner(currentOwner, this.orec)) {
-			inplaceWrite.tempValue = (value == null ? (T) NULL_VALUE : value);
-			boxesWrittenInPlace = boxesWrittenInPlace.cons(vbox);
-			return;
-		    }
-		    currentOwner = inplaceWrite.orec;
-		    continue;
-		}
-		// more recent than my number
-		break;
-	    } else {
-		if (retrieveAncestorVersion(currentOwner.owner) >= 0) {
-		    if (vbox.CASinplace(inplaceWrite, new InplaceWrite<T>(this.orec, (value == null ? (T) NULL_VALUE : value),
-			    inplaceWrite))) {
-			return;
-		    }
-		    inplaceWrite = vbox.inplace;
-		    currentOwner = inplaceWrite.orec;
-		    continue;
-		} 
-		break;
-	    }
-	}
+        while (true) {
+            if (currentOwner.version != 0) {
+                if (currentOwner.version <= this.number) {
+                    if (inplaceWrite.CASowner(currentOwner, this.orec)) {
+                        inplaceWrite.tempValue = (value == null ? (T) NULL_VALUE : value);
+                        boxesWrittenInPlace = boxesWrittenInPlace.cons(vbox);
+                        return;
+                    }
+                    currentOwner = inplaceWrite.orec;
+                    continue;
+                }
+                // more recent than my number
+                break;
+            } else {
+                if (retrieveAncestorVersion(currentOwner.owner) >= 0) {
+                    if (vbox.CASinplace(inplaceWrite, new InplaceWrite<T>(this.orec, (value == null ? (T) NULL_VALUE : value),
+                            inplaceWrite))) {
+                        return;
+                    }
+                    inplaceWrite = vbox.inplace;
+                    currentOwner = inplaceWrite.orec;
+                    continue;
+                }
+                break;
+            }
+        }
 
-	manualAbort();
-	throw EXECUTE_SEQUENTIALLY_EXCEPTION;
+        manualAbort();
+        throw EXECUTE_SEQUENTIALLY_EXCEPTION;
     }
 
     /*
@@ -309,145 +309,145 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
      */
     @Override
     protected <T> T getLocalArrayValue(VArrayEntry<T> entry) {
-	if (this.arrayWrites != EMPTY_MAP) {
-	    VArrayEntry<T> wsEntry = (VArrayEntry<T>) this.arrayWrites.get(entry);
-	    if (wsEntry != null) {
-		return (wsEntry.getWriteValue() == null ? (T) NULL_VALUE : wsEntry.getWriteValue());
-	    }
-	}
+        if (this.arrayWrites != EMPTY_MAP) {
+            VArrayEntry<T> wsEntry = (VArrayEntry<T>) this.arrayWrites.get(entry);
+            if (wsEntry != null) {
+                return (wsEntry.getWriteValue() == null ? (T) NULL_VALUE : wsEntry.getWriteValue());
+            }
+        }
 
-	ReadWriteTransaction iter = getRWParent();
-	while (iter != null) {
-	    synchronized (iter) {
-		if (iter.arrayWrites != EMPTY_MAP) {
-		    VArrayEntry<T> wsEntry = (VArrayEntry<T>) iter.arrayWrites.get(entry);
-		    if (wsEntry == null) {
-			iter = iter.getRWParent();
-			continue;
-		    }
+        ReadWriteTransaction iter = getRWParent();
+        while (iter != null) {
+            synchronized (iter) {
+                if (iter.arrayWrites != EMPTY_MAP) {
+                    VArrayEntry<T> wsEntry = (VArrayEntry<T>) iter.arrayWrites.get(entry);
+                    if (wsEntry == null) {
+                        iter = iter.getRWParent();
+                        continue;
+                    }
 
-		    if (wsEntry.nestedVersion <= retrieveAncestorVersion(iter)) {
-			this.arraysRead = this.arraysRead.cons(entry);
-			entry.setReadOwner(iter);
-			return (wsEntry.getWriteValue() == null ? (T) NULL_VALUE : wsEntry.getWriteValue());
-		    } else {
-		        TransactionSignaller.SIGNALLER.signalCommitFail(iter);
-		    }
-		}
-	    }
-	    iter = iter.getRWParent();
-	}
+                    if (wsEntry.nestedVersion <= retrieveAncestorVersion(iter)) {
+                        this.arraysRead = this.arraysRead.cons(entry);
+                        entry.setReadOwner(iter);
+                        return (wsEntry.getWriteValue() == null ? (T) NULL_VALUE : wsEntry.getWriteValue());
+                    } else {
+                        TransactionSignaller.SIGNALLER.signalCommitFail(iter);
+                    }
+                }
+            }
+            iter = iter.getRWParent();
+        }
 
-	return null;
+        return null;
     }
 
     /*
-     * Both parallel nested transactions and perTxBoxes may be seen as alternatives to work 
-     * around inherently-conflicting workloads. An important question may be posed if we put 
-     * them together: when should a perTxBox be committed, if write by a parallel nested 
+     * Both parallel nested transactions and perTxBoxes may be seen as alternatives to work
+     * around inherently-conflicting workloads. An important question may be posed if we put
+     * them together: when should a perTxBox be committed, if write by a parallel nested
      * transaction? Is it solving a conflict at top-level, or nested level of parallelism?
-     * 
+     *
      * Should the need for perTxBoxes arise in parNesting, that question shall have to be addressed.
      */
     @Override
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
         throw new RuntimeException("Parallel Nested Transactions do not support PerTxBoxes");
     }
-    
+
     @Override
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
-	throw new RuntimeException("Parallel Nested Transactions do not support PerTxBoxes");
+        throw new RuntimeException("Parallel Nested Transactions do not support PerTxBoxes");
     }
-    
+
     @Override
     protected void finish() {
-	boxesWritten = null;
-	perTxValues = null;
-	mergedTxs = null;
+        boxesWritten = null;
+        perTxValues = null;
+        mergedTxs = null;
     }
 
     @Override
     protected void doCommit() {
-	tryCommit();
-	boxesWritten = null;
-	perTxValues = EMPTY_MAP;
-	mergedTxs = null;
+        tryCommit();
+        boxesWritten = null;
+        perTxValues = EMPTY_MAP;
+        mergedTxs = null;
     }
 
     @Override
     protected void cleanUp() {
-	boxesWrittenInPlace = null;
-	nestedReads = null;
-	for (ReadBlock block : globalReads) {
-	    block.free = true;
-	    block.freeBlocks.incrementAndGet();
-	}
-	globalReads = null;
+        boxesWrittenInPlace = null;
+        nestedReads = null;
+        for (ReadBlock block : globalReads) {
+            block.free = true;
+            block.freeBlocks.incrementAndGet();
+        }
+        globalReads = null;
 
     }
 
     protected NestedCommitRecord helpCommitAll(NestedCommitRecord start) {
-	NestedCommitRecord lastSeen = start;
-	NestedCommitRecord current = lastSeen.next.get();
-	while (current != null) {
-	    if (!current.recordCommitted) {
-		current.helpCommit();
-	    }
-	    lastSeen = current;
-	    current = current.next.get();
-	}
-	return lastSeen;
+        NestedCommitRecord lastSeen = start;
+        NestedCommitRecord current = lastSeen.next.get();
+        while (current != null) {
+            if (!current.recordCommitted) {
+                current.helpCommit();
+            }
+            lastSeen = current;
+            current = current.next.get();
+        }
+        return lastSeen;
     }
 
     @Override
     protected void tryCommit() {
-	ReadWriteTransaction parent = getRWParent();
-	NestedCommitRecord lastSeen;
-	NestedCommitRecord newCommit;
+        ReadWriteTransaction parent = getRWParent();
+        NestedCommitRecord lastSeen;
+        NestedCommitRecord newCommit;
 
-	do {
-	    lastSeen = helpCommitAll(parent.nestedCommitQueue);
-	    snapshotValidation(lastSeen.commitNumber);
-	    Cons<VArrayEntry<?>> varrayReadsToPropagate = validateNestedArrayReads();
-	    newCommit = new NestedCommitRecord(this, this.mergedTxs, parent.mergedTxs, varrayReadsToPropagate, arrayWrites, arrayWritesCount, lastSeen.commitNumber + 1);
-	} while (!lastSeen.next.compareAndSet(null, newCommit));
+        do {
+            lastSeen = helpCommitAll(parent.nestedCommitQueue);
+            snapshotValidation(lastSeen.commitNumber);
+            Cons<VArrayEntry<?>> varrayReadsToPropagate = validateNestedArrayReads();
+            newCommit = new NestedCommitRecord(this, this.mergedTxs, parent.mergedTxs, varrayReadsToPropagate, arrayWrites, arrayWritesCount, lastSeen.commitNumber + 1);
+        } while (!lastSeen.next.compareAndSet(null, newCommit));
 
-	lastSeen = parent.nestedCommitQueue;
-	while ((lastSeen != null) && (lastSeen.commitNumber <= newCommit.commitNumber)) {
-	    if (!lastSeen.recordCommitted) {
-		lastSeen.helpCommit();
-		parent.nestedCommitQueue = lastSeen;
-	    }
-	    lastSeen = lastSeen.next.get();
-	}
+        lastSeen = parent.nestedCommitQueue;
+        while ((lastSeen != null) && (lastSeen.commitNumber <= newCommit.commitNumber)) {
+            if (!lastSeen.recordCommitted) {
+                lastSeen.helpCommit();
+                parent.nestedCommitQueue = lastSeen;
+            }
+            lastSeen = lastSeen.next.get();
+        }
 
     }
 
     @Override
     protected void snapshotValidation(int lastSeenNumber) {
-	if (retrieveAncestorVersion(parent) == lastSeenNumber) {
-	    return;
-	}
+        if (retrieveAncestorVersion(parent) == lastSeenNumber) {
+            return;
+        }
 
-	for (Map.Entry<VBox, InplaceWrite> read : nestedReads.entrySet()) {
-	    validateNestedRead(read);
-	}
+        for (Map.Entry<VBox, InplaceWrite> read : nestedReads.entrySet()) {
+            validateNestedRead(read);
+        }
 
-	for (ParallelNestedTransaction mergedTx : mergedTxs) {
-	    for (Map.Entry<VBox, InplaceWrite> read : mergedTx.nestedReads.entrySet()) {
-		validateNestedRead(read);
-	    }
-	}
+        for (ParallelNestedTransaction mergedTx : mergedTxs) {
+            for (Map.Entry<VBox, InplaceWrite> read : mergedTx.nestedReads.entrySet()) {
+                validateNestedRead(read);
+            }
+        }
 
-	if (!this.globalReads.isEmpty()) {
-	    validateGlobalReads(globalReads, next);
-	}
+        if (!this.globalReads.isEmpty()) {
+            validateGlobalReads(globalReads, next);
+        }
 
-	for (ParallelNestedTransaction mergedTx : mergedTxs) {
-	    if (!mergedTx.globalReads.isEmpty()) {
-		validateGlobalReads(mergedTx.globalReads, mergedTx.next);
-	    }
-	}
+        for (ParallelNestedTransaction mergedTx : mergedTxs) {
+            if (!mergedTx.globalReads.isEmpty()) {
+                validateGlobalReads(mergedTx.globalReads, mergedTx.next);
+            }
+        }
 
     }
 
@@ -458,19 +458,19 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
      * case the search stops.
      */
     protected void validateNestedRead(Map.Entry<VBox, InplaceWrite> read) {
-	InplaceWrite inplaceRead = read.getValue();
-	InplaceWrite iter = read.getKey().inplace;
-	do {
-	    if (iter == inplaceRead) {
-		break;
-	    }
-	    int maxVersion = retrieveAncestorVersion(iter.orec.owner);
-	    if (maxVersion >= 0) {
-		manualAbort();
-		TransactionSignaller.SIGNALLER.signalCommitFail(iter.orec.owner);
-	    }
-	    iter = iter.next;
-	} while (iter != null);
+        InplaceWrite inplaceRead = read.getValue();
+        InplaceWrite iter = read.getKey().inplace;
+        do {
+            if (iter == inplaceRead) {
+                break;
+            }
+            int maxVersion = retrieveAncestorVersion(iter.orec.owner);
+            if (maxVersion >= 0) {
+                manualAbort();
+                TransactionSignaller.SIGNALLER.signalCommitFail(iter.orec.owner);
+            }
+            iter = iter.next;
+        } while (iter != null);
     }
 
     /*
@@ -478,64 +478,64 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
      * writes of that VBox: no entry may be found that belonged to an ancestor
      */
     protected void validateGlobalReads(Cons<ReadBlock> reads, int startIdx) {
-	VBox[] array = reads.first().entries;
-	// the first may not be full
-	for (int i = startIdx + 1; i < array.length; i++) {
-	    InplaceWrite iter = array[i].inplace;
-	    do {
-		int maxVersion = retrieveAncestorVersion(iter.orec.owner);
-		if (maxVersion >= 0) {
-		    manualAbort();
-		    TransactionSignaller.SIGNALLER.signalCommitFail(iter.orec.owner);
-		}
-		iter = iter.next;
-	    } while (iter != null);
-	}
+        VBox[] array = reads.first().entries;
+        // the first may not be full
+        for (int i = startIdx + 1; i < array.length; i++) {
+            InplaceWrite iter = array[i].inplace;
+            do {
+                int maxVersion = retrieveAncestorVersion(iter.orec.owner);
+                if (maxVersion >= 0) {
+                    manualAbort();
+                    TransactionSignaller.SIGNALLER.signalCommitFail(iter.orec.owner);
+                }
+                iter = iter.next;
+            } while (iter != null);
+        }
 
-	// the rest are full
-	for (ReadBlock block : reads.rest()) {
-	    array = block.entries;
-	    for (int i = 0; i < array.length; i++) {
-		InplaceWrite iter = array[i].inplace;
-		do {
-		    int maxVersion = retrieveAncestorVersion(iter.orec.owner);
-		    if (maxVersion >= 0) {
-			manualAbort();
-			TransactionSignaller.SIGNALLER.signalCommitFail(iter.orec.owner);
-		    }
-		    iter = iter.next;
-		} while (iter != null);
-	    }
-	}
+        // the rest are full
+        for (ReadBlock block : reads.rest()) {
+            array = block.entries;
+            for (int i = 0; i < array.length; i++) {
+                InplaceWrite iter = array[i].inplace;
+                do {
+                    int maxVersion = retrieveAncestorVersion(iter.orec.owner);
+                    if (maxVersion >= 0) {
+                        manualAbort();
+                        TransactionSignaller.SIGNALLER.signalCommitFail(iter.orec.owner);
+                    }
+                    iter = iter.next;
+                } while (iter != null);
+            }
+        }
     }
 
     protected Cons<VArrayEntry<?>> validateNestedArrayReads() {
-	Map<VArrayEntry<?>, VArrayEntry<?>> parentArrayWrites = getRWParent().arrayWrites;
-	Cons<VArrayEntry<?>> parentArrayReads = getRWParent().arraysRead;
-	int maxVersionOnParent = retrieveAncestorVersion(parent);
-	for (VArrayEntry<?> entry : arraysRead) {
+        Map<VArrayEntry<?>, VArrayEntry<?>> parentArrayWrites = getRWParent().arrayWrites;
+        Cons<VArrayEntry<?>> parentArrayReads = getRWParent().arraysRead;
+        int maxVersionOnParent = retrieveAncestorVersion(parent);
+        for (VArrayEntry<?> entry : arraysRead) {
 
-	    // If the read was performed on an ancestor of the parent, then
-	    // propagate it for further validation
-	    if (entry.owner != parent) {
-		parentArrayReads = parentArrayReads.cons(entry);
-	    }
+            // If the read was performed on an ancestor of the parent, then
+            // propagate it for further validation
+            if (entry.owner != parent) {
+                parentArrayReads = parentArrayReads.cons(entry);
+            }
 
-	    synchronized (parent) {
-		if (parentArrayWrites != EMPTY_MAP) {
-		    // Verify if the parent contains a more recent write for the
-		    // read that we performed somewhere in our ancestors
-		    VArrayEntry<?> parentWrite = parentArrayWrites.get(entry);
-		    if (parentWrite == null) {
-			continue;
-		    }
-		    if (parentWrite.nestedVersion > maxVersionOnParent) {
-		        TransactionSignaller.SIGNALLER.signalCommitFail(parent);
-		    }
-		}
-	    }
-	}
+            synchronized (parent) {
+                if (parentArrayWrites != EMPTY_MAP) {
+                    // Verify if the parent contains a more recent write for the
+                    // read that we performed somewhere in our ancestors
+                    VArrayEntry<?> parentWrite = parentArrayWrites.get(entry);
+                    if (parentWrite == null) {
+                        continue;
+                    }
+                    if (parentWrite.nestedVersion > maxVersionOnParent) {
+                        TransactionSignaller.SIGNALLER.signalCommitFail(parent);
+                    }
+                }
+            }
+        }
 
-	return parentArrayReads;
+        return parentArrayReads;
     }
 }

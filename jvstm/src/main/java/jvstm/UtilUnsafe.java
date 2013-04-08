@@ -50,7 +50,7 @@ public final class UtilUnsafe {
     }
 
     private UtilUnsafe() { }
-    
+
     public static long objectFieldOffset(Class<?> klass, String fieldName){
         Field f = null;
         try {

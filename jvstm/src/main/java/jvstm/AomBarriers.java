@@ -28,27 +28,27 @@ package jvstm;
 
 
 /**
- * This class replaces the get() and put() methods of the VBox and it provides 
+ * This class replaces the get() and put() methods of the VBox and it provides
  * the barriers implementation to be used in the Deuce integration of the JVSTM.
- * This integration follows the AOM approach (Adaptive Object Metadata) and 
+ * This integration follows the AOM approach (Adaptive Object Metadata) and
  * according to this model the T type parameter passed in all barriers represents
- * the object itself, once the AOM follows an object-level conflict detection 
+ * the object itself, once the AOM follows an object-level conflict detection
  * granularity.
- * 
- * Another difference from the AomBarriers to the put/get barriers of the VBox is 
- * in the additional parameter Transaction. Instead of getting the current transaction 
+ *
+ * Another difference from the AomBarriers to the put/get barriers of the VBox is
+ * in the additional parameter Transaction. Instead of getting the current transaction
  * from the ThreadLocal context, the invoker (i.e. the Deuce's ContextDelegator) is
- * responsible for passing the current transaction to the AomBarriers methods. 
+ * responsible for passing the current transaction to the AomBarriers methods.
  * The jvstm.Context object that is present in all transactional scopes keeps track
- * of the current transaction object.     
+ * of the current transaction object.
  */
 public class AomBarriers {
     /**
      * The correct constraint for T should be: T extends E & VBoxAom<E>.
      * Yet, Java generics does not allow the previous constraint.
-     * In the Deuce we will not invoke this method and we call directly   
+     * In the Deuce we will not invoke this method and we call directly
      * tx.getBoxValue(ref) because it is not possible to access an
-     * StmBarrier out of a transactional scope.   
+     * StmBarrier out of a transactional scope.
      */
     public static <T extends VBoxAom<T>> T get(Transaction tx, T ref) {
         if (tx == null) {
@@ -142,14 +142,14 @@ public class AomBarriers {
         /*
          * Check if the transaction trx is the current writer and owner of the
          * ref object.
-         */ 
+         */
         InplaceWrite<T> inplaceWrite = ref.inplace;
         OwnershipRecord currentOwner = inplaceWrite.orec;
         if (currentOwner.owner == trx) { // we are already the current writer
             return inplaceWrite.tempValue;
         }
         /*
-         * We will check the standard write-set for an object that we could 
+         * We will check the standard write-set for an object that we could
          * have written in a previous invocation to the rwTrx.setBoxValue().
          */
         T value = (T) trx.boxesWritten.get(ref);
@@ -158,12 +158,12 @@ public class AomBarriers {
             trx.setBoxValue(ref, value);
         }
         /*
-         * !!!!! Instead of trying to acquire the ownership over the ref object on every 
-         * put operation to the same object, as happens in the standard JVSTM, we 
+         * !!!!! Instead of trying to acquire the ownership over the ref object on every
+         * put operation to the same object, as happens in the standard JVSTM, we
          * will just try it on the first write to an object.
          * !!!!! On the next put invocations we will write into the replica stored in the
-         * standard write-set. We could take a different approach and invoke again the 
-         * trx.setBoxValue, but this option has overheads when it fails to acquire the 
+         * standard write-set. We could take a different approach and invoke again the
+         * trx.setBoxValue, but this option has overheads when it fails to acquire the
          * ownership and it will insert again the same replica into the standard write-set.
          */
         return value;
@@ -186,9 +186,9 @@ public class AomBarriers {
     private static <T extends VBoxAom<T>> T getTargetForInnevitable(T ref, int txNumber){
         VBoxBody<T> vbody = ref.body;
         if ((vbody != null) && (vbody.version == txNumber)) {
-            // In this case we already have written to this VBox during 
-            // current Inevitable transaction (strange in this scenario - 
-            // maybe possible in others). 
+            // In this case we already have written to this VBox during
+            // current Inevitable transaction (strange in this scenario -
+            // maybe possible in others).
             // So we already have replicated the last value.
             return vbody.value;
         } else {
@@ -197,12 +197,12 @@ public class AomBarriers {
             if (body!= null && body.version > txNumber) {
                 TransactionSignaller.SIGNALLER.signalCommitFail();
                 throw new AssertionError("Impossible condition - Commit fail signalled!");
-            }        
+            }
             if(body == null)
                 return ref.replicate();
             else
                 return body.value.replicate();
-        }	
+        }
     }
 
     private static <T extends VBoxAom<T>> void putInInevitableTrx(T ref, int newValue, long fieldOffset){
@@ -210,7 +210,7 @@ public class AomBarriers {
         T newT = getTargetForInnevitable(ref, tx.number);
         UtilUnsafe.UNSAFE.putInt(newT, fieldOffset, newValue);
         tx.setBoxValue(ref, newT);
-        tx.commit();	
+        tx.commit();
     }
 
     private static <T extends VBoxAom<T>> void putInInevitableTrx(T ref, long newValue, long fieldOffset){
@@ -218,7 +218,7 @@ public class AomBarriers {
         T newT = getTargetForInnevitable(ref, tx.number);
         UtilUnsafe.UNSAFE.putLong(newT, fieldOffset, newValue);
         tx.setBoxValue(ref, newT);
-        tx.commit();	
+        tx.commit();
     }
 
     private static <T extends VBoxAom<T>> void putInInevitableTrx(T ref, boolean newValue, long fieldOffset){
@@ -226,7 +226,7 @@ public class AomBarriers {
         T newT = getTargetForInnevitable(ref, tx.number);
         UtilUnsafe.UNSAFE.putBoolean(newT, fieldOffset, newValue);
         tx.setBoxValue(ref, newT);
-        tx.commit();	
+        tx.commit();
     }
 
 
@@ -235,7 +235,7 @@ public class AomBarriers {
         T newT = getTargetForInnevitable(ref, tx.number);
         UtilUnsafe.UNSAFE.putByte(newT, fieldOffset, newValue);
         tx.setBoxValue(ref, newT);
-        tx.commit();	
+        tx.commit();
     }
 
     private static <T extends VBoxAom<T>> void putInInevitableTrx(T ref, short newValue, long fieldOffset){
@@ -243,7 +243,7 @@ public class AomBarriers {
         T newT = getTargetForInnevitable(ref, tx.number);
         UtilUnsafe.UNSAFE.putShort(newT, fieldOffset, newValue);
         tx.setBoxValue(ref, newT);
-        tx.commit();	
+        tx.commit();
     }
 
     private static <T extends VBoxAom<T>> void putInInevitableTrx(T ref, char newValue, long fieldOffset){
@@ -251,14 +251,14 @@ public class AomBarriers {
         T newT = getTargetForInnevitable(ref, tx.number);
         UtilUnsafe.UNSAFE.putChar(newT, fieldOffset, newValue);
         tx.setBoxValue(ref, newT);
-        tx.commit();	
+        tx.commit();
     }
     private static <T extends VBoxAom<T>> void putInInevitableTrx(T ref, float newValue, long fieldOffset){
         Transaction tx = Transaction.beginInevitable();
         T newT = getTargetForInnevitable(ref, tx.number);
         UtilUnsafe.UNSAFE.putFloat(newT, fieldOffset, newValue);
         tx.setBoxValue(ref, newT);
-        tx.commit();	
+        tx.commit();
     }
 
     private static <T extends VBoxAom<T>> void putInInevitableTrx(T ref, double newValue, long fieldOffset){
@@ -266,7 +266,7 @@ public class AomBarriers {
         T newT = getTargetForInnevitable(ref, tx.number);
         UtilUnsafe.UNSAFE.putDouble(newT, fieldOffset, newValue);
         tx.setBoxValue(ref, newT);
-        tx.commit();	
+        tx.commit();
     }
 
     private static <T extends VBoxAom<T>> void putInInevitableTrx(T ref, Object newValue, long fieldOffset){
@@ -274,7 +274,7 @@ public class AomBarriers {
         T newT = getTargetForInnevitable(ref, tx.number);
         UtilUnsafe.UNSAFE.putObject(newT, fieldOffset, newValue);
         tx.setBoxValue(ref, newT);
-        tx.commit();	
+        tx.commit();
     }
 
 }

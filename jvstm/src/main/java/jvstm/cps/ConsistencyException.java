@@ -39,33 +39,33 @@ public class ConsistencyException extends RuntimeException {
 
     @Override
     public String getMessage() {
-	return message;
+        return message;
     }
 
     public void init(Object target, Method method) {
-	this.target = target;
-	this.method = method;
-	try {
-	    message = "Object " + getTarget();
-	} catch (Exception ex) {
-	    message = "An object of type " + getTarget().getClass();
-	}
-	message += " is inconsistent according to the consistency predicate: " + getMethodFullname();
+        this.target = target;
+        this.method = method;
+        try {
+            message = "Object " + getTarget();
+        } catch (Exception ex) {
+            message = "An object of type " + getTarget().getClass();
+        }
+        message += " is inconsistent according to the consistency predicate: " + getMethodFullname();
     }
 
     public Object getTarget() {
-	return target;
+        return target;
     }
 
     public String getMethodName() {
-	return method.getName();
+        return method.getName();
     }
 
     public String getMethodFullname() {
-	return getMethodClassname() + "." + getMethodName();
+        return getMethodClassname() + "." + getMethodName();
     }
 
     public String getMethodClassname() {
-	return method.getDeclaringClass().getName();
+        return method.getDeclaringClass().getName();
     }
 }

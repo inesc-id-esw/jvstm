@@ -45,11 +45,11 @@ public class OwnershipRecord {
     public static final int RUNNING = 0;
 
     protected static final OwnershipRecord DEFAULT_COMMITTED_OWNER = new OwnershipRecord() {
-	{
-	    version = 1;
-	    nestedVersion = 0;
-	    owner = null;
-	}
+        {
+            version = 1;
+            nestedVersion = 0;
+            owner = null;
+        }
     };
 
     // version = 0 is reserved for the state RUNNING
@@ -60,28 +60,28 @@ public class OwnershipRecord {
     public volatile ReadWriteTransaction owner;
 
     public OwnershipRecord() {
-	this.owner = null;
-	this.nestedVersion = 0;
+        this.owner = null;
+        this.nestedVersion = 0;
     }
 
     public OwnershipRecord(ReadWriteTransaction owner) {
-	this.owner = owner;
-	this.nestedVersion = 0;
+        this.owner = owner;
+        this.nestedVersion = 0;
     }
 
     protected boolean CASnestedVersion(int expectedNestedVersion, int newNestedVersion) {
-	return UNSAFE.compareAndSwapObject(this, Offsets.nestedVersionOffset, expectedNestedVersion, newNestedVersion);
+        return UNSAFE.compareAndSwapObject(this, Offsets.nestedVersionOffset, expectedNestedVersion, newNestedVersion);
     }
 
     protected boolean CASowner(ReadWriteTransaction expectedOwner, ReadWriteTransaction newOwner) {
-	return UNSAFE.compareAndSwapObject(this, Offsets.ownerOffset, expectedOwner, newOwner);
+        return UNSAFE.compareAndSwapObject(this, Offsets.ownerOffset, expectedOwner, newOwner);
     }
 
     /**
-     * Due to the JVSTM integration in Deuce, we must keep in a separate 
-     * class all constants initialized with Unasfe operations, otherwise 
-     * the JVM may crash on the bootstrap when it loads a transactional 
-     * class. 
+     * Due to the JVSTM integration in Deuce, we must keep in a separate
+     * class all constants initialized with Unasfe operations, otherwise
+     * the JVM may crash on the bootstrap when it loads a transactional
+     * class.
      */
     private static class Offsets {
 
@@ -90,5 +90,5 @@ public class OwnershipRecord {
         private static final long ownerOffset = UtilUnsafe.objectFieldOffset(OwnershipRecord.class, "owner");;
 
     }
-    
+
 }

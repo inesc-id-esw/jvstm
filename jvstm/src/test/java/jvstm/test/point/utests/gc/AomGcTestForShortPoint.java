@@ -9,7 +9,7 @@ import jvstm.test.point.impl.AomShortPointFactory;
 public class AomGcTestForShortPoint extends AomGcTest<Short>{
 
     public AomGcTestForShortPoint() {
-	super(new AomShortPointFactory());
+        super(new AomShortPointFactory());
     }
-    
+
 }

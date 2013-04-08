@@ -49,7 +49,7 @@ public class ActiveTransactionsRecord {
      * there is no active transaction older than the number notified.
      */
 
-    private final static AtomicReference<Cons<TxQueueListener>> listeners = 
+    private final static AtomicReference<Cons<TxQueueListener>> listeners =
         new AtomicReference<Cons<TxQueueListener>>(Cons.<TxQueueListener>empty());
 
     public static void addListener(TxQueueListener listener) {
@@ -224,7 +224,7 @@ public class ActiveTransactionsRecord {
     protected boolean trySetNext(ActiveTransactionsRecord next) {
         return this.next.compareAndSet(null, next);
     }
-    
+
     protected void setCommitted() {
         this.recordCommitted = true;
     }
@@ -254,7 +254,7 @@ public class ActiveTransactionsRecord {
 
         nBlocks = this.writeSet.perTxBoxesWriteSet.nBlocks;
         blockIdx = 0;
-        idx = 0; 
+        idx = 0;
         for (Cons<GarbageCollectable> bodiesPerBlock : this.writeSet.perTxBoxesWriteSet.bodiesPerBlock) {
             for (GarbageCollectable body : bodiesPerBlock) {
                 body.clearPrevious();
@@ -298,69 +298,69 @@ public class ActiveTransactionsRecord {
 
     /**
      *  If vbodies' history only have one VBoxBody then we will try to revert it.
-     *  
-     *  The reversion process first acquires the object’s monitor and then executes the following  
+     *
+     *  The reversion process first acquires the object’s monitor and then executes the following
      *  3 steps (that are marked in the code bellow):
-     *  
-     *  - (1) read the head of the object’s history and check that it is the VBoxBody that was 
-     *  just trimmed (the body argument), executing the following two steps only if it is; 
-     *  
-     *  - (2) copy the values of the last committed body to the corresponding fields in the object. 
-     *  This copy is performed by the toCompactLayout method. 
-     *  
-     *  - (3) do an atomic compare and swap to change the value of the object’s header from its 
+     *
+     *  - (1) read the head of the object’s history and check that it is the VBoxBody that was
+     *  just trimmed (the body argument), executing the following two steps only if it is;
+     *
+     *  - (2) copy the values of the last committed body to the corresponding fields in the object.
+     *  This copy is performed by the toCompactLayout method.
+     *
+     *  - (3) do an atomic compare and swap to change the value of the object’s header from its
      *  previously read value to null.
-     *  
-     *  To understand why our current approach is correct, note that when we revert an object, 
-     *  we do not change the instances of VBoxBody that represent the object’s history; we 
+     *
+     *  To understand why our current approach is correct, note that when we revert an object,
+     *  we do not change the instances of VBoxBody that represent the object’s history; we
      *  simply set the body field of the reverted object to null.
      *  Moreover, the old object’s history is still valid, in the sense that it represents
      *  correct information about the committed values for the object; it just happens
      *  that it is not needed anymore.
-     *  
+     *
      *  Correctness of the Reversion:
-     *    
-     *  Imagine that one thread Tw is at commit phase and writing back to an object concurrently 
+     *
+     *  Imagine that one thread Tw is at commit phase and writing back to an object concurrently
      *  with another thread Tr that is trying to revert it.
      *  In this scenario consider the following interleaves:
-     *   
+     *
      *  - Tw -> Tr(1):
-     *   
-     *  If Tw finishes all its steps before Tr reads the head of the object’s history, then Tr 
+     *
+     *  If Tw finishes all its steps before Tr reads the head of the object’s history, then Tr
      *  will refuse to revert the object because it will see in the head of the history a different body.
-     *  
+     *
      *  - Tr(3) -> Tw:
-     *  
+     *
      *  If Tr is able to run to completion before Tw reads the history’s head, then Tw will see
-     *  the object in the compact layout and will extend it as usual (See VBoxAom::commit method). 
-     *  
+     *  the object in the compact layout and will extend it as usual (See VBoxAom::commit method).
+     *
      *  - Tw -> Tr(2/3):
-     *  
+     *
      *  If Tr sees the expected value at the history’s head, and Tw sees that same value, because
      *  it reads it before Tr sets it to null. In this case, Tw decides that it does not
      *  need to extend the object (because the object is already in the extended layout)
      *  and simply adds another version at the head of the current history and sets the
-     *  corresponding body field in the vbox object; this will be done independently of what Tr does. 
-     *  If Tw finishes first, the CAS of Tr will fail (step 3), leaving the object in the correct state 
+     *  corresponding body field in the vbox object; this will be done independently of what Tr does.
+     *  If Tw finishes first, the CAS of Tr will fail (step 3), leaving the object in the correct state
      *  (in the extended layout with the new value at the beginning of its history - the value written by Tw).
-     *  
+     *
      *  - Tw(1) -> Tr -> T2(2)
-     *  
-     *  If both Tr and Tw both see the object extended and Tr sees the expected value at the history’s 
+     *
+     *  If both Tr and Tw both see the object extended and Tr sees the expected value at the history’s
      *  head and finishes before Tw, then Tr successfully converts the object to the compact layout and
-     *  after that the Tw overwrites the body field with the new history, effectively turning the object 
+     *  after that the Tw overwrites the body field with the new history, effectively turning the object
      *  into the extended layout again.
-     *   
+     *
      */
     private <T extends VBox<T>> boolean tryRevert(VBox<T> vbox, GarbageCollectable body){
         synchronized (vbox){
-            if(vbox.body == body /* (1) step one of the reversion */ 
+            if(vbox.body == body /* (1) step one of the reversion */
                     // && (Transaction.mostRecentRecord.transactionNumber - body.version) >= 8
                     // && (currentOwner.version != 0 && currentOwner.version <= this.transactionNumber)
             ){
                 nrOfTries++;
                 vbox.toCompactLayout(((VBoxBody<T>)body).value); /* (2) step two of the reversion */
-                boolean res = UtilUnsafe.UNSAFE.compareAndSwapObject(vbox, VBox.Offsets.bodyOffset, body, null); /* (3) step three of the reversion */ 
+                boolean res = UtilUnsafe.UNSAFE.compareAndSwapObject(vbox, VBox.Offsets.bodyOffset, body, null); /* (3) step three of the reversion */
                 if(res) nrOfReversions++;
                 return res;
             }

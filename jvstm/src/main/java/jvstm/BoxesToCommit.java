@@ -31,8 +31,8 @@ import jvstm.util.Cons;
 
 public class BoxesToCommit {
 
-    public static final BoxesToCommit EMPTY_BOXES = new BoxesToCommit(); 
-    
+    public static final BoxesToCommit EMPTY_BOXES = new BoxesToCommit();
+
     /*
      * There are nBlocks of VBoxes ranged from 0 to nBlocks-1. Any i-th block
      * (except the last one) manages VBoxes from i*blockSize (including) to
@@ -54,26 +54,26 @@ public class BoxesToCommit {
     protected final Cons<GarbageCollectable>[] bodiesPerBlock;
     /* A write-back status for each bucket */
     protected final AtomicBoolean[] blocksDone;
-    
+
     private BoxesToCommit() {
-	this.nBlocks = 0;
-	this.blockSize = 0;
-	this.allWrittenVBoxes = new VBox[0];
-	this.allWrittenValues = new Object[0];
-	this.writeSetLength = 0;
-	this.bodiesPerBlock = new Cons[0];
-	this.blocksDone = new AtomicBoolean[0];
+        this.nBlocks = 0;
+        this.blockSize = 0;
+        this.allWrittenVBoxes = new VBox[0];
+        this.allWrittenValues = new Object[0];
+        this.writeSetLength = 0;
+        this.bodiesPerBlock = new Cons[0];
+        this.blocksDone = new AtomicBoolean[0];
     }
-    
+
     public BoxesToCommit(int nBlocks, int blockSize, VBox[] allWrittenVBoxes, Object[] allWrittenValues, int writeSetLength,
-	    Cons<GarbageCollectable>[] bodiesPerBlock, AtomicBoolean[] blocksDone) {
-	this.nBlocks = nBlocks;
-	this.blockSize = blockSize;
-	this.allWrittenVBoxes = allWrittenVBoxes;
-	this.allWrittenValues = allWrittenValues;
-	this.writeSetLength = writeSetLength;
-	this.bodiesPerBlock = bodiesPerBlock;
-	this.blocksDone = blocksDone;
+            Cons<GarbageCollectable>[] bodiesPerBlock, AtomicBoolean[] blocksDone) {
+        this.nBlocks = nBlocks;
+        this.blockSize = blockSize;
+        this.allWrittenVBoxes = allWrittenVBoxes;
+        this.allWrittenValues = allWrittenValues;
+        this.writeSetLength = writeSetLength;
+        this.bodiesPerBlock = bodiesPerBlock;
+        this.blocksDone = blocksDone;
     }
-    
+
 }

@@ -46,7 +46,7 @@ public class GCTask implements Runnable {
                     t.setDaemon(true);
                     return t;
                 }};
-        
+
         ThreadPoolExecutor executor = null;
         int poolSize = Runtime.getRuntime().availableProcessors() / 10 + 1;
         // if (poolSize > 40) {
@@ -58,7 +58,7 @@ public class GCTask implements Runnable {
         executor.allowCoreThreadTimeOut(true);
         return executor;
     }
-    
+
     public GCTask(ActiveTransactionsRecord lastCleanedRecord) {
         this.lastCleanedRecord = lastCleanedRecord;
     }
@@ -77,11 +77,11 @@ public class GCTask implements Runnable {
             }
         }
     }
-    
+
     /**
-     * This method is used for unit tests purpose to force GC running and 
+     * This method is used for unit tests purpose to force GC running and
      * convert objects to the CompactLayout, when using the AOM approach.
-     * In this case we should also have disabled the previous asynchronous 
+     * In this case we should also have disabled the previous asynchronous
      * task through the VM property: -Djvstm.gc.disabled=true
      */
     public void runGc(){
@@ -164,7 +164,7 @@ public class GCTask implements Runnable {
             previous.next = toRemove.next;
         }
     }
-    
+
     // public static int total = 0;
     // public static int count = 0;
     // public static int max = 0;

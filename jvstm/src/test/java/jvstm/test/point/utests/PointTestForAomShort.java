@@ -7,7 +7,7 @@ import jvstm.test.point.impl.AomShortPointFactory;
 public class PointTestForAomShort extends TestPoint<Short>{
 
     public PointTestForAomShort() {
-	super(new AomShortPointFactory());
+        super(new AomShortPointFactory());
     }
 
 }

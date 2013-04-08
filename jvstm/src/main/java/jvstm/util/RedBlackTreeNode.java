@@ -63,10 +63,10 @@ public class RedBlackTreeNode<K,V> {
      * @param key key with which the specified value is to be associated.
      * @param value value to be associated with the specified key.
      * @param comparator the comparator that will be used to sort the
-     *                   keys in the tree.  If <tt>null</tt>, the natural 
-     *                   order of the <tt>key</tt> is used, as per the 
+     *                   keys in the tree.  If <tt>null</tt>, the natural
+     *                   order of the <tt>key</tt> is used, as per the
      *                   Comparable interface.
-     * @return  a new node that represents a tree where the <tt>key</tt> 
+     * @return  a new node that represents a tree where the <tt>key</tt>
      *          is mapped to <tt>value</tt>.
      */
     public RedBlackTreeNode<K,V> put(K key, V value, Comparator<? super K> comparator) {
@@ -80,12 +80,12 @@ public class RedBlackTreeNode<K,V> {
     public Pair<RedBlackTreeNode<K,V>,V> putIfAbsent(K key, V value, Comparator<? super K> comparator) {
         return insert(key, value, comparator, MODE_IF_ABSENT);
     }
-    
-    
 
-    private Pair<RedBlackTreeNode<K,V>,V> insert(K key, 
-                                                 V value, 
-                                                 Comparator<? super K> comparator, 
+
+
+    private Pair<RedBlackTreeNode<K,V>,V> insert(K key,
+                                                 V value,
+                                                 Comparator<? super K> comparator,
                                                  int mode) {
         Pair<RedBlackTreeNode<K,V>,V> result = new Pair<RedBlackTreeNode<K,V>,V>();
 
@@ -98,14 +98,14 @@ public class RedBlackTreeNode<K,V> {
         if (result.first != null) {
             result.first.color = BLACK;
         }
-        return result;        
+        return result;
     }
 
 
-    private void insert(K key, 
-                        V value, 
-                        Comparator<? super K> comparator, 
-                        Pair<RedBlackTreeNode<K,V>,V> result, 
+    private void insert(K key,
+                        V value,
+                        Comparator<? super K> comparator,
+                        Pair<RedBlackTreeNode<K,V>,V> result,
                         int mode) {
         if (this == EMPTY) {
             if (mode != MODE_REPLACE) {
@@ -133,9 +133,9 @@ public class RedBlackTreeNode<K,V> {
         }
     }
 
-    private void insertComparable(Comparable<K> key, 
-                                  V value, 
-                                  Pair<RedBlackTreeNode<K,V>,V> result, 
+    private void insertComparable(Comparable<K> key,
+                                  V value,
+                                  Pair<RedBlackTreeNode<K,V>,V> result,
                                   int mode) {
         if (this == EMPTY) {
             if (mode != MODE_REPLACE) {
@@ -168,19 +168,19 @@ public class RedBlackTreeNode<K,V> {
 
         if ((node.color == BLACK) && (left.color == RED)) {
             if (left.left.color == RED) {
-                result.first = new RedBlackTreeNode<K,V>(RED, 
-                                                         left.key, 
-                                                         left.value, 
-                                                         new RedBlackTreeNode<K,V>(BLACK, left.left.key, left.left.value, left.left.left, left.left.right), 
+                result.first = new RedBlackTreeNode<K,V>(RED,
+                                                         left.key,
+                                                         left.value,
+                                                         new RedBlackTreeNode<K,V>(BLACK, left.left.key, left.left.value, left.left.left, left.left.right),
                                                          new RedBlackTreeNode<K,V>(BLACK, node.key, node.value, left.right, node.right));
                 return;
             }
 
             if (left.right.color == RED) {
-                result.first = new RedBlackTreeNode<K,V>(RED, 
-                                                         left.right.key, 
-                                                         left.right.value, 
-                                                         new RedBlackTreeNode<K,V>(BLACK, left.key, left.value, left.left, left.right.left), 
+                result.first = new RedBlackTreeNode<K,V>(RED,
+                                                         left.right.key,
+                                                         left.right.value,
+                                                         new RedBlackTreeNode<K,V>(BLACK, left.key, left.value, left.left, left.right.left),
                                                          new RedBlackTreeNode<K,V>(BLACK, node.key, node.value, left.right.right, node.right));
                 return;
             }
@@ -194,19 +194,19 @@ public class RedBlackTreeNode<K,V> {
 
         if ((node.color == BLACK) && (right.color == RED)) {
             if (right.left.color == RED) {
-                result.first = new RedBlackTreeNode<K,V>(RED, 
-                                                         right.left.key, 
-                                                         right.left.value, 
-                                                         new RedBlackTreeNode<K,V>(BLACK, node.key, node.value, node.left, right.left.left), 
+                result.first = new RedBlackTreeNode<K,V>(RED,
+                                                         right.left.key,
+                                                         right.left.value,
+                                                         new RedBlackTreeNode<K,V>(BLACK, node.key, node.value, node.left, right.left.left),
                                                          new RedBlackTreeNode<K,V>(BLACK, right.key, right.value, right.left.right, right.right));
                 return;
             }
 
             if (right.right.color == RED) {
-                result.first = new RedBlackTreeNode<K,V>(RED, 
-                                                         right.key, 
-                                                         right.value, 
-                                                         new RedBlackTreeNode<K,V>(BLACK, node.key, node.value, node.left, right.left), 
+                result.first = new RedBlackTreeNode<K,V>(RED,
+                                                         right.key,
+                                                         right.value,
+                                                         new RedBlackTreeNode<K,V>(BLACK, node.key, node.value, node.left, right.left),
                                                          new RedBlackTreeNode<K,V>(BLACK, right.right.key, right.right.value, right.right.left, right.right.right));
                 return;
             }
@@ -274,7 +274,7 @@ public class RedBlackTreeNode<K,V> {
         RBTIterator() {
             this.path = Cons.empty();
         }
-        
+
         RBTIterator(RedBlackTreeNode<K,V> root) {
             this();
             if (root != EMPTY) {
@@ -289,11 +289,11 @@ public class RedBlackTreeNode<K,V> {
             }
             this.next = node;
         }
-        
-        public boolean hasNext() { 
+
+        public boolean hasNext() {
             return next != null;
         }
-        
+
         public RedBlackTreeNode<K,V> next() {
             if (next == null) {
                 throw new NoSuchElementException();
@@ -315,7 +315,7 @@ public class RedBlackTreeNode<K,V> {
                 return result;
             }
         }
-        
+
         public void remove() {
             throw new UnsupportedOperationException();
         }

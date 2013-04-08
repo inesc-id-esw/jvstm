@@ -15,8 +15,8 @@ public class RunMultipleThreadsInLoop {
   private static final Random rand = new Random();
 
   public static <T extends Number> void performTest(
-      final int nrOfThreads, 
-      final int nrOfIterations, 
+      final int nrOfThreads,
+      final int nrOfIterations,
       final Point<T> p ) throws InterruptedException{
     final Thread[] threads = new Thread[nrOfThreads];
     long coordsSum = p.getX().longValue() + p.getY().longValue();
@@ -36,12 +36,12 @@ public class RunMultipleThreadsInLoop {
     Thread.sleep(600);
     System.out.println("Number of reversions = " + ActiveTransactionsRecord.nrOfReversions);
     System.out.println("Number of tries = " + ActiveTransactionsRecord.nrOfTries);
-    System.out.println("Object is " + ((VBox)p).body == null? "COMPACT" : "EXTENDED"); 
+    System.out.println("Object is " + ((VBox)p).body == null? "COMPACT" : "EXTENDED");
     long currSum = p.getX().longValue() + p.getY().longValue();
     Assert.assertEquals("Final verification: ", coordsSum, currSum);
   }
   public static <T extends Number> void workerThread(
-      final int nrOfIterations, 
+      final int nrOfIterations,
       final Point<T> p,
       final long coordsSum
   ){
@@ -56,8 +56,8 @@ public class RunMultipleThreadsInLoop {
             int valueToAdd = rand.nextInt(10) - 5;
             p.setX(x + valueToAdd);
             p.setY(y - valueToAdd);
-            String res = Thread.currentThread().getName() + ": [x=" + x + ", y=" + y + "] ===> " + "[x=" + (x+valueToAdd) + ", y=" + (y-valueToAdd) + "]"; 
-            return res; 
+            String res = Thread.currentThread().getName() + ": [x=" + x + ", y=" + y + "] ===> " + "[x=" + (x+valueToAdd) + ", y=" + (y-valueToAdd) + "]";
+            return res;
           }
         });
         // System.out.println(String.format("iteration %d - %s - has read: %s", j, trxKind, res));

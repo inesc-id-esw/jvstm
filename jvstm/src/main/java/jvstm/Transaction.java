@@ -69,9 +69,9 @@ public abstract class Transaction {
 
     // a per thread TxContext
     private static final ThreadLocal<TxContext> threadTxContext = new ThreadLocal<TxContext>() {
-	@Override protected TxContext initialValue() {
-	    return Transaction.allTxContexts.enqueue(new TxContext(Thread.currentThread()));
-	}
+        @Override protected TxContext initialValue() {
+            return Transaction.allTxContexts.enqueue(new TxContext(Thread.currentThread()));
+        }
     };
 
     // List of all tx contexts.  The GC thread will iterate this list to GC any unused ActiveTxRecords.
@@ -80,10 +80,10 @@ public abstract class Transaction {
     static final String GC_PROP = "jvstm.gc.disabled";
 
     static {
-	// initialize the allTxContexts
-	Transaction.allTxContexts = new TxContext(null);
-	
-	// start the GC thread.
+        // initialize the allTxContexts
+        Transaction.allTxContexts = new TxContext(null);
+
+        // start the GC thread.
         boolean gcDisabled = Boolean.getBoolean(GC_PROP);
         String NEW_LINE = System.getProperty("line.separator");
         Logger logger = Logger.getLogger("jvstm");
@@ -100,15 +100,15 @@ public abstract class Transaction {
     private static TransactionFactory TRANSACTION_FACTORY = new DefaultTransactionFactory();
 
     public static void setTransactionFactory(TransactionFactory factory) {
-	TRANSACTION_FACTORY = factory;
+        TRANSACTION_FACTORY = factory;
     }
 
     public static Transaction current() {
-	return current.get();
+        return current.get();
     }
 
     public static TxContext context() {
-	return Transaction.threadTxContext.get();
+        return Transaction.threadTxContext.get();
     }
 
     // This method is called during the commit of a write transaction.  Even though it is possible
@@ -116,60 +116,60 @@ public abstract class Transaction {
     // transaction to see some record that might not be the most recent one.  However, this is ok,
     // because when a transactio begin it will check for another more recent record.
     public static void setMostRecentCommittedRecord(ActiveTransactionsRecord record) {
-	mostRecentCommittedRecord = record;
+        mostRecentCommittedRecord = record;
     }
 
     public static void addTxQueueListener(TxQueueListener listener) {
-	ActiveTransactionsRecord.addListener(listener);
+        ActiveTransactionsRecord.addListener(listener);
     }
 
     public static boolean isInTransaction() {
-	return current.get() != null;
+        return current.get() != null;
     }
 
     private static ActiveTransactionsRecord getRecordForNewTransaction() {
-	ActiveTransactionsRecord rec = Transaction.mostRecentCommittedRecord;
+        ActiveTransactionsRecord rec = Transaction.mostRecentCommittedRecord;
 
-	TxContext ctx = threadTxContext.get();
-	ctx.oldestRequiredVersion = rec; // volatile write
+        TxContext ctx = threadTxContext.get();
+        ctx.oldestRequiredVersion = rec; // volatile write
 
-	while (true) {
-	    while ((rec.getNext() != null) && (rec.getNext().isCommitted())) {
-		rec = rec.getNext();
-	    }
-	    if (rec != ctx.oldestRequiredVersion) {
-		// a more recent record exists, so backoff and try again with the new one
-		ctx.oldestRequiredVersion = rec; // volatile write
-	    } else {
-		return rec;
-	    }
-	}
+        while (true) {
+            while ((rec.getNext() != null) && (rec.getNext().isCommitted())) {
+                rec = rec.getNext();
+            }
+            if (rec != ctx.oldestRequiredVersion) {
+                // a more recent record exists, so backoff and try again with the new one
+                ctx.oldestRequiredVersion = rec; // volatile write
+            } else {
+                return rec;
+            }
+        }
     }
 
     /** Warning: this method has limited usability.  See the UnsafeSingleThreaded class for
      * details */
     public static Transaction beginUnsafeSingleThreaded() {
-	Transaction parent = current.get();
-	if (parent != null) {
-	    throw new Error("Unsafe single-threaded transactions cannot be nested");
-	}
+        Transaction parent = current.get();
+        if (parent != null) {
+            throw new Error("Unsafe single-threaded transactions cannot be nested");
+        }
 
-	ActiveTransactionsRecord activeRecord = getRecordForNewTransaction();
-	Transaction tx = new UnsafeSingleThreadedTransaction(activeRecord);
-	tx.start();
-	return tx;
+        ActiveTransactionsRecord activeRecord = getRecordForNewTransaction();
+        Transaction tx = new UnsafeSingleThreadedTransaction(activeRecord);
+        tx.start();
+        return tx;
     }
 
     public static Transaction beginInevitable() {
-	Transaction parent = current.get();
-	if (parent != null) {
-	    throw new Error("Inevitable transactions cannot be nested");
-	}
+        Transaction parent = current.get();
+        if (parent != null) {
+            throw new Error("Inevitable transactions cannot be nested");
+        }
 
-	ActiveTransactionsRecord activeRecord = getRecordForNewTransaction();
-	Transaction tx = new InevitableTransaction(activeRecord);
-	tx.start();
-	return tx;
+        ActiveTransactionsRecord activeRecord = getRecordForNewTransaction();
+        Transaction tx = new InevitableTransaction(activeRecord);
+        tx.start();
+        return tx;
     }
 
     public static Transaction begin() {
@@ -222,187 +222,187 @@ public abstract class Transaction {
      * succeeds, the new transaction begins in the version that the read-write transaction produced.
      */
     public static Transaction commitAndBegin(boolean readOnly) {
-	Transaction tx = current.get();
-	return tx.commitAndBeginTx(readOnly);
+        Transaction tx = current.get();
+        return tx.commitAndBeginTx(readOnly);
     }
 
     public static Transaction beginParallelNested(boolean readOnly) {
-	Transaction parent = current.get();
-	Transaction tx = parent.makeParallelNestedTransaction(readOnly);
-	tx.start();
-	return tx;
+        Transaction parent = current.get();
+        Transaction tx = parent.makeParallelNestedTransaction(readOnly);
+        tx.start();
+        return tx;
     }
-    
+
     public static Transaction beginUnsafeMultithreaded() {
-	Transaction parent = current.get();
-	Transaction tx = parent.makeUnsafeMultithreaded();
-	tx.start();
-	return tx;
+        Transaction parent = current.get();
+        Transaction tx = parent.makeUnsafeMultithreaded();
+        tx.start();
+        return tx;
     }
 
     public static void initThreadPool(int numberThreads) {
-	nestedParPool = Executors.newFixedThreadPool(numberThreads, new ThreadFactory() {
-	    @Override
-	    public Thread newThread(Runnable r) {
-		Thread t = new Thread(r);
-		t.setDaemon(true);
-		return t;
-	    }
-	});
+        nestedParPool = Executors.newFixedThreadPool(numberThreads, new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r);
+                t.setDaemon(true);
+                return t;
+            }
+        });
     }
-    
+
     public static void initCachedThreadPool() {
-	nestedParPool = Executors.newCachedThreadPool(new ThreadFactory() {
-	    @Override
-	    public Thread newThread(Runnable r) {
-		Thread t = new Thread(r);
-		t.setDaemon(true);
-		return t;
-	    }
-	});
+        nestedParPool = Executors.newCachedThreadPool(new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r);
+                t.setDaemon(true);
+                return t;
+            }
+        });
     }
 
     protected static ExecutorService nestedParPool = Executors.newFixedThreadPool(Runtime.getRuntime()
-	    .availableProcessors() * 2, new ThreadFactory() {
-	@Override
-	public Thread newThread(Runnable r) {
-	    Thread t = new Thread(r);
-	    t.setDaemon(true);
-	    return t;
-	}
+            .availableProcessors() * 2, new ThreadFactory() {
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread t = new Thread(r);
+            t.setDaemon(true);
+            return t;
+        }
     });
 
     public <E> List<E> manageNestedParallelTxs(List<? extends TransactionalTask<E>> callables) {
-	return manageNestedParallelTxs(callables, nestedParPool);
+        return manageNestedParallelTxs(callables, nestedParPool);
     }
 
     protected boolean flattenNested = false;
 
     public <E> List<E> manageNestedParallelTxs(List<? extends TransactionalTask<E>> callables, ExecutorService threadPool) {
-	List<E> results = new ArrayList<E>();
-	if (flattenNested) {
-	    try {
-		for (TransactionalTask<E> callable : callables) {
-		    results.add((callable).execute());
-		}
-	    } catch (Throwable t) {
-		if (t instanceof RuntimeException) {
-		    throw (RuntimeException) t;
-		} else {
-		    t.printStackTrace();
-		    System.exit(0);
-		    return null;
-		}
-	    }
-	    return results;
-	}
+        List<E> results = new ArrayList<E>();
+        if (flattenNested) {
+            try {
+                for (TransactionalTask<E> callable : callables) {
+                    results.add((callable).execute());
+                }
+            } catch (Throwable t) {
+                if (t instanceof RuntimeException) {
+                    throw (RuntimeException) t;
+                } else {
+                    t.printStackTrace();
+                    System.exit(0);
+                    return null;
+                }
+            }
+            return results;
+        }
 
-	List<Future<E>> futures = null;
-	List<TransactionalTask<E>> repeatList = null;
-	boolean finishedCorrectly = false;
-	try {
-	    futures = threadPool.invokeAll(callables);
-	    int futureLength = futures.size();
-	    for (int i = 0; i < futureLength; i++) {
-		try {
-		    results.add(futures.get(i).get());
-		} catch (ExecutionException ee) {
-		    Throwable t = ee.getCause();
-		    if (t instanceof ExecuteParallelNestedTxSequentiallyException) {
-			if (repeatList == null) {
-			    repeatList = new ArrayList<TransactionalTask<E>>();
-			}
-			repeatList.add(callables.get(i));
-		    } else if (t instanceof RuntimeException) {
-			throw (RuntimeException) t;
-		    } else {
-			throw new RuntimeException(ee);
-		    }
-		}
-	    }
-	    finishedCorrectly = true;
-	} catch (InterruptedException e) {
-	    throw new RuntimeException(e);
-	} finally {
-	    if (!finishedCorrectly) {
-		for (Future<E> future : futures) {
-		    try {
-			future.get();
-		    } catch (InterruptedException e) {
-		    } catch (ExecutionException e) {
-		    }
-		}
-	    } else if (repeatList != null) {
-		flattenNested = true;
-		try {
-		    for (TransactionalTask<E> callable : repeatList) {
-			results.add(callable.execute());
-		    }
-		} catch (Throwable t) {
-		    if (t instanceof RuntimeException) {
-			throw (RuntimeException) t;
-		    } else {
-			throw new RuntimeException(t);
-		    }
-		}
-		flattenNested = false;
-	    }
-	}
-	return results;
+        List<Future<E>> futures = null;
+        List<TransactionalTask<E>> repeatList = null;
+        boolean finishedCorrectly = false;
+        try {
+            futures = threadPool.invokeAll(callables);
+            int futureLength = futures.size();
+            for (int i = 0; i < futureLength; i++) {
+                try {
+                    results.add(futures.get(i).get());
+                } catch (ExecutionException ee) {
+                    Throwable t = ee.getCause();
+                    if (t instanceof ExecuteParallelNestedTxSequentiallyException) {
+                        if (repeatList == null) {
+                            repeatList = new ArrayList<TransactionalTask<E>>();
+                        }
+                        repeatList.add(callables.get(i));
+                    } else if (t instanceof RuntimeException) {
+                        throw (RuntimeException) t;
+                    } else {
+                        throw new RuntimeException(ee);
+                    }
+                }
+            }
+            finishedCorrectly = true;
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } finally {
+            if (!finishedCorrectly) {
+                for (Future<E> future : futures) {
+                    try {
+                        future.get();
+                    } catch (InterruptedException e) {
+                    } catch (ExecutionException e) {
+                    }
+                }
+            } else if (repeatList != null) {
+                flattenNested = true;
+                try {
+                    for (TransactionalTask<E> callable : repeatList) {
+                        results.add(callable.execute());
+                    }
+                } catch (Throwable t) {
+                    if (t instanceof RuntimeException) {
+                        throw (RuntimeException) t;
+                    } else {
+                        throw new RuntimeException(t);
+                    }
+                }
+                flattenNested = false;
+            }
+        }
+        return results;
     }
 
     public static void abort() {
-	Transaction tx = current.get();
-	tx.abortTx();
+        Transaction tx = current.get();
+        tx.abortTx();
     }
-    
+
     public static void commit() {
-	Transaction tx = current.get();
-	tx.commitTx(true);
+        Transaction tx = current.get();
+        tx.commitTx(true);
     }
 
     public static void checkpoint() {
-	Transaction tx = current.get();
-	tx.commitTx(false);
+        Transaction tx = current.get();
+        tx.commitTx(false);
     }
 
     public static SuspendedTransaction suspend() {
-	return current.get().suspendTx();
+        return current.get().suspendTx();
     }
 
     public static Transaction resume(SuspendedTransaction suspendedTx) {
-	if (current.get() != null) {
-	    throw new ResumeException("Can't resume a transaction into a thread with an active transaction already");
-	}
+        if (current.get() != null) {
+            throw new ResumeException("Can't resume a transaction into a thread with an active transaction already");
+        }
 
-	// In the previous lines I'm checking that the current thread
-	// has no transaction, because, otherwise, we would lose the
-	// current transaction.
-	//
-	// Likewise, I should not allow that the same transaction is
-	// associated with more than one thread.  For that, however, I
-	// would have to keep track of which thread owns each
-	// transaction and change that atomically.  I recall having
-	// the thread in each transaction but I removed sometime ago.
-	// So, until I investigate this further, whoever is using this
-	// resume stuff must be carefull, because the system will not
-	// detect that the same transaction is being used in two
-	// different threads.
+        // In the previous lines I'm checking that the current thread
+        // has no transaction, because, otherwise, we would lose the
+        // current transaction.
+        //
+        // Likewise, I should not allow that the same transaction is
+        // associated with more than one thread.  For that, however, I
+        // would have to keep track of which thread owns each
+        // transaction and change that atomically.  I recall having
+        // the thread in each transaction but I removed sometime ago.
+        // So, until I investigate this further, whoever is using this
+        // resume stuff must be carefull, because the system will not
+        // detect that the same transaction is being used in two
+        // different threads.
 
-	TxContext currentTxContext = context();
-	currentTxContext.oldestRequiredVersion = suspendedTx.txContext.oldestRequiredVersion;
-	/* NOTE: we CANNOT set
-	 * suspendedTx.txContext.oldestRequiredVersion = null;
-	 *
-	 * Doing so would allow the GCTask to miss out on this version, by seeing null in the oldestRequiredVersion of
-	 * both the currentTxContext and the suspendedTx.txContext.  The TxContext in suspendedTx will be removed from
-	 * the list when the now resumed transaction becomes GCed.
-	 */
+        TxContext currentTxContext = context();
+        currentTxContext.oldestRequiredVersion = suspendedTx.txContext.oldestRequiredVersion;
+        /* NOTE: we CANNOT set
+         * suspendedTx.txContext.oldestRequiredVersion = null;
+         *
+         * Doing so would allow the GCTask to miss out on this version, by seeing null in the oldestRequiredVersion of
+         * both the currentTxContext and the suspendedTx.txContext.  The TxContext in suspendedTx will be removed from
+         * the list when the now resumed transaction becomes GCed.
+         */
 
-	// set the transaction in this thread
-	current.set(suspendedTx.theTx);
-	// return the resumed transaction
-	return suspendedTx.theTx;
+        // set the transaction in this thread
+        current.set(suspendedTx.theTx);
+        // return the resumed transaction
+        return suspendedTx.theTx;
     }
 
     // the transaction version that is used to read boxes. Must always represent a consistent state
@@ -421,73 +421,73 @@ public abstract class Transaction {
     public final OwnershipRecord orecForNewObjects = new OwnershipRecord();
 
     public Transaction(Transaction parent, int number) {
-	this.parent = parent;
-	this.number = number;
+        this.parent = parent;
+        this.number = number;
     }
 
     public Transaction(int number) {
-	this(null, number);
+        this(null, number);
     }
 
     public Transaction(Transaction parent) {
-	this(parent, parent.getNumber());
+        this(parent, parent.getNumber());
     }
 
     public void start() {
-	current.set(this);
+        current.set(this);
     }
 
     protected Transaction getParent() {
-	return parent;
+        return parent;
     }
 
     public int getNumber() {
-	return number;
+        return number;
     }
 
     protected void setNumber(int number) {
-	this.number = number;
+        this.number = number;
     }
 
     public void abortTx() {
-	finishTx();
+        finishTx();
     }
 
     public void commitTx(boolean finishAlso) {
-	doCommit();
+        doCommit();
 
-	if (finishAlso) {
-	    finishTx();
-	}
+        if (finishAlso) {
+            finishTx();
+        }
     }
 
     private void finishTx() {
-	finish();
+        finish();
 
-	current.set(this.getParent());
+        current.set(this.getParent());
     }
 
     protected void finish() {
-	// intentionally empty
+        // intentionally empty
     }
 
     public SuspendedTransaction suspendTx() {
-	// remove the transaction from the thread
-	current.set(null);
+        // remove the transaction from the thread
+        current.set(null);
 
-	TxContext newTxContext = new TxContext(this);
-	// create a new SuspendedTransaction holding the transaction and its context.
-	SuspendedTransaction suspendedTx = new SuspendedTransaction(this, newTxContext);
-	// enqueue the new TxContext to hold the transaction's required record
-	Transaction.allTxContexts.enqueue(newTxContext);
-	TxContext currentTxContext = context();
-	// the order is important! We must not let go of the required version, so we set it ahead before clearing it in
-	// the current context
-	newTxContext.oldestRequiredVersion = currentTxContext.oldestRequiredVersion;
-	currentTxContext.oldestRequiredVersion = null;
+        TxContext newTxContext = new TxContext(this);
+        // create a new SuspendedTransaction holding the transaction and its context.
+        SuspendedTransaction suspendedTx = new SuspendedTransaction(this, newTxContext);
+        // enqueue the new TxContext to hold the transaction's required record
+        Transaction.allTxContexts.enqueue(newTxContext);
+        TxContext currentTxContext = context();
+        // the order is important! We must not let go of the required version, so we set it ahead before clearing it in
+        // the current context
+        newTxContext.oldestRequiredVersion = currentTxContext.oldestRequiredVersion;
+        currentTxContext.oldestRequiredVersion = null;
 
-	return suspendedTx;
-	// the currentTxContext is left to be reused by this thread
+        return suspendedTx;
+        // the currentTxContext is left to be reused by this thread
     }
 
     protected abstract Transaction commitAndBeginTx(boolean readOnly);
@@ -515,50 +515,50 @@ public abstract class Transaction {
     public abstract boolean isWriteTransaction();
 
     public static void transactionallyDo(TransactionalCommand command) {
-	while (true) {
-	    Transaction tx = Transaction.begin();
-	    try {
-		command.doIt();
-		tx.commit();
-		tx = null;
-		return;
-	    } catch (CommitException ce) {
-		tx.abort();
-		tx = null;
-	    } finally {
-		if (tx != null) {
-		    tx.abort();
-		}
-	    }
-	}
+        while (true) {
+            Transaction tx = Transaction.begin();
+            try {
+                command.doIt();
+                tx.commit();
+                tx = null;
+                return;
+            } catch (CommitException ce) {
+                tx.abort();
+                tx = null;
+            } finally {
+                if (tx != null) {
+                    tx.abort();
+                }
+            }
+        }
     }
 
     public static <T> T doIt(Callable<T> xaction) throws Exception {
-	return doIt(xaction, false);
+        return doIt(xaction, false);
     }
 
     public static <T> T doIt(Callable<T> xaction, boolean tryReadOnly) throws Exception {
-	T result = null;
-	while (true) {
-	    Transaction.begin(tryReadOnly);
-	    boolean finished = false;
-	    try {
-		result = xaction.call();
-		Transaction.commit();
-		finished = true;
-		return result;
-	    } catch (CommitException ce) {
-		Transaction.abort();
-		finished = true;
-	    } catch (WriteOnReadException wore) {
-		Transaction.abort();
-		finished = true;
-		tryReadOnly = false;
-	    } finally {
-		if (! finished) {
-		    Transaction.abort();
-		}
-	    }
-	}
+        T result = null;
+        while (true) {
+            Transaction.begin(tryReadOnly);
+            boolean finished = false;
+            try {
+                result = xaction.call();
+                Transaction.commit();
+                finished = true;
+                return result;
+            } catch (CommitException ce) {
+                Transaction.abort();
+                finished = true;
+            } catch (WriteOnReadException wore) {
+                Transaction.abort();
+                finished = true;
+                tryReadOnly = false;
+            } finally {
+                if (! finished) {
+                    Transaction.abort();
+                }
+            }
+        }
     }
 }

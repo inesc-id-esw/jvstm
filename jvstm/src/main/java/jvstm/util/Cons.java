@@ -28,7 +28,7 @@ package jvstm.util;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-public final class Cons<E> implements Iterable<E> { 
+public final class Cons<E> implements Iterable<E> {
     protected static final Cons EMPTY = new Cons(null, null);
 
     public final static <T> Cons<T> empty() {
@@ -46,7 +46,7 @@ public final class Cons<E> implements Iterable<E> {
     public final Cons<E> cons(E elem) {
         return new Cons<E>(elem, this);
     }
-    
+
     public final E first() {
         if (isEmpty()) {
             throw new EmptyListException();
@@ -115,7 +115,7 @@ public final class Cons<E> implements Iterable<E> {
                     next = next.rest;
                 }
             }
-            
+
             // share the rest
             newCons = newCons.reverseInto(next.rest);
             return newCons;
@@ -127,7 +127,7 @@ public final class Cons<E> implements Iterable<E> {
         while ((iter != cons) && (iter != EMPTY)) {
             iter = iter.rest;
         }
-        
+
         if (iter == EMPTY) {
             return this;
         } else {
@@ -146,7 +146,7 @@ public final class Cons<E> implements Iterable<E> {
                 newCons = newCons.cons(next.first);
                 next = next.rest;
             }
-            
+
             // share the rest
             newCons = newCons.reverseInto(next.rest);
             return newCons;
@@ -233,16 +233,16 @@ public final class Cons<E> implements Iterable<E> {
 
     final static class ConsIterator<T> implements Iterator<T> {
         private Cons<T> current;
-        
+
         ConsIterator(Cons<T> start) {
             this.current = start;
         }
-        
-        public final boolean hasNext() { 
+
+        public final boolean hasNext() {
             return (current != EMPTY);
         }
-        
-        public final T next() { 
+
+        public final T next() {
             if (current == EMPTY) {
                 throw new NoSuchElementException();
             } else {
@@ -251,7 +251,7 @@ public final class Cons<E> implements Iterable<E> {
                 return result;
             }
         }
-        
+
         public final void remove() {
             throw new UnsupportedOperationException();
         }

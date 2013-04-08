@@ -59,7 +59,7 @@ public class TxContext {
      */
     /** The owner that needs this TxContext. Either a Thread or a Transaction */
     public final WeakReference owner;
-    
+
     public TxContext(Object owner) {
         this.owner = new WeakReference(owner);
     }

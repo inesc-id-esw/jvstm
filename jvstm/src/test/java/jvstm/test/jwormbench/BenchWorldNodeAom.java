@@ -12,8 +12,8 @@ import jwormbench.core.IWorm;
 
 /**
  * Abstracts the node object within the BenchWorld.
- * 
- * @author F. Miguel Carvalho mcarvalho[@]cc.isel.pt 
+ *
+ * @author F. Miguel Carvalho mcarvalho[@]cc.isel.pt
  */
 public class BenchWorldNodeAom extends VBoxAom<BenchWorldNodeAom> implements INode{
     /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*
@@ -22,28 +22,28 @@ public class BenchWorldNodeAom extends VBoxAom<BenchWorldNodeAom> implements INo
     private static final long value__ADDRESS__;
     static{
         try {
-    	value__ADDRESS__ = UtilUnsafe.UNSAFE.objectFieldOffset(BenchWorldNodeAom.class.getDeclaredField("value"));
+            value__ADDRESS__ = UtilUnsafe.UNSAFE.objectFieldOffset(BenchWorldNodeAom.class.getDeclaredField("value"));
         } catch (SecurityException e) {
-    	throw new RuntimeException(e);
+            throw new RuntimeException(e);
         } catch (NoSuchFieldException e) {
-    	throw new RuntimeException(e);
+            throw new RuntimeException(e);
         }
     }
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // ---------------------- FIELDS --------------------- 
-    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~    
+    // ---------------------- FIELDS ---------------------
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     protected int value;
     protected IWorm worm;
 
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // -------------------   CONSTRUCTOR ----------------- 
+    // -------------------   CONSTRUCTOR -----------------
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     public BenchWorldNodeAom(int value){
-	this.value = value;
-	worm = null;
+        this.value = value;
+        worm = null;
     }
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    // -------------------   PROPERTIES  ----------------- 
+    // -------------------   PROPERTIES  -----------------
     //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     /**
      * @see wormbench.INode#getValue()
@@ -77,10 +77,10 @@ public class BenchWorldNodeAom extends VBoxAom<BenchWorldNodeAom> implements INo
     }
     @Override
     public BenchWorldNodeAom replicate() {
-	return new BenchWorldNode__FIELDS__(value);
+        return new BenchWorldNode__FIELDS__(value);
     }
     @Override
     public void toCompactLayout(BenchWorldNodeAom from) {
-	this.value = from.value;
+        this.value = from.value;
     }
 }

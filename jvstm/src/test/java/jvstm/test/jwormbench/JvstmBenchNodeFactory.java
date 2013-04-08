@@ -6,6 +6,6 @@ import jwormbench.factories.INodeFactory;
 
 public class JvstmBenchNodeFactory implements INodeFactory{
     public INode make(int initValue){
-	return new BenchWorldNodeAom(initValue);
+        return new BenchWorldNodeAom(initValue);
     }
 }

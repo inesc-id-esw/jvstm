@@ -28,18 +28,18 @@ package jvstm;
 import static jvstm.UtilUnsafe.UNSAFE;
 
 public class VBox<E> {
-    
+
     /**
-     * We moved here all VBox constants that are initialized with Unsafe operations, 
-     * due to the JVSTM integration in Deuce. 
+     * We moved here all VBox constants that are initialized with Unsafe operations,
+     * due to the JVSTM integration in Deuce.
      * To support the JVSTM all the transactional classes are instrumented by the Deuce
-     * to inherit from the VBox class. Yet, if a transactional class is part of the JRE 
-     * it can be loaded during the bootstrap, but the JVM bootstrap does not allow the use of 
-     * Unsafe operations. 
-     * Once the original VBox implementation uses the Unsafe class in its static constructor 
-     * then any inherited class from VBox will perform also an unsafe operation when it is 
-     * loaded, which is forbidden by the JVM bootstrap. For this reason we moved all these 
-     * constants into a separate class.     
+     * to inherit from the VBox class. Yet, if a transactional class is part of the JRE
+     * it can be loaded during the bootstrap, but the JVM bootstrap does not allow the use of
+     * Unsafe operations.
+     * Once the original VBox implementation uses the Unsafe class in its static constructor
+     * then any inherited class from VBox will perform also an unsafe operation when it is
+     * loaded, which is forbidden by the JVM bootstrap. For this reason we moved all these
+     * constants into a separate class.
      */
     static class Offsets {
 
@@ -51,17 +51,17 @@ public class VBox<E> {
 
     /**
      * This is a special auxiliary type to distinguish the overloaded constructor
-     * that is required by the VBoxAom class. 
+     * that is required by the VBoxAom class.
      */
     protected static class AOMMarker {}
-    
+
     public VBoxBody<E> body;
     protected InplaceWrite<E> inplace;
 
     public VBox() {
         this((E)null);
     }
-    
+
     public VBox(E initial) {
         inplace = new InplaceWrite<E>();
         put(initial);
@@ -70,9 +70,9 @@ public class VBox<E> {
     /**
      * This is a specific constructor required by the VBoxAom class.
      * Any transactional class defined in the AOM (Adaptive Object Metadata)
-     * should inherit from VBoxAom, which in turn inherits from VBox, and 
-     * should initialize the versioned history with null, corresponding 
-     * to the compact layout. 
+     * should inherit from VBoxAom, which in turn inherits from VBox, and
+     * should initialize the versioned history with null, corresponding
+     * to the compact layout.
      */
     protected VBox(AOMMarker x) {
         inplace = new InplaceWrite<E>();
@@ -138,9 +138,9 @@ public class VBox<E> {
         VBoxBody<E> existingBody = null;
         if (currentHead != null) {
             existingBody = currentHead.getBody(txNumber);
-            
-            // Commented by FMC@17-09-2012 => it causes a crash in JVM for 
-            // transactional classes that inherit fom the VBox and loaded 
+
+            // Commented by FMC@17-09-2012 => it causes a crash in JVM for
+            // transactional classes that inherit fom the VBox and loaded
             // during the bootstrap.
             // assert(existingBody == null || existingBody.version <= txNumber);
         }
@@ -166,7 +166,7 @@ public class VBox<E> {
     }
 
     protected boolean CASinplace(InplaceWrite<E> prevBackup, InplaceWrite<E> newBackup) {
-	return UNSAFE.compareAndSwapObject(this, Offsets.inplaceOffset, prevBackup, newBackup);
+        return UNSAFE.compareAndSwapObject(this, Offsets.inplaceOffset, prevBackup, newBackup);
     }
 
     // in the future, if more than one subclass of body exists, we may

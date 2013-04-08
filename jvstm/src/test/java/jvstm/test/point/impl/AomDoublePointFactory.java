@@ -7,7 +7,7 @@ public class AomDoublePointFactory implements PointFactory<Double>{
 
     @Override
     public Point<Double> make(Number x, Number y) {
-	return new AomDoublePoint(x.doubleValue(), y.doubleValue());
+        return new AomDoublePoint(x.doubleValue(), y.doubleValue());
     }
 
 }

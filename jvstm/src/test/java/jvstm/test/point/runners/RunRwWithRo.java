@@ -8,7 +8,7 @@ import jvstm.test.point.core.Point;
 
 public class RunRwWithRo{
   public static <T extends Number> void performTest(final Point<T> p) throws Exception{
-    final long initX = p.getX().longValue(); 
+    final long initX = p.getX().longValue();
     final long initY = p.getY().longValue();
     Transaction roTrx = Transaction.begin(true);
     SuspendedTransaction roTrxToken = roTrx.suspendTx();
@@ -35,7 +35,7 @@ public class RunRwWithRo{
     // Main thread starts a new transaction
     //
     Assert.assertEquals(initX, p.getX().longValue());
-    Assert.assertEquals(initY, p.getY().longValue());    
+    Assert.assertEquals(initY, p.getY().longValue());
     //
     // ThreadLocal -> rw
     //
@@ -56,6 +56,6 @@ public class RunRwWithRo{
   }
   private static long update(long src){
     return (src*4+6)/2;
-  } 
+  }
 
 }

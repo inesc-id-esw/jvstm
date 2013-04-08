@@ -36,8 +36,8 @@ public class DependedVBoxes {
 
     // class used to store the depended-aspect of a VBox, so that we
     // don't need to change the VBox class
-    // this class is simply a VLinkedSet (hence, a versioned set) that 
-    // answers to the Depended interface 
+    // this class is simply a VLinkedSet (hence, a versioned set) that
+    // answers to the Depended interface
     static class DependedState extends VLinkedSet<DependenceRecord> implements Depended {
         public void addDependence(DependenceRecord record) {
             add(record);
@@ -58,7 +58,7 @@ public class DependedVBoxes {
     // the use of global-lock to access the map is not, most probably,
     // the best choice for this, but it will do for now
 
-    // the use of a ConcurrentHashMap would be preferable, but I would need a 
+    // the use of a ConcurrentHashMap would be preferable, but I would need a
     // ConcurrentWeakHashMap that does not exist yet...
 
     private static final Map<VBox,Depended> DEPENDED = new WeakHashMap<VBox,Depended>();

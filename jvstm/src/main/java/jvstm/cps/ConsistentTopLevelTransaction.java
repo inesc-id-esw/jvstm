@@ -157,7 +157,7 @@ public class ConsistentTopLevelTransaction extends TopLevelTransaction implement
                 exc.init(obj, predicate);
                 throw exc;
             }
-            
+
             Transaction.commit();
 
             finished = true;

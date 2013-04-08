@@ -29,18 +29,18 @@ package jvstm;
  * All the exceptions related to the transaction control flow, such as the
  * jvstm.CommitException and the jvstm.EarlyAbortException, must be instantiated
  * and thrown by a concrete implementation of this signaller.
- * 
+ *
  * We added this requirement to the JVSTM due to its integration in Deuce STM.
  * According to the Deuce STM these kind of exceptions must inherit from the
  * class org.deuce.transaction.TransactionException.
- * 
+ *
  * You should use the signaling methods immediately followed by a
  * <tt>throw new AssertionError();</tt> to avoid compilation errors when it is
  * expected to be returned something in the place where you want to throw a
  * transaction exception.
- * 
+ *
  * Here is an example of signalling a commit fail:
- * 
+ *
  * <pre>
  * {@code
  * TransactionSignaller.SIGNALLER.signalCommitFail();

@@ -34,16 +34,16 @@ public abstract class CommitException extends RuntimeException {
     private final Transaction tx;
 
     protected CommitException() {
-	super();
-	this.tx = null;
+        super();
+        this.tx = null;
     }
 
     protected CommitException(Transaction tx) {
-	this.tx = tx;
+        this.tx = tx;
     }
 
     public Transaction getTransactionCausedConflict() {
-	return this.tx;
+        return this.tx;
     }
 
 }
