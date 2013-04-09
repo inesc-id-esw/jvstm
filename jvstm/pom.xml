@@ -27,6 +27,9 @@
                     <version>2.13</version>
                     <configuration>
                         <argLine>-Xms1G -Xmx1G</argLine>
+                        <systemPropertyVariables>
+                            <jvstm.aom.reversion>true</jvstm.aom.reversion>
+                        </systemPropertyVariables>
                         <includes>
                             <!-- Add the defaults -->
                             <include>**/Test*.java</include>
@@ -38,16 +41,13 @@
                             <include>jvstm/test/point/utests/PointTestForAomInt.java</include>
                             <include>jvstm/test/point/utests/PointTestForAomInteger.java</include>
                             <include>jvstm/test/point/utests/PointTestForAomShort.java</include>
-                            <!-- <include>jvstm/test/point/utests/gc/AomGcTestForDoublePoint.java</include> -->
-                            <!-- <include>jvstm/test/point/utests/gc/AomGcTestForIntegerPoint.java</include> -->
-                            <!-- <include>jvstm/test/point/utests/gc/AomGcTestForIntPoint.java</include> -->
-                            <!-- <include>jvstm/test/point/utests/gc/AomGcTestForShortPoint.java</include> -->
+                            <include>jvstm/test/point/utests/gc/AomGcTestForDoublePoint.java</include>
+                            <include>jvstm/test/point/utests/gc/AomGcTestForIntegerPoint.java</include>
+                            <include>jvstm/test/point/utests/gc/AomGcTestForIntPoint.java</include>
+                            <include>jvstm/test/point/utests/gc/AomGcTestForShortPoint.java</include>
                         </includes>
                         <excludes>
-                            <exclude>jvstm/test/point/utests/gc/AomGcTestForDoublePoint.java</exclude>
-                            <enclude>jvstm/test/point/utests/gc/AomGcTestForIntegerPoint.java</enclude>
-                            <enclude>jvstm/test/point/utests/gc/AomGcTestForIntPoint.java</enclude>
-                            <enclude>jvstm/test/point/utests/gc/AomGcTestForShortPoint.java</enclude>
+                            <exclude>jvstm/test/jwormbench/utest/*.java</exclude>
                         </excludes>
                     </configuration>
                 </plugin>

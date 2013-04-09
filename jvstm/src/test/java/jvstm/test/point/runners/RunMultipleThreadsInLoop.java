@@ -19,10 +19,10 @@ public class RunMultipleThreadsInLoop {
       final int nrOfIterations,
       final Point<T> p ) throws InterruptedException{
     final Thread[] threads = new Thread[nrOfThreads];
-    long coordsSum = p.getX().longValue() + p.getY().longValue();
+    final long coordsSum = p.getX().longValue() + p.getY().longValue();
     for (int i = 0; i < threads.length; i++) {
       threads[i] = new Thread(){@Override public void run() {
-        workerThread(nrOfIterations, p, p.getX().longValue() + p.getY().longValue());
+        workerThread(nrOfIterations, p, coordsSum);
         System.out.println(String.format("Thread %d finish!!!", Thread.currentThread().getId()));
       }};
     }
