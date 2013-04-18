@@ -20,6 +20,7 @@
         <version.junit>4.10</version.junit>
         <version.maven.compiler-plugin>2.0.2</version.maven.compiler-plugin>
         <version.maven.exec-plugin>1.2.1</version.maven.exec-plugin>
+        <version.pt.ist.esw.advice>1.8</version.pt.ist.esw.advice>
     </properties>
 
     <build>
@@ -61,6 +62,11 @@
                             <goal>java</goal>
                         </goals>
                         <configuration>
+                            <includePluginDependencies>true</includePluginDependencies>
+                            <executableDependency>
+                                <groupId>pt.ist.esw</groupId>
+                                <artifactId>advice-program</artifactId>
+                            </executableDependency>
                             <mainClass>pt.ist.esw.advice.GenerateAnnotationInstance</mainClass>
                             <arguments>
                                 <argument>jvstm.Atomic</argument>
@@ -76,6 +82,11 @@
                             <goal>java</goal>
                         </goals>
                         <configuration>
+                            <includePluginDependencies>true</includePluginDependencies>
+                            <executableDependency>
+                                <groupId>pt.ist.esw</groupId>
+                                <artifactId>advice-program</artifactId>
+                            </executableDependency>
                             <mainClass>pt.ist.esw.advice.ProcessAnnotations</mainClass>
                             <arguments>
                                 <argument>-a</argument>
@@ -92,6 +103,11 @@
                             <goal>java</goal>
                         </goals>
                         <configuration>
+                            <includePluginDependencies>true</includePluginDependencies>
+                            <executableDependency>
+                                <groupId>pt.ist.esw</groupId>
+                                <artifactId>advice-program</artifactId>
+                            </executableDependency>
                             <mainClass>pt.ist.esw.advice.ProcessAnnotations</mainClass>
                             <arguments>
                                 <argument>-a</argument>
@@ -101,6 +117,13 @@
                         </configuration>
                     </execution>
                 </executions>
+                <dependencies>
+                    <dependency>
+                        <groupId>pt.ist.esw</groupId>
+                        <artifactId>advice-program</artifactId>
+                        <version>${version.pt.ist.esw.advice}</version>
+                    </dependency>
+                </dependencies>
             </plugin>
 
         </plugins>
@@ -117,11 +140,18 @@
         </repository>
     </repositories>
 
+    <pluginRepositories>
+        <pluginRepository>
+            <id>advice-repository</id>
+            <url>http://inesc-id-esw.github.com/advice/maven-repo/</url>
+        </pluginRepository>
+    </pluginRepositories>
+
     <dependencies>
         <dependency>
             <groupId>pt.ist.esw</groupId>
-            <artifactId>advice</artifactId>
-            <version>1.5</version>
+			<artifactId>advice-runtime</artifactId>
+			<version>${version.pt.ist.esw.advice}</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
