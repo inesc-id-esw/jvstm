@@ -4,7 +4,7 @@
     <groupId>jvstm</groupId>
     <artifactId>jvstm-fenix</artifactId>
     <packaging>jar</packaging>
-    <version>1.4</version>
+    <version>1.5-SNAPSHOT</version>
     <name>JVSTM lock-based for Fenix</name>
     <url>http://web.ist.utl.pt/joao.cachopo/jvstm/</url>
 
@@ -12,7 +12,7 @@
         <connection>scm:git:git@github.com:inesc-id-esw/JVSTM.git</connection>
         <developerConnection>scm:git:git@github.com:inesc-id-esw/JVSTM.git</developerConnection>
         <!-- <url>Should be a publicly browsable repository</url> -->
-        <tag>jvstm-fenix-1.4</tag>
+        <tag>HEAD</tag>
   </scm>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
