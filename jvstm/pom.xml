@@ -126,6 +126,14 @@
                 </dependencies>
             </plugin>
 
+            <plugin>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>2.4.1</version>
+                <configuration>
+                    <pushChanges>false</pushChanges>
+                </configuration>
+            </plugin>
+
         </plugins>
     </build>
 
@@ -150,8 +158,8 @@
     <dependencies>
         <dependency>
             <groupId>pt.ist.esw</groupId>
-			<artifactId>advice-runtime</artifactId>
-			<version>${version.pt.ist.esw.advice}</version>
+            <artifactId>advice-runtime</artifactId>
+            <version>${version.pt.ist.esw.advice}</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
