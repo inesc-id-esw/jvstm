@@ -18,6 +18,13 @@
         <version.maven.exec-plugin>1.2.1</version.maven.exec-plugin>
     </properties>
 
+    <scm>
+        <connection>scm:git:git@github.com:inesc-id-esw/JVSTM.git</connection>
+        <developerConnection>scm:git:git@github.com:inesc-id-esw/JVSTM.git</developerConnection>
+        <url>http://inesc-id-esw.github.com/JVSTM</url>
+        <tag>HEAD</tag>
+    </scm>
+
     <build>
         <pluginManagement>
             <plugins>
@@ -55,6 +62,14 @@
         </pluginManagement>
 
         <plugins>
+            <plugin>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>2.4.1</version>
+                <configuration>
+                    <pushChanges>false</pushChanges>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
