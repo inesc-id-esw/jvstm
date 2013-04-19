@@ -12,6 +12,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
+        <project.deploy.maven-repo>file:///${basedir}/../JVSTM-pages/maven-repo</project.deploy.maven-repo>
+
         <version.guice>2.0</version.guice>
         <version.junit>4.10</version.junit>
         <version.jwormbench>1.0</version.jwormbench>
@@ -176,14 +178,31 @@
         </dependency>
     </dependencies>
 
+    <!--
+        note: making a release of this software on GitHub's gh-pages branch
+        requires an existing clone of such branch in another directory in your
+        computer, and then to configure the property
+        ${project.deploy.maven-repo} to point to the maven repository within
+        such location. E.g.:
+
+             .
+             |__ JVSTM
+             |   \__ ...
+             |__ JVSTM-pages
+                 |__ ...
+                 \__ maven-repo
+
+         Then just run `mvn clean deploy` in the checkout you wish to deploy :-)
+    -->
+
     <distributionManagement>
         <repository>
-            <id>jvstm-release</id>
-            <url>https://fenix-ashes.ist.utl.pt/nexus/content/repositories/jvstm-release</url>
+            <id>gh-pages</id>
+            <url>${project.deploy.maven-repo}</url>
         </repository>
         <snapshotRepository>
-            <id>jvstm-snapshot</id>
-            <url>https://fenix-ashes.ist.utl.pt/nexus/content/repositories/jvstm-snapshot</url>
+            <id>gh-pages</id>
+            <url>${project.deploy.maven-repo}</url>
         </snapshotRepository>
     </distributionManagement>
 
