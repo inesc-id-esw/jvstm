@@ -2,11 +2,11 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>jvstm</groupId>
-    <artifactId>jvstm-lock-free</artifactId>
+    <artifactId>jvstm</artifactId>
     <packaging>jar</packaging>
     <version>1.0-SNAPSHOT</version>
-    <name>jvstm-lock-free</name>
-    <url>http://web.ist.utl.pt/joao.cachopo/jvstm/</url>
+    <name>JVSTM (lock-free)</name>
+    <url>http://inesc-id-esw.github.com/JVSTM</url>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
