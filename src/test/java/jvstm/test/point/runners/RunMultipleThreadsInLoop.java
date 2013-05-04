@@ -1,8 +1,16 @@
 package jvstm.test.point.runners;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
 import java.util.Random;
 
 import java.util.concurrent.Callable;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import junit.framework.Assert;
 import jvstm.ActiveTransactionsRecord;
@@ -13,17 +21,18 @@ import jvstm.test.point.core.Point;
 public class RunMultipleThreadsInLoop {
 
   private static final Random rand = new Random();
+  static private Logger logger = LoggerFactory.getLogger(RunMultipleThreadsInLoop.class);
 
   public static <T extends Number> void performTest(
       final int nrOfThreads,
       final int nrOfIterations,
-      final Point<T> p ) throws InterruptedException{
+      final Point<T> p ) throws InterruptedException, IOException{
     final Thread[] threads = new Thread[nrOfThreads];
     final long coordsSum = p.getX().longValue() + p.getY().longValue();
     for (int i = 0; i < threads.length; i++) {
       threads[i] = new Thread(){@Override public void run() {
         workerThread(nrOfIterations, p, coordsSum);
-        System.out.println(String.format("Thread %d finish!!!", Thread.currentThread().getId()));
+        logger.info("Thread {} finish!!!", Thread.currentThread().getId());
       }};
     }
     for (int i = 0; i < threads.length; i++) {
@@ -31,12 +40,12 @@ public class RunMultipleThreadsInLoop {
     }
     for (int i = 0; i < threads.length; i++) {
       threads[i].join();
-      System.out.println(String.format("Thread %d release join!!!", threads[i].getId()));
+      logger.info("Thread {} release join!!!", threads[i].getId());
     }
     Thread.sleep(600);
-    System.out.println("Number of reversions = " + ActiveTransactionsRecord.nrOfReversions);
-    System.out.println("Number of tries = " + ActiveTransactionsRecord.nrOfTries);
-    System.out.println("Object is " + ((VBox)p).body == null? "COMPACT" : "EXTENDED");
+    logger.info("Number of reversions = {}", ActiveTransactionsRecord.nrOfReversions);
+    logger.info("Number of tries = {}", ActiveTransactionsRecord.nrOfTries);
+    logger.info("Object is {}", ((VBox)p).body == null? "COMPACT" : "EXTENDED");
     long currSum = p.getX().longValue() + p.getY().longValue();
     Assert.assertEquals("Final verification: ", coordsSum, currSum);
   }
@@ -60,7 +69,7 @@ public class RunMultipleThreadsInLoop {
             return res;
           }
         });
-        // System.out.println(String.format("iteration %d - %s - has read: %s", j, trxKind, res));
+        // logger.info("iteration {} - {} - has read: {}", j, trxKind, res);
         long currSum = Transaction.doIt(new Callable<Long>(){ public Long call() throws Exception {
             long x = p.getX().longValue();
             long y = p.getY().longValue();
