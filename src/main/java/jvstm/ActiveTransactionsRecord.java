@@ -283,13 +283,6 @@ public class ActiveTransactionsRecord {
     public static int nrOfTries = 0;
 
     static{
-        Handler [] hs = Logger.getLogger("").getHandlers();
-        if(hs.length != 0)
-            hs[0].setFormatter(new Formatter() {
-                public String format(LogRecord record) {
-                    return record.getMessage();
-                }
-            });
         Logger logger = Logger.getLogger("jvstm");
         REVERSION = Boolean.getBoolean(REVERSION_PROP);
         logger.info("********** AOM reversion = " + (REVERSION? "ON" : "OFF"));

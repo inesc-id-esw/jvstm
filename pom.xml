@@ -38,6 +38,7 @@
                         <argLine>-Xms1G -Xmx1G</argLine>
                         <systemPropertyVariables>
                             <jvstm.aom.reversion>true</jvstm.aom.reversion>
+                            <java.util.logging.config.file>target/test-classes/logging.properties</java.util.logging.config.file>
                         </systemPropertyVariables>
                         <includes>
                             <!-- Add the defaults -->
@@ -153,6 +154,16 @@
     </repositories>
 
     <dependencies>
+        <dependency> 
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.5</version>
+        </dependency>
+        <dependency> 
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-jdk14</artifactId>
+            <version>1.7.5</version>
+        </dependency>
         <dependency>
             <groupId>pt.ist.esw</groupId>
             <artifactId>advice</artifactId>
