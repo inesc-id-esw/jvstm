@@ -79,4 +79,7 @@ public class TxContext {
         }
     }
 
+    public TxContext next(){
+        return next;
+    } 
 }

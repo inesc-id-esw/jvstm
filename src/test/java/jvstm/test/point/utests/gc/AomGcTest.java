@@ -1,14 +1,16 @@
 package jvstm.test.point.utests.gc;
 
-import org.junit.Test;
-
 import junit.framework.Assert;
 import jvstm.ActiveTransactionsRecord;
 import jvstm.Transaction;
 import jvstm.VBox;
+import jvstm.gc.TxContext;
 import jvstm.test.point.core.Point;
 import jvstm.test.point.core.PointFactory;
 import jvstm.test.point.core.PointFields;
+
+import org.junit.Before;
+import org.junit.Test;
 
 
 /**
@@ -29,6 +31,17 @@ public abstract class AomGcTest<T extends Number>{
 
     public AomGcTest(PointFactory<T> pointFac) {
         this.pointFac = pointFac;
+    }
+    
+    @Before
+    public void setUp(){
+        TxContext currentCtx = Transaction.allTxContexts;
+        while (currentCtx != null) {
+            currentCtx.inCommitAndBegin = false;
+            currentCtx.oldestRequiredVersion = null;
+            currentCtx = currentCtx.next();
+        }
+        Transaction.gcTask.runGc();
     }
 
     @Test
