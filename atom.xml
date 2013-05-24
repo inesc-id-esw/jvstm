@@ -1,28 +1,33 @@
 ---
 layout: nil
-title : Atom Feed
 ---
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
- 
- <title>{{ site.title }}</title>
- <link href="{{ site.production_url }}/atom.xml" rel="self"/>
- <link href="{{ site.production_url }}"/>
- <updated>{{ site.time | date_to_xmlschema }}</updated>
- <id>{{ site.production_url }}</id>
- <author>
-   <name>{{ site.author.name }}</name>
-   <email>{{ site.author.email }}</email>
- </author>
+    
+    <title>JVSTM</title>
+    <link href="{{ site.baseurl }}/blog"/>
+    <link type="application/atom+xml" rel="self" href="{{ site.baseurl }}/atom.xml"/>
+    <updated>{{ site.time | date_to_xmlschema }}</updated>
+    <id>{{ site.baseurl }}/blog</id>
+    <author>
+        <name>JVSTM - Java Versioned STM</name>
+        <email>jvstm@googlegroups.com</email>
+    </author>
 
- {% for post in site.posts %}
- <entry>
-   <title>{{ post.title }}</title>
-   <link href="{{ site.production_url }}{{ post.url }}"/>
-   <updated>{{ post.date | date_to_xmlschema }}</updated>
-   <id>{{ site.production_url }}{{ post.id }}</id>
-   <content type="html">{{ post.content | xml_escape }}</content>
- </entry>
- {% endfor %}
- 
+    {% for post in site.posts %}
+    {% assign author = site.authors[post.author] %}
+    <entry>
+        <id>{{ site.baseurl }}{{ post.id }}</id>
+        <link type="text/html" rel="alternate" href="{{ site.baseurl }}{{ post.url }}"/>
+        <title>{{ post.title }}</title>
+        <published>{{ post.date | date_to_xmlschema }}</published>
+        <updated>{{ post.date | date_to_xmlschema }}</updated>
+        <author>
+            <name>{{ author.display_name }}</name>
+            <uri>{{ author.web }}</uri>
+        </author>
+        <content type="html">{{ post.content | xml_escape }}</content>
+    </entry>
+    {% endfor %}
+    
 </feed>

@@ -1,0 +1,14 @@
+
+{% assign author = site.authors[page.author] %}
+
+<div class="post">
+  <span class="date"> {{ page.date | date: '%A, %B %d, %Y' }}</span>
+  <div class="title">
+    <h2>{{ page.title }}</h2>
+  </div>
+  {{ content }}
+  <div class="meta">
+    <img src="http://www.gravatar.com/avatar/{{ author.gravatar }}?s=30" />
+    Posted by <a href="{{ author.web }}"><span class="author">{{ author.display_name }}</span></a>.
+  </div>
+</div>

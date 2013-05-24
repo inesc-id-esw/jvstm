@@ -1,5 +1,80 @@
----
-layout: default
----
-{% include JB/setup %}
-{% include themes/dinky/page.html %}
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.5 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+	<meta name="description" content="JVSTM Web Page" />
+	<meta name="keywords" content="DML, strong consistency, transactions, enterprise applications, STM, JVSTM, strict serializability" />
+	<meta name="author" content="JVSTM / Original design by andreasviklund.com" />
+	<link rel="stylesheet" type="text/css" href="{{site.baseurl}}/stylesheets/variant-multi.css" title="JVSTM - Java Versioned STM" media="all" />
+	<title>JVSTM - Java Versioned STM</title>
+    </head>
+
+    <body>
+        <div id="containerlimited"><!-- Use"containerfull" for 100% width. For fixed width, use "container980", "container760" or "container600" (the number is the layout width in pixels). -->
+            <div id="header">
+		<h1><a href="{{ site.baseurl }}">JVSTM</a></h1>
+		<!-- <h2>Develop Java applications with a transactional and -->
+		<!-- persistent domain model</h2> -->
+                <h2>Java Versioned STM</h2>
+            </div>
+            <div id="menu">
+            	<ul>
+                    <!-- <li><a href="{{ site.baseurl }}/rss.xml"><img src="{{ site.baseurl }}/images/feed-icon-28x28.png" /></a></li> -->
+                    <li><a href="{{ site.baseurl }}/atom.xml"><img src="{{ site.baseurl }}/images/feed-icon-28x28.png" /></a></li>
+            	</ul>
+            </div>
+            
+            <div id="main">
+		<div id="sidebar">
+                    <div class="sidebarbox">
+                        <h2>Documentation</h2>
+                        <ul class="sidemenu">
+                            <li><a href="{{ site.baseurl }}/index.html">About</a></li>
+                            <li><a href="{{ site.baseurl }}/QuickStart.html">Quick Start</a></li>
+                            <li><a href="{{ site.baseurl }}/Publications.html">Publications</a></li>
+                            <li><a href="http://www.gnu.org/licenses/lgpl-3.0.txt">License</a></li>
+                        </ul>
+                    </div>
+
+                    <div class="sidebarbox">
+                        <h2>Get Involved</h2>
+                        <!-- <p>This is a sidebar text box. It can be used for regular links:</p> -->
+                        <ul class="sidemenu">
+                            <li><a href="http://groups.google.com/group/jvstm">Discussion Group</a></li>
+                            <li><a href="https://github.com/inesc-id-esw/JVSTM/wiki">Wiki</a></li>
+                            <li><a href="{{ site.baseurl }}/blog/index.html">Blog</a></li>
+                            <li><a href="https://github.com/inesc-id-esw/JVSTM/issues">Issues</a></li>
+                            <li><a href="Contact.html">Contact Us</a></li>
+                          </ul>
+                    </div>
+		</div>
+
+		<div id="content">
+                    {{ content }} <div class="clear">&nbsp;</div>
+                </div>
+		<div class="clear">&nbsp;</div>
+            </div>
+            <div id="footer">
+		<div id="footersections">
+                    <div class="lefty">
+                        <a href="http://www.gnu.org/licenses/lgpl-3.0.txt"><img src="http://www.gnu.org/graphics/lgplv3-88x31.png" /></a>
+                    </div>
+                    <div class="righty">
+                        <p>The work on JVSTM has been partially supported by <a href="http://www.fct.pt/">FCT</a>, via the RULAM project (under contract number <a href="http://www.fct.pt/apoios/projectos/consulta/vglobal_projecto.phtml.en?idProjecto=108240&idElemConcurso=2769">PTDC/EIA-EIA/108240/2008</a>).<p>
+                    </div>
+                    <div class="clear">&nbsp;</div> 
+		</div>
+            </div>   
+            
+            <div id="credits">
+		<p>&copy; 2008-2013 JVSTM - Java Versioned STM<br />
+		<span class="small">Based on template design by <a href="http://andreasviklund.com/">Andreas Viklund</a></span></p>
+            </div>  
+        </div>
+        {% include google-analytics.html %}
+    </body>
+</html>
+
+<!-- Local Variables: -->
+<!-- mode: nxml -->
+<!-- End: -->
