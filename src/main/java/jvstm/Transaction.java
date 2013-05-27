@@ -85,10 +85,11 @@ public abstract class Transaction {
 
         // start the GC thread.
         boolean gcDisabled = Boolean.getBoolean(GC_PROP);
-        String NEW_LINE = System.getProperty("line.separator");
         Logger logger = Logger.getLogger("jvstm");
-        logger.info("********** GC vbodies = " + (gcDisabled? "OFF" : "ON"));
-        logger.info(" (turn " + (gcDisabled? "ON" : "OFF") + " in property: " + GC_PROP + ")" + NEW_LINE);
+        logger.info(String.format(
+                "********** GC vbodies = %b (disable/enable it in property %s)",
+                gcDisabled,
+                GC_PROP));
         gcTask = new GCTask(mostRecentCommittedRecord);
         if(!gcDisabled){
             Thread gc = new Thread(gcTask);
