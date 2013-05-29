@@ -4,7 +4,7 @@ lsi: false
 pygments: true
 # When running jekyll on your local computer change the base url to point to
 # the _site directory (full-path)
-baseurl: http://inesc-id-esw.github.io/JVSTM
+baseurl: http://inesc-id-esw.github.io/jvstm
 
 authors:
   jcachopo:
