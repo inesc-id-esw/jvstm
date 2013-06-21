@@ -88,7 +88,7 @@ public abstract class Transaction {
         Logger logger = Logger.getLogger("jvstm");
         logger.info(String.format(
                 "********** GC vbodies = %b (disable/enable it in property %s)",
-                gcDisabled,
+                !gcDisabled,
                 GC_PROP));
         gcTask = new GCTask(mostRecentCommittedRecord);
         if(!gcDisabled){
