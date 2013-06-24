@@ -41,6 +41,10 @@ public class TopLevelTransaction extends ReadWriteTransaction {
         this.activeTxRecord = activeRecord;
     }
 
+    public ActiveTransactionsRecord getActiveTxRecord() {
+        return this.activeTxRecord;
+    }
+
     @Override
     public Transaction makeUnsafeMultithreaded() {
         return new UnsafeParallelTransaction(this);
@@ -159,7 +163,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
      * @throws CommitException if the validation fails
      */
     protected ActiveTransactionsRecord validate(ActiveTransactionsRecord startCheck) {
-    ActiveTransactionsRecord lastChecked = startCheck;
+        ActiveTransactionsRecord lastChecked = startCheck;
         ActiveTransactionsRecord recordToCheck = lastChecked.getNext();
 
         while (recordToCheck != null) {
