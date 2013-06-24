@@ -50,7 +50,7 @@ package jvstm;
  */
 public abstract class TransactionSignaller {
 
-    protected static TransactionSignaller SIGNALLER = new DefaultTransactionSignaller();
+    public static TransactionSignaller SIGNALLER = new DefaultTransactionSignaller();
 
     public static void setSignaller(
             TransactionSignaller signaller) {
