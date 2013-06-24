@@ -169,6 +169,10 @@ public class VBox<E> {
         return UNSAFE.compareAndSwapObject(this, Offsets.inplaceOffset, prevBackup, newBackup);
     }
 
+    public InplaceWrite<E> getInplace() {
+        return this.inplace;
+    }
+
     // in the future, if more than one subclass of body exists, we may
     // need a factory here but, for now, it's simpler to have it like
     // this
@@ -181,7 +185,7 @@ public class VBox<E> {
      *===========================================================================*/
 
     private static final String ILLEGAL_AOM_USE = "this method is part of the AOM (Adaptive Object Metadata) approach and " +
-        "should be overriden by VBox inherited classes.";
+            "should be overriden by VBox inherited classes.";
 
     public E replicate(){
         throw new UnsupportedOperationException("Illegal use of the replicate method - " + ILLEGAL_AOM_USE);
