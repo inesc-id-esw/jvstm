@@ -103,7 +103,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
      * valid read state (which is // * the record previous to the
      * commitTxRecord)
      */
-    private void validateCommitAndEnqueue(ActiveTransactionsRecord lastCheck) {
+    protected void validateCommitAndEnqueue(ActiveTransactionsRecord lastCheck) {
         ProcessPerTxBoxesTransaction commitTx = speculatePerTxBoxes(lastCheck.transactionNumber);
         WriteSet writeSet = makeWriteSet();
         writeSet.addPerTxBoxesWrites(commitTx.specWriteSet);
