@@ -80,7 +80,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
         setNumber(newRecord.transactionNumber);
     }
 
-    protected WriteSet makeWriteSet() {
+    public WriteSet makeWriteSet() {
         return new WriteSet(this);
     }
 

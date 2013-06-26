@@ -139,7 +139,7 @@ public class InevitableTransaction extends TopLevelTransaction {
     }
 
     @Override
-    protected WriteSet makeWriteSet() {
+    public WriteSet makeWriteSet() {
         return new WriteSet(vboxesWrittenBack);
     }
 
