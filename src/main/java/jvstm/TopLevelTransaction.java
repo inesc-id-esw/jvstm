@@ -45,6 +45,10 @@ public class TopLevelTransaction extends ReadWriteTransaction {
         return this.activeTxRecord;
     }
 
+    public void setCommitTxRecord(ActiveTransactionsRecord record) {
+        this.commitTxRecord = record;
+    }
+
     @Override
     public Transaction makeUnsafeMultithreaded() {
         return new UnsafeParallelTransaction(this);
@@ -112,7 +116,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
         WriteSet writeSet = makeWriteSet();
         writeSet.addPerTxBoxesWrites(commitTx.specWriteSet);
 
-        this.commitTxRecord = new ActiveTransactionsRecord(lastCheck.transactionNumber + 1, writeSet);
+        setCommitTxRecord(new ActiveTransactionsRecord(lastCheck.transactionNumber + 1, writeSet));
         enqueueValidCommit(lastCheck, writeSet);
 
         // At this point we no longer need the values we wrote in the VBox's
@@ -151,7 +155,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
             // lead to the conclusion that they are not. This way we avoid registering those reads and skip the validation.
             commitTx = speculatePerTxBoxes(lastCheck.transactionNumber);
             writeSet.addPerTxBoxesWrites(commitTx.specWriteSet);
-            this.commitTxRecord = new ActiveTransactionsRecord(lastCheck.transactionNumber + 1, writeSet);
+            setCommitTxRecord(new ActiveTransactionsRecord(lastCheck.transactionNumber + 1, writeSet));
         }
     }
 

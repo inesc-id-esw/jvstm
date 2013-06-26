@@ -52,7 +52,7 @@ public class InevitableTransaction extends TopLevelTransaction {
         // start by enqueueing the request
         do {
             latestRecord = findLatestRecord(latestRecord);
-            this.commitTxRecord = new InevitableActiveTransactionsRecord(latestRecord.transactionNumber + 1);
+            setCommitTxRecord(new InevitableActiveTransactionsRecord(latestRecord.transactionNumber + 1));
         } while (!latestRecord.trySetNext(this.commitTxRecord));
 
         ensureCommitStatus();
