@@ -109,17 +109,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
         writeSet.addPerTxBoxesWrites(commitTx.specWriteSet);
 
         this.commitTxRecord = new ActiveTransactionsRecord(lastCheck.transactionNumber + 1, writeSet);
-        while (!lastCheck.trySetNext(this.commitTxRecord)) {
-            // Failed enqueue, at least some other transaction succeeded in the meantime
-            lastCheck = helpCommitAll();
-            snapshotValidation(lastCheck.transactionNumber);
-            // Re-execute the perTxBoxes speculatively. They are supposed to be a point of contention, thus
-            // any validation to check if previous speculative reads are still up-to-date should most of the time
-            // lead to the conclusion that they are not. This way we avoid registering those reads and skip the validation.
-            commitTx = speculatePerTxBoxes(lastCheck.transactionNumber);
-            writeSet.addPerTxBoxesWrites(commitTx.specWriteSet);
-            this.commitTxRecord = new ActiveTransactionsRecord(lastCheck.transactionNumber + 1, writeSet);
-        }
+        enqueueValidCommit(lastCheck, writeSet);
 
         // At this point we no longer need the values we wrote in the VBox's
         // tempValue slot, so we update the ownership record's version to
@@ -134,6 +124,31 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 
         // after validating, upgrade the transaction's valid read state
         // upgradeTx(lastValid);
+    }
+
+    /**
+     * Enqueue a valid commit (just after the record lastCheck).  If enqueue fails then, revalidate, upgrade the transaction and retry to enqueue.
+     * 
+     * @param lastCheck  The last record up to where validation succeeded.
+     * @param writeSet  The writeSet of this commit.
+     * @return
+     */
+    /* This code was extracted from validateCommitAndEnqueue, to enable overriding
+    it in subclasses that wish to reuse the remainder of the algorithm coded in
+    validateCommitAndEnqueue. */
+    protected void enqueueValidCommit(ActiveTransactionsRecord lastCheck, WriteSet writeSet) {
+        ProcessPerTxBoxesTransaction commitTx;
+        while (!lastCheck.trySetNext(this.commitTxRecord)) {
+            // Failed enqueue, at least some other transaction succeeded in the meantime
+            lastCheck = helpCommitAll();
+            snapshotValidation(lastCheck.transactionNumber);
+            // Re-execute the perTxBoxes speculatively. They are supposed to be a point of contention, thus
+            // any validation to check if previous speculative reads are still up-to-date should most of the time
+            // lead to the conclusion that they are not. This way we avoid registering those reads and skip the validation.
+            commitTx = speculatePerTxBoxes(lastCheck.transactionNumber);
+            writeSet.addPerTxBoxesWrites(commitTx.specWriteSet);
+            this.commitTxRecord = new ActiveTransactionsRecord(lastCheck.transactionNumber + 1, writeSet);
+        }
     }
 
     /**
