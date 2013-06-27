@@ -233,7 +233,7 @@ public class ActiveTransactionsRecord {
         return this.recordCommitted;
     }
 
-    protected WriteSet getWriteSet() {
+    public WriteSet getWriteSet() {
         return this.writeSet;
     }
 

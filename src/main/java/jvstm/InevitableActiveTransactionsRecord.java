@@ -37,7 +37,7 @@ public class InevitableActiveTransactionsRecord extends ActiveTransactionsRecord
 
     // anyone doing this will have to be delayed until this transaction sets the write-set
     @Override
-    protected WriteSet getWriteSet() {
+    public WriteSet getWriteSet() {
         synchronized (WRITE_SET_MONITOR) {
             while (this.writeSet == null) {
                 try {
