@@ -53,7 +53,7 @@ public class InevitableTransaction extends TopLevelTransaction {
         do {
             latestRecord = findLatestRecord(latestRecord);
             setCommitTxRecord(new InevitableActiveTransactionsRecord(latestRecord.transactionNumber + 1));
-        } while (!latestRecord.trySetNext(this.commitTxRecord));
+        } while (!latestRecord.trySetNext(getCommitTxRecord()));
 
         ensureCommitStatus();
         upgradeTx(latestRecord);
@@ -61,7 +61,7 @@ public class InevitableTransaction extends TopLevelTransaction {
         // once we get here, we may already increment the transaction number.
         // This is also required to allow setBoxValue to immediately write to
         // the vbox.body
-        setNumber(commitTxRecord.transactionNumber);
+        setNumber(getCommitTxRecord().transactionNumber);
         super.start();
     }
 
@@ -72,7 +72,7 @@ public class InevitableTransaction extends TopLevelTransaction {
         ActiveTransactionsRecord recordToCommit = Transaction.mostRecentCommittedRecord.getNext();
 
         while ((recordToCommit != null)
-               && (recordToCommit.transactionNumber < this.commitTxRecord.transactionNumber)) {
+                && (recordToCommit.transactionNumber < getCommitTxRecord().transactionNumber)) {
             helpCommit(recordToCommit);
             recordToCommit = recordToCommit.getNext();
         }
@@ -80,7 +80,9 @@ public class InevitableTransaction extends TopLevelTransaction {
 
     protected ActiveTransactionsRecord findLatestRecord(ActiveTransactionsRecord from) {
         ActiveTransactionsRecord latest = from;
-        for (ActiveTransactionsRecord aux; (aux = latest.getNext()) != null; latest = aux);
+        for (ActiveTransactionsRecord aux; (aux = latest.getNext()) != null; latest = aux) {
+            ;
+        }
         return latest;
     }
 
@@ -91,6 +93,7 @@ public class InevitableTransaction extends TopLevelTransaction {
         //throw new Error("An Inevitable transaction cannot abort.  I've committed it instead.");
     }
 
+    @Override
     public Transaction makeNestedTransaction(boolean readOnly) {
         throw new Error(getClass().getSimpleName() + " doesn't support nesting yet");
     }
@@ -130,10 +133,12 @@ public class InevitableTransaction extends TopLevelTransaction {
         }
     }
 
+    @Override
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
         throw new Error(getClass().getSimpleName() + " doesn't support PerTxBoxes yet");
     }
 
+    @Override
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
         throw new Error(getClass().getSimpleName() + " doesn't support PerTxBoxes yet");
     }
@@ -145,11 +150,13 @@ public class InevitableTransaction extends TopLevelTransaction {
 
     @Override
     protected void tryCommit() {
+        ActiveTransactionsRecord commitRecord = getCommitTxRecord();
+        
         // we know we're valid and we're already enqueued. just set the writeset
-        ((InevitableActiveTransactionsRecord)commitTxRecord).setWriteSet(makeWriteSet());
+        ((InevitableActiveTransactionsRecord)commitRecord).setWriteSet(makeWriteSet());
 
-        helpCommit(this.commitTxRecord);
-        upgradeTx(this.commitTxRecord);
+        helpCommit(commitRecord);
+        upgradeTx(commitRecord);
     }
 
     @Override

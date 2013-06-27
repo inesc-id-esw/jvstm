@@ -49,6 +49,10 @@ public class TopLevelTransaction extends ReadWriteTransaction {
         this.commitTxRecord = record;
     }
 
+    public ActiveTransactionsRecord getCommitTxRecord() {
+        return this.commitTxRecord;
+    }
+
     @Override
     public Transaction makeUnsafeMultithreaded() {
         return new UnsafeParallelTransaction(this);
@@ -116,22 +120,20 @@ public class TopLevelTransaction extends ReadWriteTransaction {
         WriteSet writeSet = makeWriteSet();
         writeSet.addPerTxBoxesWrites(commitTx.specWriteSet);
 
-        setCommitTxRecord(new ActiveTransactionsRecord(lastCheck.transactionNumber + 1, writeSet));
+        assignCommitRecord(lastCheck.transactionNumber + 1, writeSet);
         enqueueValidCommit(lastCheck, writeSet);
 
         // At this point we no longer need the values we wrote in the VBox's
         // tempValue slot, so we update the ownership record's version to
         // allow reuse of the slot.
-        this.orec.version = commitTxRecord.transactionNumber;
-        for (OwnershipRecord mergedOrec : linearNestedOrecs) {
-            mergedOrec.version = commitTxRecord.transactionNumber;
-        }
-        for (ParallelNestedTransaction tx : mergedTxs) {
-            tx.orec.version = commitTxRecord.transactionNumber;
-        }
+        updateOrecVersion();
 
         // after validating, upgrade the transaction's valid read state
         // upgradeTx(lastValid);
+    }
+
+    protected void assignCommitRecord(int txNumber, WriteSet writeSet) {
+        setCommitTxRecord(new ActiveTransactionsRecord(txNumber, writeSet));
     }
 
     /**
@@ -146,7 +148,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
     validateCommitAndEnqueue. */
     protected void enqueueValidCommit(ActiveTransactionsRecord lastCheck, WriteSet writeSet) {
         ProcessPerTxBoxesTransaction commitTx;
-        while (!lastCheck.trySetNext(this.commitTxRecord)) {
+        while (!lastCheck.trySetNext(getCommitTxRecord())) {
             // Failed enqueue, at least some other transaction succeeded in the meantime
             lastCheck = helpCommitAll();
             snapshotValidation(lastCheck.transactionNumber);
@@ -155,7 +157,20 @@ public class TopLevelTransaction extends ReadWriteTransaction {
             // lead to the conclusion that they are not. This way we avoid registering those reads and skip the validation.
             commitTx = speculatePerTxBoxes(lastCheck.transactionNumber);
             writeSet.addPerTxBoxesWrites(commitTx.specWriteSet);
-            setCommitTxRecord(new ActiveTransactionsRecord(lastCheck.transactionNumber + 1, writeSet));
+            assignCommitRecord(lastCheck.transactionNumber + 1, writeSet);
+        }
+    }
+
+    /**
+     * Update the ownership record's version
+     */
+    public void updateOrecVersion() {
+        this.orec.version = getCommitTxRecord().transactionNumber;
+        for (OwnershipRecord mergedOrec : linearNestedOrecs) {
+            mergedOrec.version = getCommitTxRecord().transactionNumber;
+        }
+        for (ParallelNestedTransaction tx : mergedTxs) {
+            tx.orec.version = getCommitTxRecord().transactionNumber;
         }
     }
 
@@ -187,7 +202,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
         if (isWriteTransaction()) {
             validate();
             ensureCommitStatus();
-            upgradeTx(this.commitTxRecord);
+            upgradeTx(getCommitTxRecord());
         }
     }
 
@@ -248,7 +263,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
     protected void ensureCommitStatus() {
         ActiveTransactionsRecord recordToCommit = Transaction.mostRecentCommittedRecord.getNext();
 
-        while ((recordToCommit != null) && (recordToCommit.transactionNumber <= this.commitTxRecord.transactionNumber)) {
+        while ((recordToCommit != null) && (recordToCommit.transactionNumber <= getCommitTxRecord().transactionNumber)) {
             helpCommit(recordToCommit);
             recordToCommit = recordToCommit.getNext();
         }
