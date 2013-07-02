@@ -91,6 +91,7 @@ public class VBox<E> {
 
     // used for persistence support
     protected VBox(VBoxBody<E> body) {
+        this.inplace = new InplaceWrite<E>();
         this.body = body;
     }
 
