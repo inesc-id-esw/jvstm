@@ -158,10 +158,25 @@ public class VBox<E> {
      * Return the body that was actually kept.
      */
     protected VBoxBody<E> CASbody(VBoxBody<E> expected, VBoxBody<E> newValue) {
-        if (UNSAFE.compareAndSwapObject(this, Offsets.bodyOffset, expected, newValue)) {
-            return newValue;
-        } else { // if the CAS failed the new value must already be there!
-            return this.body.getBody(newValue.version);
+        /* In the pure JVSTM the CAS can only fail because another thread already
+        committed this value.  However, when used together with Fenix Framework,
+        it is possible that the body changes because of reloads.  We identify
+        this by testing whether our commit did make it (this.body.version must
+        be >= newValue.version).  If not, we retry the CAS.*/
+
+        while (true) {
+            if (UNSAFE.compareAndSwapObject(this, Offsets.bodyOffset, expected, newValue)) {
+                return newValue;
+            } else { // if the CAS failed the new value must already be there unless FenixFramework was doing a reload!
+                expected = this.body; // update expected in case we need to loop
+
+                if (expected.version < newValue.version) {
+                    // retry;
+                    continue;
+                } else {
+                    return this.body.getBody(newValue.version);
+                }
+            }
         }
     }
 
