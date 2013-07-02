@@ -26,10 +26,19 @@
 package jvstm;
 
 public class DefaultTransactionFactory implements TransactionFactory {
+
+    @Override
     public Transaction makeTopLevelTransaction(ActiveTransactionsRecord record) {
         return new TopLevelTransaction(record);
     }
+
+    @Override
     public Transaction makeReadOnlyTopLevelTransaction(ActiveTransactionsRecord record) {
         return new TopLevelReadTransaction(record);
+    }
+
+    @Override
+    public boolean reuseTopLevelReadOnlyTransactions() {
+        return true;
     }
 }

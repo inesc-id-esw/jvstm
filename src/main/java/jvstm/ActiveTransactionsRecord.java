@@ -221,7 +221,7 @@ public class ActiveTransactionsRecord {
      * @return <code>true</code> if the next was successfully set. <code>false</code> if there was
      * another record already set as next
      */
-    protected boolean trySetNext(ActiveTransactionsRecord next) {
+    public boolean trySetNext(ActiveTransactionsRecord next) {
         return this.next.compareAndSet(null, next);
     }
 
@@ -233,7 +233,7 @@ public class ActiveTransactionsRecord {
         return this.recordCommitted;
     }
 
-    protected WriteSet getWriteSet() {
+    public WriteSet getWriteSet() {
         return this.writeSet;
     }
 
