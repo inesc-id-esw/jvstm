@@ -181,7 +181,7 @@ public abstract class Transaction {
         ActiveTransactionsRecord activeRecord = null;
         Transaction parent = current();
 
-        if (parent == null && readOnly) {
+        if (TRANSACTION_FACTORY.reuseTopLevelReadOnlyTransactions() && parent == null && readOnly) {
             Transaction tx = getRecordForNewTransaction().tx;
             tx.start();
             return tx;

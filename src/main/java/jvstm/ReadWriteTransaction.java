@@ -27,7 +27,6 @@ package jvstm;
 
 import static jvstm.UtilUnsafe.UNSAFE;
 
-import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Map;
@@ -186,10 +185,29 @@ public abstract class ReadWriteTransaction extends Transaction {
         VBoxBody<T> body = vbox.body;
 
         if (body!= null && body.version > number) {
-            // signal early transaction abort
-            TransactionSignaller.SIGNALLER.signalEarlyAbort();
+            body = newerVersionDetected(body);
         }
 
+        addToReadSet(vbox);
+
+        if (body == null) {
+            /*
+             * The object (vbox) is in the compact layout (of the AOM) and the
+             * vbox itself corresponds to the most recent committed version.
+             */
+            return (T) vbox;
+        } else {
+            return getValueFromBody(vbox, body);
+        }
+    }
+
+    protected <T> VBoxBody<T> newerVersionDetected(VBoxBody<T> body) {
+        // signal early transaction abort
+        TransactionSignaller.SIGNALLER.signalEarlyAbort();
+        throw new AssertionError("Impossible condition - Commit fail signalled!");
+    }
+
+    protected <T> void addToReadSet(VBox<T> vbox) {
         VBox[] readset = null;
         if (next < 0) {
             readset = borrowFromPool();
@@ -199,16 +217,12 @@ public abstract class ReadWriteTransaction extends Transaction {
             readset = bodiesRead.first();
         }
         readset[next--] = vbox;
-        if(body == null)
-            /*
-             * The object (vbox) is in the compact layout (of the AOM) and the
-             * vbox itself corresponds to the most recent committed version.
-             */
-            return (T) vbox;
-        else
-            return body.value;
     }
 
+    // The vbox argument is needed in subclasses
+    protected <T> T getValueFromBody(VBox<T> vbox, VBoxBody<T> body) {
+        return body.value;
+    }
 
     @Override
     public <T> T getBoxValue(VBox<T> vbox) {
@@ -270,10 +284,10 @@ public abstract class ReadWriteTransaction extends Transaction {
                     continue;
                 }
             } else { // fallback to the standard write-set
-                     // note: here we could consider the special case when the
-                     // other writer is committed with a version
-                     // greater than ours and either abort or try to upgrade the
-                     // transaction
+                // note: here we could consider the special case when the
+                // other writer is committed with a version
+                // greater than ours and either abort or try to upgrade the
+                // transaction
                 if (boxesWritten == EMPTY_MAP) {
                     boxesWritten = new IdentityHashMap<VBox, Object>();
                 }
@@ -344,13 +358,15 @@ public abstract class ReadWriteTransaction extends Transaction {
             arrayWritesCount = new IdentityHashMap<VArray<?>, Integer>();
         }
         entry.setWriteValue(value, this.nestedCommitQueue.commitNumber);
-        if (arrayWrites.put(entry, entry) != null)
+        if (arrayWrites.put(entry, entry) != null) {
             return;
+        }
 
         // Count number of writes to the array
         Integer writeCount = arrayWritesCount.get(entry.array);
-        if (writeCount == null)
+        if (writeCount == null) {
             writeCount = 0;
+        }
         arrayWritesCount.put(entry.array, writeCount + 1);
     }
 
@@ -374,8 +390,8 @@ public abstract class ReadWriteTransaction extends Transaction {
             // the rest are full
             for (VBox[] ar : bodiesRead.rest()) {
                 for (int i = 0; i < ar.length; i++) {
-            VBoxBody body = ar[i].body;
-            if (body != null && body.version > myNumber) {
+                    VBoxBody body = ar[i].body;
+                    if (body != null && body.version > myNumber) {
                         TransactionSignaller.SIGNALLER.signalCommitFail();
                     }
                 }
@@ -397,8 +413,8 @@ public abstract class ReadWriteTransaction extends Transaction {
                 for (ReadBlock block : mergedTx.globalReads.rest()) {
                     array = block.entries;
                     for (int i = 0; i < array.length; i++) {
-                VBoxBody body = array[i].body;
-                if (body != null && body.version > myNumber) {
+                        VBoxBody body = array[i].body;
+                        if (body != null && body.version > myNumber) {
                             TransactionSignaller.SIGNALLER.signalCommitFail();
                         }
                     }
