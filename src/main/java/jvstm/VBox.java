@@ -169,10 +169,12 @@ public class VBox<E> {
             if (UNSAFE.compareAndSwapObject(this, Offsets.bodyOffset, expected, newValue)) {
                 return newValue;
             } else { // if the CAS failed the new value must already be there unless FenixFramework was doing a reload!
-                expected = this.body; // update expected in case we need to loop
-
                 if (expected.version < newValue.version) {
-                    // retry;
+                    // update expected
+                    expected = this.body;
+                    // update the tail
+                    newValue = makeNewBody(newValue.value, newValue.version, expected);
+                    // retry
                     continue;
                 } else {
                     return this.body.getBody(newValue.version);
