@@ -41,11 +41,11 @@ public class VBox<E> {
      * loaded, which is forbidden by the JVM bootstrap. For this reason we moved all these
      * constants into a separate class.
      */
-    static class Offsets {
+    public static class Offsets {
 
         // --- Setup to use Unsafe
-        static final long bodyOffset = UtilUnsafe.objectFieldOffset(VBox.class, "body");
-        static final long inplaceOffset = UtilUnsafe.objectFieldOffset(VBox.class, "inplace");
+        public static final long bodyOffset = UtilUnsafe.objectFieldOffset(VBox.class, "body");
+        public static final long inplaceOffset = UtilUnsafe.objectFieldOffset(VBox.class, "inplace");
 
     }
 
