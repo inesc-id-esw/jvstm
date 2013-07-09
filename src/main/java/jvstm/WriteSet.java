@@ -42,7 +42,7 @@ import jvstm.util.Pair;
  * picking a unique bucket and copying the values of that bucket's VBoxes to their "public" place
  * (the body of the VBox).
  */
-public final class WriteSet {
+public class WriteSet {
     private static final ThreadLocal<Random> random = new ThreadLocal<Random>() {
         @Override
         protected Random initialValue() {
@@ -203,14 +203,16 @@ public final class WriteSet {
             Cons<GarbageCollectable>[] bodiesPerBlock = this.normalWriteSet.bodiesPerBlock;
             for (int i = 0; i < this.arrayCommitState.length; i++) {
                 VArrayCommitState cs = this.arrayCommitState[i];
-                if (cs.array.writebackLock.tryLock())
+                if (cs.array.writebackLock.tryLock()) {
                     try {
-                        if (cs.array.version >= newTxNumber)
+                        if (cs.array.version >= newTxNumber) {
                             continue;
+                        }
                         bodiesPerBlock[nBlocks + i] = cs.doWriteback(newTxNumber);
                     } finally {
                         cs.array.writebackLock.unlock();
                     }
+                }
             }
 
             // This loop is SIMILAR but not THE SAME as the one above: it uses
@@ -219,8 +221,9 @@ public final class WriteSet {
                 VArrayCommitState cs = this.arrayCommitState[i];
                 cs.array.writebackLock.lock();
                 try {
-                    if (cs.array.version >= newTxNumber)
+                    if (cs.array.version >= newTxNumber) {
                         continue;
+                    }
                     bodiesPerBlock[nBlocks + i] = cs.doWriteback(newTxNumber);
                 } finally {
                     cs.array.writebackLock.unlock();
@@ -235,8 +238,8 @@ public final class WriteSet {
             AtomicBoolean[] blocksDone = boxesToCommit.blocksDone;
             Cons<GarbageCollectable>[] bodiesPerBlock = boxesToCommit.bodiesPerBlock;
             int finalBlock = random.get().nextInt(nBlocks); // start at a
-                                                                 // random
-                                                                 // position
+            // random
+            // position
             int currentBlock = finalBlock;
             do {
                 if (!blocksDone[currentBlock].get()) {
@@ -261,13 +264,13 @@ public final class WriteSet {
         Cons<GarbageCollectable> newBodies = Cons.empty();
         VBox[] vboxes = boxesToCommit.allWrittenVBoxes;
         Object[] values = boxesToCommit.allWrittenValues;
-    /*
-     * We inverted the write-back loop to keep a direct correspondence between the vboxes array
-     * and the cons of vbodies.
-     * !!!! ATENTION => this is a requirement for the versioned history reversion process of
-     * the AOM (adaptive object metadata).
-     */
-    for (int i = max - 1; i >= min; i--) {
+        /*
+         * We inverted the write-back loop to keep a direct correspondence between the vboxes array
+         * and the cons of vbodies.
+         * !!!! ATENTION => this is a requirement for the versioned history reversion process of
+         * the AOM (adaptive object metadata).
+         */
+        for (int i = max - 1; i >= min; i--) {
             VBox vbox = vboxes[i];
             Object newValue = values[i];
 
@@ -305,8 +308,9 @@ public final class WriteSet {
 
     private VArrayCommitState[] prepareArrayWrites(Map<VArrayEntry<?>, VArrayEntry<?>> arrayWrites,
             Map<VArray<?>, Integer> arrayWritesCount) {
-        if (arrayWrites.isEmpty())
+        if (arrayWrites.isEmpty()) {
             return new VArrayCommitState[0];
+        }
 
         // During commit, arrayWritebacks keeps the write-set divided into
         // per-array lists
@@ -337,8 +341,8 @@ public final class WriteSet {
             lastArrayEntries.first[pos] = entry;
 
             if (lastArrayEntries.first.length == pos + 1) { // We have all the
-                                                            // writes for the
-                                                            // current array
+                // writes for the
+                // current array
                 VArrayEntry<?>[] writesToCommit = lastArrayEntries.first;
 
                 // Sort entries
