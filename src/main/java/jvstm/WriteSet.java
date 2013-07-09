@@ -177,6 +177,23 @@ public class WriteSet {
         this.arrayCommitState = new VArrayCommitState[0];
     }
 
+    protected WriteSet(VBox[] allWrittenVBoxes, int blockSize) {
+
+        int writeSetLength = allWrittenVBoxes.length;
+        int nBlocksAux = writeSetLength / blockSize;
+        int nBlocks = (nBlocksAux == 0 && writeSetLength > 0) ? 1 : nBlocksAux;
+        @SuppressWarnings("unchecked")
+        Cons<GarbageCollectable>[] bodiesPerBlock = new Cons[nBlocks];
+        AtomicBoolean[] blocksDone = new AtomicBoolean[nBlocks];
+        for (int i = 0; i < nBlocks; i++) {
+            blocksDone[i] = new AtomicBoolean(false);
+        }
+
+        this.normalWriteSet = new BoxesToCommit(nBlocks, blockSize, allWrittenVBoxes, null, writeSetLength, bodiesPerBlock, blocksDone);
+
+        this.arrayCommitState = new VArrayCommitState[0];
+    }
+
     protected final void helpWriteBack(int newTxNumber) {
         // It is important that this order or processing is preserved: perTxBoxes' commits' writes to VBoxes
         // take precedence over the normal write set of the committing transaction
@@ -238,8 +255,8 @@ public class WriteSet {
             AtomicBoolean[] blocksDone = boxesToCommit.blocksDone;
             Cons<GarbageCollectable>[] bodiesPerBlock = boxesToCommit.bodiesPerBlock;
             int finalBlock = random.get().nextInt(nBlocks); // start at a
-            // random
-            // position
+                                                            // random
+                                                            // position
             int currentBlock = finalBlock;
             do {
                 if (!blocksDone[currentBlock].get()) {
@@ -261,15 +278,21 @@ public class WriteSet {
         // max depends on whether this is the last block
         int max = (block == (boxesToCommit.nBlocks - 1)) ? boxesToCommit.writeSetLength : (min + boxesToCommit.blockSize);
 
-        Cons<GarbageCollectable> newBodies = Cons.empty();
         VBox[] vboxes = boxesToCommit.allWrittenVBoxes;
         Object[] values = boxesToCommit.allWrittenValues;
-        /*
-         * We inverted the write-back loop to keep a direct correspondence between the vboxes array
-         * and the cons of vbodies.
-         * !!!! ATENTION => this is a requirement for the versioned history reversion process of
-         * the AOM (adaptive object metadata).
-         */
+        Cons<GarbageCollectable> newBodies = writeBackLoop(newTxNumber, min, max, vboxes, values);
+
+        return newBodies;
+    }
+
+    /*
+     * We inverted the write-back loop to keep a direct correspondence between the vboxes array
+     * and the cons of vbodies.
+     * !!!! ATENTION => this is a requirement for the versioned history reversion process of
+     * the AOM (adaptive object metadata).
+     */
+    protected Cons<GarbageCollectable> writeBackLoop(int newTxNumber, int min, int max, VBox[] vboxes, Object[] values) {
+        Cons<GarbageCollectable> newBodies = Cons.empty();
         for (int i = max - 1; i >= min; i--) {
             VBox vbox = vboxes[i];
             Object newValue = values[i];
@@ -277,7 +300,6 @@ public class WriteSet {
             VBoxBody newBody = vbox.commit((newValue == ReadWriteTransaction.NULL_VALUE) ? null : newValue, newTxNumber);
             newBodies = newBodies.cons(newBody);
         }
-
         return newBodies;
     }
 
@@ -341,8 +363,8 @@ public class WriteSet {
             lastArrayEntries.first[pos] = entry;
 
             if (lastArrayEntries.first.length == pos + 1) { // We have all the
-                // writes for the
-                // current array
+                                                            // writes for the
+                                                            // current array
                 VArrayEntry<?>[] writesToCommit = lastArrayEntries.first;
 
                 // Sort entries
