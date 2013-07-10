@@ -248,7 +248,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
         return ((float) numberOfWritesToCheck) / numberOfReadsToCheck > WR_THRESHOLD;
     }
 
-    protected static ActiveTransactionsRecord helpCommitAll() {
+    protected ActiveTransactionsRecord helpCommitAll() {
         ActiveTransactionsRecord lastSeenCommitted = Transaction.mostRecentCommittedRecord;
         ActiveTransactionsRecord recordToCommit = lastSeenCommitted.getNext();
 
@@ -275,7 +275,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
      * @param recordToCommit
      *            the record to help commit
      */
-    protected static void helpCommit(ActiveTransactionsRecord recordToCommit) {
+    protected void helpCommit(ActiveTransactionsRecord recordToCommit) {
         if (!recordToCommit.isCommitted()) {
             // We must check whether recordToCommit.getWriteSet() could, in the
             // meanwhile, have
@@ -292,7 +292,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
         }
     }
 
-    protected static void finishCommit(ActiveTransactionsRecord recordToCommit) {
+    protected void finishCommit(ActiveTransactionsRecord recordToCommit) {
         // we only advance the most recent committed record if we don't see this
         // transaction already committed
         if (!recordToCommit.isCommitted()) {

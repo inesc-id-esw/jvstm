@@ -41,11 +41,11 @@ public class VBox<E> {
      * loaded, which is forbidden by the JVM bootstrap. For this reason we moved all these
      * constants into a separate class.
      */
-    static class Offsets {
+    public static class Offsets {
 
         // --- Setup to use Unsafe
-        static final long bodyOffset = UtilUnsafe.objectFieldOffset(VBox.class, "body");
-        static final long inplaceOffset = UtilUnsafe.objectFieldOffset(VBox.class, "inplace");
+        public static final long bodyOffset = UtilUnsafe.objectFieldOffset(VBox.class, "body");
+        public static final long inplaceOffset = UtilUnsafe.objectFieldOffset(VBox.class, "inplace");
 
     }
 
@@ -91,6 +91,7 @@ public class VBox<E> {
 
     // used for persistence support
     protected VBox(VBoxBody<E> body) {
+        this.inplace = new InplaceWrite<E>();
         this.body = body;
     }
 
@@ -158,10 +159,27 @@ public class VBox<E> {
      * Return the body that was actually kept.
      */
     protected VBoxBody<E> CASbody(VBoxBody<E> expected, VBoxBody<E> newValue) {
-        if (UNSAFE.compareAndSwapObject(this, Offsets.bodyOffset, expected, newValue)) {
-            return newValue;
-        } else { // if the CAS failed the new value must already be there!
-            return this.body.getBody(newValue.version);
+        /* In the pure JVSTM the CAS can only fail because another thread already
+        committed this value.  However, when used together with Fenix Framework,
+        it is possible that the body changes because of reloads.  We identify
+        this by testing whether our commit did make it (this.body.version must
+        be >= newValue.version).  If not, we retry the CAS.*/
+
+        while (true) {
+            if (UNSAFE.compareAndSwapObject(this, Offsets.bodyOffset, expected, newValue)) {
+                return newValue;
+            } else { // if the CAS failed the new value must already be there unless FenixFramework was doing a reload!
+                if (expected.version < newValue.version) {
+                    // update expected
+                    expected = this.body;
+                    // update the tail
+                    newValue = makeNewBody(newValue.value, newValue.version, expected);
+                    // retry
+                    continue;
+                } else {
+                    return this.body.getBody(newValue.version);
+                }
+            }
         }
     }
 
