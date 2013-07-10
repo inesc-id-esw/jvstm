@@ -1,2 +1,6 @@
 target/
 *.class
+# eclipse stuff
+.classpath
+.project
+.settings/

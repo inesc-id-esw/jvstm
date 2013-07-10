@@ -28,4 +28,5 @@ package jvstm;
 public interface TransactionFactory {
     Transaction makeTopLevelTransaction(ActiveTransactionsRecord record);
     Transaction makeReadOnlyTopLevelTransaction(ActiveTransactionsRecord record);
+    boolean reuseTopLevelReadOnlyTransactions();
 }

@@ -88,7 +88,7 @@ public abstract class Transaction {
         Logger logger = Logger.getLogger("jvstm");
         logger.info(String.format(
                 "********** GC vbodies = %b (disable/enable it in property %s)",
-                gcDisabled,
+                !gcDisabled,
                 GC_PROP));
         gcTask = new GCTask(mostRecentCommittedRecord);
         if(!gcDisabled){
@@ -128,7 +128,7 @@ public abstract class Transaction {
         return current.get() != null;
     }
 
-    private static ActiveTransactionsRecord getRecordForNewTransaction() {
+    public static ActiveTransactionsRecord getRecordForNewTransaction() {
         ActiveTransactionsRecord rec = Transaction.mostRecentCommittedRecord;
 
         TxContext ctx = threadTxContext.get();
@@ -181,7 +181,7 @@ public abstract class Transaction {
         ActiveTransactionsRecord activeRecord = null;
         Transaction parent = current();
 
-        if (parent == null && readOnly) {
+        if (TRANSACTION_FACTORY.reuseTopLevelReadOnlyTransactions() && parent == null && readOnly) {
             Transaction tx = getRecordForNewTransaction().tx;
             tx.start();
             return tx;
