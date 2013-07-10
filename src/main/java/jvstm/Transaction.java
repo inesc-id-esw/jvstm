@@ -128,7 +128,7 @@ public abstract class Transaction {
         return current.get() != null;
     }
 
-    private static ActiveTransactionsRecord getRecordForNewTransaction() {
+    public static ActiveTransactionsRecord getRecordForNewTransaction() {
         ActiveTransactionsRecord rec = Transaction.mostRecentCommittedRecord;
 
         TxContext ctx = threadTxContext.get();
