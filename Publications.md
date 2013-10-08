@@ -7,6 +7,10 @@ layout: page
 Here are some scientific publications related to research on the JVSTM.  
 They are sorted by publication year.
 
+  * **Practical Parallel Nesting for Software Transactional Memory**, 
+    Nuno Diegues, João Cachopo, 2013,  DISC '13: Proceedings of the 27th
+    International Symposium on Distributed Computing
+
   * **Runtime elision of transactional barriers for captured memory**, 
     Fernando Miguel Carvalho, João Cachopo, 2013,  PPoPP '13: Proceedings
     of the 18th ACM SIGPLAN symposium on Principles and practice of parallel 
