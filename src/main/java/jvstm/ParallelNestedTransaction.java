@@ -140,6 +140,8 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
         Transaction.current.set(parent);
     }
 
+    /* Removes the inplace writes of the transaction aborting if they 
+       overwrote a previous inplace write of an ancestor. */
     private void manualAbort() {
     	ReadWriteTransaction parent = getRWParent();
     	while (parent != null) {
