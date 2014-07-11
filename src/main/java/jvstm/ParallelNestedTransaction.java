@@ -140,15 +140,21 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
         Transaction.current.set(parent);
     }
 
+    /* Removes the inplace writes of the transaction aborting if they 
+       overwrote a previous inplace write of an ancestor. */
     private void manualAbort() {
-        for (ParallelNestedTransaction mergedIntoParent : getRWParent().mergedTxs) {
-            for (VBox vboxMergedIntoParent : mergedIntoParent.boxesWrittenInPlace) {
-                revertOverwrite(vboxMergedIntoParent);
-            }
-        }
-        for (VBox vboxMergedIntoParent : getRWParent().boxesWrittenInPlace) {
-            revertOverwrite(vboxMergedIntoParent);
-        }
+    	ReadWriteTransaction parent = getRWParent();
+    	while (parent != null) {
+    		for (ParallelNestedTransaction mergedIntoParent : parent.mergedTxs) {
+    			for (VBox vboxMergedIntoParent : mergedIntoParent.boxesWrittenInPlace) {
+    				revertOverwrite(vboxMergedIntoParent);
+    			}
+    		}
+    		for (VBox vboxMergedIntoParent : parent.boxesWrittenInPlace) {
+    			revertOverwrite(vboxMergedIntoParent);
+    		}
+    		parent = parent.getRWParent();
+    	}
 
         this.orec.version = OwnershipRecord.ABORTED;
         for (ReadWriteTransaction child : mergedTxs) {
