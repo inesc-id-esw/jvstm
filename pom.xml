@@ -3,7 +3,7 @@
     <groupId>jvstm</groupId>
     <artifactId>jvstm</artifactId>
     <packaging>jar</packaging>
-    <version>2.2</version>
+    <version>2.3</version>
     <name>JVSTM (lock-free)</name>
     <url>http://inesc-id-esw.github.com/JVSTM</url>
 
@@ -11,7 +11,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-        <project.deploy.maven-repo>file:///${basedir}/../JVSTM-pages/maven-repo</project.deploy.maven-repo>
+        <project.deploy.maven-repo>file:///${basedir}/../jvstm-pages/maven-repo</project.deploy.maven-repo>
 
         <version.guice>2.0</version.guice>
         <version.junit>4.10</version.junit>
@@ -23,7 +23,7 @@
         <connection>scm:git:git@github.com:inesc-id-esw/JVSTM.git</connection>
         <developerConnection>scm:git:git@github.com:inesc-id-esw/JVSTM.git</developerConnection>
         <url>http://inesc-id-esw.github.com/JVSTM</url>
-        <tag>jvstm-2.2</tag>
+        <tag>jvstm-2.3</tag>
     </scm>
 
     <build>
