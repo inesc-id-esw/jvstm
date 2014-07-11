@@ -125,7 +125,7 @@ public class VBox<E> {
     public void put(E newE) {
         Transaction tx = Transaction.current();
         if (tx == null) {
-            tx = Transaction.beginInevitable();
+            tx = Transaction.begin();
             tx.setBoxValue(this, newE);
             tx.commit();
         } else {
