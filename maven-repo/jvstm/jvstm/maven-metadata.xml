@@ -3,12 +3,13 @@
   <groupId>jvstm</groupId>
   <artifactId>jvstm</artifactId>
   <versioning>
-    <release>2.2</release>
+    <release>2.3</release>
     <versions>
       <version>2.0</version>
       <version>2.1</version>
       <version>2.2</version>
+      <version>2.3</version>
     </versions>
-    <lastUpdated>20140114120549</lastUpdated>
+    <lastUpdated>20140711094046</lastUpdated>
   </versioning>
 </metadata>
