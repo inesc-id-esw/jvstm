@@ -7,6 +7,11 @@ layout: page
 Here are some scientific publications related to research on the JVSTM.  
 They are sorted by publication year.
 
+  * **Strongly Consistent Transactions for Enterprise Applications: Using
+    Software Transactional Memory to Improve Consistency and Performance of
+    Read-Dominated Workloads**, Sérgio Miguel Fernandes, 2014, Ph.D. thesis,
+    University of Lisbon
+
   * **Practical Parallel Nesting for Software Transactional Memory**, 
     Nuno Diegues, João Cachopo, 2013,  DISC '13: Proceedings of the 27th
     International Symposium on Distributed Computing
