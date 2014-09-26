@@ -55,7 +55,7 @@ public class TopLevelTransaction extends ReadWriteTransaction {
 
     @Override
     public Transaction makeUnsafeMultithreaded() {
-        return new UnsafeParallelTransaction(this);
+        return new DisjointParallelTransaction(this);
     }
 
     @Override

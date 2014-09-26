@@ -39,7 +39,7 @@ import jvstm.util.Cons;
  * not run in program order. The only guarantee is that their execution will be
  * equivalent to some sequential order (plus the properties of opacity). If that
  * guarantee is already provided by the disjoint accesses of each subpart,
- * consider using UnsafeParallelTransaction.
+ * consider using DisjointParallelTransaction.
  *
  * @author nmld
  *
