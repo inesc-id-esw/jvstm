@@ -87,9 +87,18 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
         this.globalReads = Cons.empty();
     }
 
+    /**
+     * @deprecated Use {@link #makeDisjointMultithreaded()} instead
+     */
+    @Deprecated
     @Override
     public Transaction makeUnsafeMultithreaded() {
-        throw new Error("An Unsafe Parallel Transaction may only be spawned by another Unsafe or a Top-Level transaction");
+        return makeDisjointMultithreaded();
+    }
+
+    @Override
+    public Transaction makeDisjointMultithreaded() {
+        throw new Error("A Disjoint Parallel Transaction may only be spawned by another Disjoint or a Top-Level transaction");
     }
 
     @Override
@@ -106,8 +115,9 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
 
     // Returns -2 if self; -1 if not anc; >= 0 as version on anc otherwise
     protected int retrieveAncestorVersion(Transaction tx) {
-        if (tx == this)
+        if (tx == this) {
             return -2;
+        }
 
         int i = 0;
         Transaction nextParent = parent;
@@ -140,21 +150,21 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
         Transaction.current.set(parent);
     }
 
-    /* Removes the inplace writes of the transaction aborting if they 
+    /* Removes the inplace writes of the transaction aborting if they
        overwrote a previous inplace write of an ancestor. */
     private void manualAbort() {
-    	ReadWriteTransaction parent = getRWParent();
-    	while (parent != null) {
-    		for (ParallelNestedTransaction mergedIntoParent : parent.mergedTxs) {
-    			for (VBox vboxMergedIntoParent : mergedIntoParent.boxesWrittenInPlace) {
-    				revertOverwrite(vboxMergedIntoParent);
-    			}
-    		}
-    		for (VBox vboxMergedIntoParent : parent.boxesWrittenInPlace) {
-    			revertOverwrite(vboxMergedIntoParent);
-    		}
-    		parent = parent.getRWParent();
-    	}
+        ReadWriteTransaction parent = getRWParent();
+        while (parent != null) {
+            for (ParallelNestedTransaction mergedIntoParent : parent.mergedTxs) {
+                for (VBox vboxMergedIntoParent : mergedIntoParent.boxesWrittenInPlace) {
+                    revertOverwrite(vboxMergedIntoParent);
+                }
+            }
+            for (VBox vboxMergedIntoParent : parent.boxesWrittenInPlace) {
+                revertOverwrite(vboxMergedIntoParent);
+            }
+            parent = parent.getRWParent();
+        }
 
         this.orec.version = OwnershipRecord.ABORTED;
         for (ReadWriteTransaction child : mergedTxs) {
@@ -186,7 +196,7 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
                 write.tempValue = overwritten.tempValue;
                 write.next = overwritten.next;
                 overwritten.orec.owner = overwritten.orec.owner; // enforce
-                                                                 // visibility
+                // visibility
                 write.orec = overwritten.orec;
                 return;
             }

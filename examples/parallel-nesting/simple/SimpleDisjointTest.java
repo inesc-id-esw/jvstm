@@ -5,21 +5,21 @@ import java.util.List;
 
 import jvstm.CommitException;
 import jvstm.Transaction;
-import jvstm.UnsafeParallelTask;
+import jvstm.DisjointParallelTask;
 import jvstm.VBox;
 
 /**
  * The main thread runs a transaction that attempts to increment two counters as an 
  * atomic action.
- * This example makes direct use of the JVSTM API for both top-level and unsafe parallel 
+ * This example makes direct use of the JVSTM API for both top-level and disjoint parallel 
  * nested transactions.
  * @author nmld
  *
  */
-public class SimpleUnsafeTest {
+public class SimpleDisjointTest {
 
     public static void main(String[] args) {
-	int result = new SimpleUnsafeTest(0, 0).start();
+	int result = new SimpleDisjointTest(0, 0).start();
 	if (result != 2) {
 	    throw new AssertionError("Expected: 2; Obtained: " + result);
 	}
@@ -29,7 +29,7 @@ public class SimpleUnsafeTest {
     protected final VBox<Integer> vbox1;
     protected final VBox<Integer> vbox2;
 
-    public SimpleUnsafeTest(int arg1, int arg2) {
+    public SimpleDisjointTest(int arg1, int arg2) {
 	this.vbox1 = new VBox<Integer>(arg1);
 	this.vbox2 = new VBox<Integer>(arg2);
     }
@@ -40,10 +40,10 @@ public class SimpleUnsafeTest {
 	    boolean finished = false;
 	    try {
 
-		List<UnsafeParallelTask<Integer>> tasks = new ArrayList<UnsafeParallelTask<Integer>>();
+		List<DisjointParallelTask<Integer>> tasks = new ArrayList<DisjointParallelTask<Integer>>();
 		
-		tasks.add(new UnsafeWorker(vbox1));
-		tasks.add(new UnsafeWorker(vbox2));
+		tasks.add(new DisjointWorker(vbox1));
+		tasks.add(new DisjointWorker(vbox2));
 		
 		List<Integer> results = Transaction.current().manageNestedParallelTxs(tasks);
 		
@@ -66,11 +66,11 @@ public class SimpleUnsafeTest {
 	}
     }
     
-    public class UnsafeWorker extends UnsafeParallelTask<Integer> {
+    public class DisjointWorker extends DisjointParallelTask<Integer> {
 
 	private VBox<Integer> vbox;
 	
-	public UnsafeWorker(VBox<Integer> vbox) {
+	public DisjointWorker(VBox<Integer> vbox) {
 	    this.vbox = vbox;
 	}
 	

@@ -55,9 +55,18 @@ public class NestedTransaction extends ReadWriteTransaction {
         super.ancVersions = ReadWriteTransaction.EMPTY_VERSIONS;
     }
 
+    /**
+     * @deprecated Use {@link #makeDisjointMultithreaded()} instead
+     */
+    @Deprecated
     @Override
     public Transaction makeUnsafeMultithreaded() {
-        throw new Error("An Unsafe Parallel Transaction may only be spawned by another Unsafe or a Top-Level transaction");
+        return makeDisjointMultithreaded();
+    }
+
+    @Override
+    public Transaction makeDisjointMultithreaded() {
+        throw new Error("A Disjoint Parallel Transaction may only be spawned by another Disjoint or a Top-Level transaction");
     }
 
     @Override
@@ -235,11 +244,15 @@ public class NestedTransaction extends ReadWriteTransaction {
         } else {
             // Propagate arrayWrites and correctly update the parent's arrayWritebacks counter
             for (VArrayEntry<?> entry : arrayWrites.values()) {
-                if (parent.arrayWrites.put(entry, entry) != null) continue;
+                if (parent.arrayWrites.put(entry, entry) != null) {
+                    continue;
+                }
 
                 // Count number of writes to the array
                 Integer writeCount = parent.arrayWritesCount.get(entry.array);
-                if (writeCount == null) writeCount = 0;
+                if (writeCount == null) {
+                    writeCount = 0;
+                }
                 parent.arrayWritesCount.put(entry.array, writeCount + 1);
             }
         }

@@ -234,9 +234,16 @@ public abstract class Transaction {
         return tx;
     }
 
+    /**
+     * @deprecated Use {@link #beginDisjointMultithreaded()} instead
+     */
     public static Transaction beginUnsafeMultithreaded() {
+        return beginDisjointMultithreaded();
+    }
+
+    public static Transaction beginDisjointMultithreaded() {
         Transaction parent = current.get();
-        Transaction tx = parent.makeUnsafeMultithreaded();
+        Transaction tx = parent.makeDisjointMultithreaded();
         tx.start();
         return tx;
     }
@@ -509,7 +516,12 @@ public abstract class Transaction {
 
     protected abstract void doCommit();
 
+    /**
+     * @deprecated Use {@link #makeDisjointMultithreaded()} instead
+     */
     public abstract Transaction makeUnsafeMultithreaded();
+
+    public abstract Transaction makeDisjointMultithreaded();
 
     public abstract Transaction makeParallelNestedTransaction(boolean readOnly);
 

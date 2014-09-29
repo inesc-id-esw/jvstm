@@ -28,8 +28,6 @@ package jvstm;
 import java.util.HashMap;
 import java.util.Map;
 
-import jvstm.util.Cons;
-
 /**
  * This transaction is only used during the lock-free commit helping procedure.
  * Namely, it encapsulates the execution of the PerTxBoxes of the committing
@@ -159,8 +157,17 @@ public class ProcessPerTxBoxesTransaction extends Transaction {
         throw new UnsupportedOperationException(UNSUPPORTED_MESSAGE);
     }
 
+    /**
+     * @deprecated Use {@link #makeDisjointMultithreaded()} instead
+     */
+    @Deprecated
     @Override
     public Transaction makeUnsafeMultithreaded() {
+        return makeDisjointMultithreaded();
+    }
+
+    @Override
+    public Transaction makeDisjointMultithreaded() {
         throw new UnsupportedOperationException(UNSUPPORTED_MESSAGE);
     }
 
