@@ -195,8 +195,7 @@ public class ParallelNestedTransaction extends ReadWriteTransaction {
             if (overwritten.orec.owner != this && overwritten.orec.version == OwnershipRecord.RUNNING) {
                 write.tempValue = overwritten.tempValue;
                 write.next = overwritten.next;
-                overwritten.orec.owner = overwritten.orec.owner; // enforce
-                // visibility
+                overwritten.orec.owner = overwritten.orec.owner; // enforce visibility
                 write.orec = overwritten.orec;
                 return;
             }
