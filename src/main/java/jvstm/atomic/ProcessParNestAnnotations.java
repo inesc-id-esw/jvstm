@@ -79,7 +79,7 @@ import org.objectweb.asm.tree.VarInsnNode;
 
 public class ProcessParNestAnnotations {
 
-        private static final Type UNSAFE_SPAWN = Type.getType(jvstm.atomic.UnsafeSpawn.class);
+        private static final Type UNSAFE_SPAWN = Type.getType(jvstm.atomic.DisjointSpawn.class);
         private static final Type PARALLEL_SPAWN = Type.getType(jvstm.atomic.ParallelSpawn.class);
         private static final Type COMBINER = Type.getType(jvstm.atomic.Combiner.class);
         private static final Type PAR_NEST = Type.getType(jvstm.atomic.ParNest.class);
@@ -419,10 +419,10 @@ public class ProcessParNestAnnotations {
                                 V1_6,
                                 ACC_FINAL,
                                 callableClass,
-                                unsafe ? "Ljvstm/UnsafeParallelTask<" : "Ljvstm/ParallelTask<"
+                                unsafe ? "Ljvstm/DisjointParallelTask<" : "Ljvstm/ParallelTask<"
                                                 + (isPrimitive(returnType) ? toObject(returnType) : (returnType.equals(Type.VOID_TYPE) ? Type
                                                                 .getObjectType("java/lang/Void") : returnType)).getDescriptor() + ">;",
-                                                                unsafe ? "jvstm/UnsafeParallelTask" : "jvstm/ParallelTask", new String[] {});
+                                                                unsafe ? "jvstm/DisjointParallelTask" : "jvstm/ParallelTask", new String[] {});
                 cw.visitSource("JVSTM Generated Wrapper Class", null);
 
                 // Create fields to hold arguments
@@ -438,7 +438,7 @@ public class ProcessParNestAnnotations {
                         MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "<init>", getCallableCtorDesc(className, mn), null, null);
                         mv.visitCode();
                         mv.visitVarInsn(ALOAD, 0);
-                        mv.visitMethodInsn(INVOKESPECIAL, unsafe ? "jvstm/UnsafeParallelTask" : "jvstm/ParallelTask", "<init>", "()V");
+                        mv.visitMethodInsn(INVOKESPECIAL, unsafe ? "jvstm/DisjointParallelTask" : "jvstm/ParallelTask", "<init>", "()V");
                         int localsPos = 0;
                         int fieldPos = 0;
                         for (Type t : arguments) {

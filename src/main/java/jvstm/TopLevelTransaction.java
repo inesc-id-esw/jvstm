@@ -53,9 +53,18 @@ public class TopLevelTransaction extends ReadWriteTransaction {
         return this.commitTxRecord;
     }
 
+    /**
+     * @deprecated Use {@link #makeDisjointMultithreaded()} instead
+     */
+    @Deprecated
     @Override
     public Transaction makeUnsafeMultithreaded() {
-        return new UnsafeParallelTransaction(this);
+        return makeDisjointMultithreaded();
+    }
+
+    @Override
+    public Transaction makeDisjointMultithreaded() {
+        return new DisjointParallelTransaction(this);
     }
 
     @Override

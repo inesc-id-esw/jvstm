@@ -32,17 +32,17 @@ import jvstm.util.Cons;
 /**
  * This type of transaction is meant for usage when one parallelizes a
  * transaction into subparts that are disjoint. This means that an
- * UnsafeParallelTransaction never aborts because of a conflict with is
+ * DisjointParallelTransaction never aborts because of a conflict with is
  * siblings.
  *
  * @author nmld
  *
  */
-public class UnsafeParallelTransaction extends ParallelNestedTransaction {
+public class DisjointParallelTransaction extends ParallelNestedTransaction {
 
     protected final OwnershipRecord parentOrec;
 
-    public UnsafeParallelTransaction(ReadWriteTransaction parent) {
+    public DisjointParallelTransaction(ReadWriteTransaction parent) {
         super(parent, true);
         this.parentOrec = parent.orec;
         this.orec.owner = parent;

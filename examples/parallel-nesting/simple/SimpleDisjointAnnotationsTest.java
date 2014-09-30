@@ -6,20 +6,20 @@ import pt.ist.esw.atomicannotation.Atomic;
 import jvstm.VBox;
 import jvstm.atomic.Combiner;
 import jvstm.atomic.ParNest;
-import jvstm.atomic.UnsafeSpawn;
+import jvstm.atomic.DisjointSpawn;
 
 /**
  * The main thread runs a transaction that attempts to increment two counters as an 
  * atomic action.
- * This example makes direct use of the JVSTM API for both top-level and unsafe parallel 
+ * This example makes direct use of the JVSTM API for both top-level and disjoint parallel 
  * nested transactions.
  * @author nmld
  *
  */
-public class SimpleUnsafeAnnotationsTest {
+public class SimpleDisjointAnnotationsTest {
 
     public static void main(String[] args) {
-	int result = new SimpleUnsafeAnnotationsTest(0, 0).start();
+	int result = new SimpleDisjointAnnotationsTest(0, 0).start();
 	if (result != 2) {
 	    throw new AssertionError("Expected: 2; Obtained: " + result);
 	}
@@ -29,7 +29,7 @@ public class SimpleUnsafeAnnotationsTest {
     protected final VBox<Integer> vbox1;
     protected final VBox<Integer> vbox2;
 
-    public SimpleUnsafeAnnotationsTest(int arg1, int arg2) {
+    public SimpleDisjointAnnotationsTest(int arg1, int arg2) {
 	this.vbox1 = new VBox<Integer>(arg1);
 	this.vbox2 = new VBox<Integer>(arg2);
     }
@@ -39,7 +39,7 @@ public class SimpleUnsafeAnnotationsTest {
 	return new ParallelIncrement().exec();
     }
     
-    public class ParallelIncrement implements UnsafeSpawn<Integer> {
+    public class ParallelIncrement implements DisjointSpawn<Integer> {
 
 	@ParNest(readOnly = false)
 	public Integer increment(VBox<Integer> vbox) {

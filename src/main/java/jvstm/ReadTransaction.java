@@ -42,6 +42,7 @@ public class ReadTransaction extends Transaction {
         return beginWithActiveRecord(readOnly, null);
     }
 
+    @Override
     public Transaction makeNestedTransaction(boolean readOnly) {
         if (!readOnly) {
             throw WRITE_ON_READ_EXCEPTION;
@@ -49,6 +50,7 @@ public class ReadTransaction extends Transaction {
         return new ReadTransaction(this);
     }
 
+    @Override
     public <T> T getBoxValue(VBox<T> vbox) {
         VBoxBody<T> vbody = vbox.body;
         /*
@@ -56,38 +58,54 @@ public class ReadTransaction extends Transaction {
          * In that case the object is in the compact layout and the own vbox
          * corresponds to most recent committed version.
          */
-        if(vbody == null)
+        if(vbody == null) {
             return (T) vbox; // object in compact layout.
-        else
+        } else {
             return vbody.getBody(number).value;
+        }
     }
 
+    @Override
     public <T> void setBoxValue(VBox<T> vbox, T value) {
         throw WRITE_ON_READ_EXCEPTION;
     }
 
+    @Override
     public <T> T getPerTxValue(PerTxBox<T> box, T initial) {
         return initial;
     }
 
+    @Override
     public <T> void setPerTxValue(PerTxBox<T> box, T value) {
         throw WRITE_ON_READ_EXCEPTION;
     }
 
+    @Override
     public <T> T getArrayValue(VArrayEntry<T> entry) {
         return entry.getValue(number);
     }
 
+    @Override
     public <T> void setArrayValue(VArrayEntry<T> entry, T value) {
         throw WRITE_ON_READ_EXCEPTION;
     }
 
+    @Override
     protected void doCommit() {
     }
 
+    /**
+     * @deprecated Use {@link #makeDisjointMultithreaded()} instead
+     */
+    @Deprecated
     @Override
     public Transaction makeUnsafeMultithreaded() {
-        throw new Error("Read Transaction cannot be unsafe multithreaded yet!");
+        return makeDisjointMultithreaded();
+    }
+
+    @Override
+    public Transaction makeDisjointMultithreaded() {
+        throw new Error("Read Transaction cannot be disjoint multithreaded yet!");
     }
 
     @Override

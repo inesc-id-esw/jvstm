@@ -92,8 +92,17 @@ public class UnsafeSingleThreadedTransaction extends Transaction {
         throw new Error("UnsafeSingleThreaded transactions don't support nesting yet");
     }
 
+    /**
+     * @deprecated Use {@link #makeDisjointMultithreaded()} instead
+     */
+    @Deprecated
     @Override
     public Transaction makeUnsafeMultithreaded() {
+        return makeDisjointMultithreaded();
+    }
+
+    @Override
+    public Transaction makeDisjointMultithreaded() {
         throw new Error("UnsafeSingleThreaded transactions don't support nesting yet");
     }
 
